@@ -13,7 +13,7 @@ that is not `done` here.
 | F-03 | P0 | Revoke engine: barrier -> fixpoint -> `compute_final` -> chunked write -> verify; dry run; reinstate; resume; `check_invariants` | done | tests/integration/test_core_scenario.py, tests/unit/test_compute.py, tests/integration/test_schema.py, tests/integration/test_tenant_guard.py | `docs/qa/F-03.md` (PASS) |
 | F-04 | P0 | Blame + impact (ancestors/descendants, shortest path via parent pointers, `not_in_graph`) | done | tests/unit/test_blame.py (10), tests/integration/test_blame_impact.py (4) | `docs/qa/F-04.md` (PASS) |
 | F-05 | P0 | REST API + registry graph + tenant tokens + auth + limits + errors | qa | tests/integration/test_api.py (7) | `docs/qa/F-05.md` (pending) |
-| F-06 | P0 | MCP server (stdio + Streamable HTTP): record_source, remember, record_action, revoke, blame, impact | todo | - | - |
+| F-06 | P0 | MCP server (stdio + Streamable HTTP): record_source, remember, record_action, revoke, blame, impact | qa | tests/integration/test_mcp.py (2) | `docs/qa/F-06.md` (pending) |
 | F-07 | P0 | Claude Code hook adapter + `/v1/events` mapping + recorded-payload fixtures + cross-session `artifact_key` link | todo | - | - |
 | F-08 | P0 | OpenCode plugin (`pedigree.ts`) mapped from real logged payloads | todo | - | - |
 | F-09 | P0 | UI v1: graph view, status colours, revoke dry-run/confirm, depth slider, revert list | todo | - | - |
