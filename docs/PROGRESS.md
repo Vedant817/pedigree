@@ -309,3 +309,13 @@
   byte-identical afterwards, stale copies are reaped, empty/oversized root lists are rejected, and
   both interfaces return the same counts.
 - 312 passed, 1 skipped; ruff PASS.
+
+---
+
+### 2026-10-16 04:25 IST | Phase P3 | F-18 audit_sources (PageRank + exact reach) | STATUS: done
+- `src/pedigree/engine/audit.py` + `GET /v1/audit/sources` + MCP `pedigree_audit_sources`:
+  `algo.pageRank` over `Node`/`DERIVED_FROM` for the ranking, and the exact descendant count from
+  `algo.BFS` (which excludes the start node - verified by probe) next to each score, so the two are
+  never conflated. `tests/integration/test_audit.py` (4) covers both counts, the limit clamp, REST
+  and MCP.
+- 316 passed, 1 skipped; ruff, secret scan, numbers PASS.

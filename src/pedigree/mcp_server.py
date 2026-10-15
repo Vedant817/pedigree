@@ -9,6 +9,7 @@ from .api.routes.engine import AGENT_SAFE_KINDS
 from .config import get_settings, graph_name
 from .db.client import Db
 from .db.schema import ensure_schema, node_count
+from .engine.audit import audit_sources
 from .engine.blame import blame as run_blame
 from .engine.blame import impact as run_impact
 from .engine.gate import check_action
@@ -209,6 +210,14 @@ class PedigreeMCPServer:
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": tid}}
             return _call(lambda: whatif(self.db, gname, tid, roots or [], reason="what-if"))
+
+        @srv.tool()
+        def pedigree_audit_sources(tenant_id: str | None = None, token: str | None = None,
+                                   limit: int = 50) -> dict:
+            tid, gname = self._resolve(tenant_id, token)
+            if gname is None:
+                return {"ok": False, "error": {"code": "unauthorized", "message": tid}}
+            return _call(lambda: audit_sources(self.db, gname, limit=limit))
 
         @srv.tool()
         def pedigree_report(tenant_id: str | None = None, token: str | None = None) -> dict:

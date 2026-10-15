@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request
 
 from ...config import graph_name
 from ...db.schema import ensure_schema, node_count
+from ...engine.audit import audit_sources
 from ...engine.blame import blame as run_blame
 from ...engine.blame import impact as run_impact
 from ...engine.ingest import corroborate, ensure_session, record_action, record_source, remember, session_read
@@ -196,6 +197,11 @@ def register(app: FastAPI, db, registry, settings) -> None:
         tenant, gname = tenant_and_db(request)
         result = run_impact(db, gname, node_id, max_depth=max_depth)
         return result
+
+    @app.get("/v1/audit/sources")
+    def audit(request: Request, limit: int = 50):
+        tenant, gname = tenant_and_db(request)
+        return audit_sources(db, gname, limit=limit)
 
     @app.get("/v1/graph")
     def graph_summary(request: Request):

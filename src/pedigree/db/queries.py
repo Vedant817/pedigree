@@ -230,6 +230,11 @@ CALL algo.pageRank('Node','DERIVED_FROM') YIELD node, score
 WHERE 'Source' IN labels(node) AND node.status = 'ok'
 RETURN node.id, node.kind, score ORDER BY score DESC LIMIT $k
 """
+#: exact reach count for many roots at once (paired with the PageRank ranking above)
+Q_DESCENDANT_COUNTS = """
+UNWIND $ids AS i MATCH (r:Node {id:i}) CALL algo.BFS(r, -1, 'FEEDS') YIELD nodes
+RETURN r.id AS id, size(nodes) AS n
+"""
 
 # --- invariants (aggregate counts; see db/schema.py) ------------------------
 Q_INV_COUNT_NODES = "MATCH (n) RETURN count(n) AS n"
