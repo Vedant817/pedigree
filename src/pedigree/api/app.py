@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import uuid
 from collections import defaultdict
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.staticfiles import StaticFiles
 
 from ..config import get_settings
 from ..db.client import Db
@@ -72,6 +74,8 @@ def create_app(db: Db | None = None, settings=None) -> FastAPI:
     routes.engine.register(app, db, registry, settings)
     routes.events.register(app, db, registry, settings)
     routes.gate.register(app, db, registry, settings)
+    routes.workspace.register(app, db)
+    app.mount("/", StaticFiles(directory=Path(__file__).resolve().parents[1] / "ui", html=True), name="workspace")
     return app
 
 

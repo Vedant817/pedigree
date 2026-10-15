@@ -285,6 +285,15 @@ MATCH (m:Memory {id:$memory_id}), (s:Source {id:$source_id})
 MERGE (m)-[c:CORROBORATED_BY]->(s) ON CREATE SET c.by = $by
 RETURN m.id
 """
+Q_UI_NODES = """
+MATCH (n:Node) WHERE n:Source OR n:Memory OR n:Action
+RETURN n.id, labels(n), n.status, n.kind, n.title, n.uri, n.tool, coalesce(n.low_integrity,false)
+ORDER BY n.created_at, n.id LIMIT $limit
+"""
+Q_UI_EDGES = """
+UNWIND $ids AS id MATCH (a:Node {id:id})-[r:DERIVED_FROM|CORROBORATED_BY]->(b:Node)
+WHERE b.id IN $ids RETURN a.id, b.id, type(r) ORDER BY a.id, b.id LIMIT $limit
+"""
 Q_GATE_SUPPORT = """
 UNWIND $ids AS i MATCH (n:Memory {id:i})-[c:CORROBORATED_BY]->(s:Source)
 RETURN n.id, s.id, s.status, c.by

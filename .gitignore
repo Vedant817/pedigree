@@ -29,6 +29,8 @@ node_modules/
 # Raw, large eval outputs (CSV/MD results under evals/results/ ARE committed)
 evals/results/raw/
 scratch/
+output/playwright/
+.playwright-cli/
 
 # OS noise
 .DS_Store

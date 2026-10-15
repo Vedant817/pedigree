@@ -5,4 +5,5 @@ from . import (
     gate,  # noqa: F401
     health,  # noqa: F401
     metrics,  # noqa: F401
+    workspace,  # noqa: F401
 )
