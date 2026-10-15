@@ -1,436 +1,283 @@
 {
-  "e1_grid_cells": 18,
-  "e1_seeds_per_cell": 30,
+  "e1_grid_cells": 1,
+  "e1_seeds_per_cell": 2,
   "e1_systems": 6,
   "e1_b0_theta": {
     "value": 0.475,
     "source": "evals/run_e1.py (calibration)"
   },
   "e1_machine": {
-    "value": "Windows-11-10.0.26300-SP0; Intel64 Family 6 Model 191 Stepping 2, GenuineIntel; 15.7 GB RAM; python 3.12.15; falkor 42201; commit 6fff1c4",
+    "value": "Windows-11-10.0.26300-SP0; Intel64 Family 6 Model 191 Stepping 2, GenuineIntel; 15.7 GB RAM; python 3.12.15; falkor 42201; commit 1f902d6",
     "source": "evals/machineinfo.py"
-  },
-  "e1_over_invalidation_b4_deepest_cell": {
-    "value": 0.2777,
-    "ci95": [
-      0.2377,
-      0.3163
-    ],
-    "n": 30,
-    "source": "evals/run_e1.py (cell L6-f3-p0.3)"
-  },
-  "e1_recall_b2_deepest_cell": {
-    "value": 0.2374,
-    "ci95": [
-      0.1357,
-      0.3596
-    ],
-    "n": 30,
-    "source": "evals/run_e1.py (cell L6-f3-p0.3)"
   },
   "e1_recall_p": {
     "value": 1.0,
     "ci95": [
-      0.9998,
+      0.9036,
       1.0
     ],
-    "n": 18629,
+    "n": 36,
     "source": "evals/run_e1.py"
   },
   "e1_recall_b0": {
-    "value": 0.4714,
+    "value": 1.0,
     "ci95": [
-      0.4643,
-      0.4786
+      0.9036,
+      1.0
     ],
-    "n": 18629,
+    "n": 36,
     "source": "evals/run_e1.py"
   },
   "e1_recall_b1": {
-    "value": 0.3546,
+    "value": 1.0,
     "ci95": [
-      0.3477,
-      0.3615
+      0.9036,
+      1.0
     ],
-    "n": 18629,
+    "n": 36,
     "source": "evals/run_e1.py"
   },
   "e1_recall_b2": {
-    "value": 0.1862,
+    "value": 0.4722,
     "ci95": [
-      0.1806,
-      0.1918
+      0.3199,
+      0.6299
     ],
-    "n": 18629,
+    "n": 36,
     "source": "evals/run_e1.py"
   },
   "e1_recall_b4": {
     "value": 1.0,
     "ci95": [
-      0.9998,
+      0.9036,
       1.0
     ],
-    "n": 18629,
+    "n": 36,
     "source": "evals/run_e1.py"
   },
   "e1_recall_b5": {
     "value": 1.0,
     "ci95": [
-      0.9998,
+      0.9036,
       1.0
     ],
-    "n": 18629,
+    "n": 36,
     "source": "evals/run_e1.py"
   },
   "e1_over_invalidation_p": {
     "value": 0.0,
     "ci95": [
       0.0,
-      0.0
+      0.0079
     ],
-    "n": 121771,
+    "n": 484,
     "source": "evals/run_e1.py"
   },
   "e1_over_invalidation_b0": {
-    "value": 0.0334,
+    "value": 0.0124,
     "ci95": [
-      0.0324,
-      0.0344
+      0.0057,
+      0.0268
     ],
-    "n": 121771,
+    "n": 484,
     "source": "evals/run_e1.py"
   },
   "e1_over_invalidation_b1": {
-    "value": 0.0181,
+    "value": 0.0083,
     "ci95": [
-      0.0174,
-      0.0189
+      0.0032,
+      0.0211
     ],
-    "n": 121771,
+    "n": 484,
     "source": "evals/run_e1.py"
   },
   "e1_over_invalidation_b2": {
-    "value": 0.0036,
+    "value": 0.0,
     "ci95": [
-      0.0033,
-      0.0039
+      0.0,
+      0.0079
     ],
-    "n": 121771,
+    "n": 484,
     "source": "evals/run_e1.py"
   },
   "e1_over_invalidation_b4": {
-    "value": 0.0493,
+    "value": 0.0041,
     "ci95": [
-      0.0481,
-      0.0505
+      0.0011,
+      0.0149
     ],
-    "n": 121771,
+    "n": 484,
     "source": "evals/run_e1.py"
   },
   "e1_over_invalidation_b5": {
-    "value": 0.9557,
+    "value": 0.9339,
     "ci95": [
-      0.9545,
-      0.9568
+      0.9082,
+      0.9528
     ],
-    "n": 121771,
+    "n": 484,
     "source": "evals/run_e1.py"
   },
   "e1_action_recall_p": {
     "value": 1.0,
     "ci95": [
-      0.9993,
+      0.7961,
       1.0
     ],
-    "n": 5629,
+    "n": 15,
     "source": "evals/run_e1.py"
   },
   "e1_action_recall_b0": {
-    "value": 0.5607,
+    "value": 1.0,
     "ci95": [
-      0.5477,
-      0.5736
+      0.7961,
+      1.0
     ],
-    "n": 5629,
+    "n": 15,
     "source": "evals/run_e1.py"
   },
   "e1_action_recall_b1": {
-    "value": 0.4194,
+    "value": 1.0,
     "ci95": [
-      0.4066,
-      0.4324
+      0.7961,
+      1.0
     ],
-    "n": 5629,
+    "n": 15,
     "source": "evals/run_e1.py"
   },
   "e1_action_recall_b2": {
-    "value": 0.2258,
+    "value": 0.4667,
     "ci95": [
-      0.2151,
-      0.2369
+      0.2481,
+      0.6988
     ],
-    "n": 5629,
+    "n": 15,
     "source": "evals/run_e1.py"
   },
   "e1_action_recall_b4": {
     "value": 1.0,
     "ci95": [
-      0.9993,
+      0.7961,
       1.0
     ],
-    "n": 5629,
+    "n": 15,
     "source": "evals/run_e1.py"
   },
   "e1_action_recall_b5": {
     "value": 1.0,
     "ci95": [
-      0.9993,
+      0.7961,
       1.0
     ],
-    "n": 5629,
+    "n": 15,
     "source": "evals/run_e1.py"
   },
   "e1_irreversible_recall_p": {
     "value": 1.0,
     "ci95": [
-      0.9966,
+      0.4385,
       1.0
     ],
-    "n": 1134,
+    "n": 3,
     "source": "evals/run_e1.py"
   },
   "e1_irreversible_recall_b0": {
-    "value": 0.5423,
+    "value": 1.0,
     "ci95": [
-      0.5132,
-      0.5711
+      0.4385,
+      1.0
     ],
-    "n": 1134,
+    "n": 3,
     "source": "evals/run_e1.py"
   },
   "e1_irreversible_recall_b1": {
-    "value": 0.4136,
+    "value": 1.0,
     "ci95": [
-      0.3853,
-      0.4425
+      0.4385,
+      1.0
     ],
-    "n": 1134,
+    "n": 3,
     "source": "evals/run_e1.py"
   },
   "e1_irreversible_recall_b2": {
-    "value": 0.2231,
+    "value": 0.6667,
     "ci95": [
-      0.1998,
-      0.2482
+      0.2077,
+      0.9385
     ],
-    "n": 1134,
+    "n": 3,
     "source": "evals/run_e1.py"
   },
   "e1_irreversible_recall_b4": {
     "value": 1.0,
     "ci95": [
-      0.9966,
+      0.4385,
       1.0
     ],
-    "n": 1134,
+    "n": 3,
     "source": "evals/run_e1.py"
   },
   "e1_irreversible_recall_b5": {
     "value": 1.0,
     "ci95": [
-      0.9966,
+      0.4385,
       1.0
     ],
-    "n": 1134,
+    "n": 3,
     "source": "evals/run_e1.py"
   },
   "e1_preserved_correct_p": {
     "value": 1.0,
     "ci95": [
-      0.9973,
+      0.3424,
       1.0
     ],
-    "n": 1401,
+    "n": 2,
     "source": "evals/run_e1.py"
   },
   "e1_preserved_correct_b0": {
     "value": 0.0,
     "ci95": [
       0.0,
-      0.0027
+      0.6576
     ],
-    "n": 1401,
+    "n": 2,
     "source": "evals/run_e1.py"
   },
   "e1_preserved_correct_b1": {
     "value": 0.0,
     "ci95": [
       0.0,
-      0.0027
+      0.6576
     ],
-    "n": 1401,
+    "n": 2,
     "source": "evals/run_e1.py"
   },
   "e1_preserved_correct_b2": {
     "value": 0.0,
     "ci95": [
       0.0,
-      0.0027
+      0.6576
     ],
-    "n": 1401,
+    "n": 2,
     "source": "evals/run_e1.py"
   },
   "e1_preserved_correct_b4": {
     "value": 0.0,
     "ci95": [
       0.0,
-      0.0027
+      0.6576
     ],
-    "n": 1401,
+    "n": 2,
     "source": "evals/run_e1.py"
   },
   "e1_preserved_correct_b5": {
     "value": 0.0,
     "ci95": [
       0.0,
-      0.0027
+      0.6576
     ],
-    "n": 1401,
+    "n": 2,
     "source": "evals/run_e1.py"
-  },
-  "e2_leakage_edge_drop_1pct": {
-    "value": 0.012,
-    "ci95": [
-      0.007,
-      0.0204
-    ],
-    "n": 1082,
-    "source": "evals/run_e2.py"
-  },
-  "e2_leakage_edge_drop_2pct": {
-    "value": 0.0434,
-    "ci95": [
-      0.0328,
-      0.0573
-    ],
-    "n": 1082,
-    "source": "evals/run_e2.py"
-  },
-  "e2_leakage_edge_drop_5pct": {
-    "value": 0.1414,
-    "ci95": [
-      0.1219,
-      0.1634
-    ],
-    "n": 1082,
-    "source": "evals/run_e2.py"
-  },
-  "e2_leakage_edge_drop_10pct": {
-    "value": 0.2412,
-    "ci95": [
-      0.2167,
-      0.2676
-    ],
-    "n": 1082,
-    "source": "evals/run_e2.py"
-  },
-  "e2_window_over_flag_k5": {
-    "value": 4.4628,
-    "ci95": [
-      3.6132,
-      5.511
-    ],
-    "n": 1082,
-    "source": "evals/run_e2.py (bootstrap CI)"
-  },
-  "e2_window_extra_actions_k5": {
-    "value": 3.2771,
-    "ci95": [
-      2.1802,
-      4.7553
-    ],
-    "n": 348,
-    "source": "evals/run_e2.py (bootstrap CI)"
-  },
-  "e2_window_over_flag_k10": {
-    "value": 5.4526,
-    "ci95": [
-      4.2547,
-      7.024
-    ],
-    "n": 1082,
-    "source": "evals/run_e2.py (bootstrap CI)"
-  },
-  "e2_window_extra_actions_k10": {
-    "value": 3.3551,
-    "ci95": [
-      2.2373,
-      4.866
-    ],
-    "n": 348,
-    "source": "evals/run_e2.py (bootstrap CI)"
-  },
-  "e2_window_over_flag_k25": {
-    "value": 5.7193,
-    "ci95": [
-      4.5381,
-      7.2714
-    ],
-    "n": 1082,
-    "source": "evals/run_e2.py (bootstrap CI)"
-  },
-  "e2_window_extra_actions_k25": {
-    "value": 3.3747,
-    "ci95": [
-      2.2621,
-      4.876
-    ],
-    "n": 348,
-    "source": "evals/run_e2.py (bootstrap CI)"
-  },
-  "e2_window_over_flag_k50": {
-    "value": 5.7193,
-    "ci95": [
-      4.5381,
-      7.2714
-    ],
-    "n": 1082,
-    "source": "evals/run_e2.py (bootstrap CI)"
-  },
-  "e2_window_extra_actions_k50": {
-    "value": 3.3747,
-    "ci95": [
-      2.2621,
-      4.876
-    ],
-    "n": 348,
-    "source": "evals/run_e2.py (bootstrap CI)"
-  },
-  "e2_window_over_flag_k100": {
-    "value": 5.7193,
-    "ci95": [
-      4.5381,
-      7.2714
-    ],
-    "n": 1082,
-    "source": "evals/run_e2.py (bootstrap CI)"
-  },
-  "e2_window_extra_actions_k100": {
-    "value": 3.3747,
-    "ci95": [
-      2.2621,
-      4.876
-    ],
-    "n": 348,
-    "source": "evals/run_e2.py (bootstrap CI)"
-  },
-  "e2_exact_leakage": {
-    "value": 0.0,
-    "ci95": [
-      0.0,
-      0.0035
-    ],
-    "n": 1082,
-    "source": "evals/run_e2.py"
   }
 }

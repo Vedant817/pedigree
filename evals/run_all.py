@@ -142,9 +142,23 @@ def main(argv=None) -> int:
     print("[eval] merging per-experiment numbers ...")
     numbers_path = RESULTS / "numbers.json"
     numbers = json.loads(numbers_path.read_text(encoding="utf-8")) if numbers_path.exists() else {}
+    from evals.static_numbers import STATIC_NUMBERS  # noqa: PLC0415
+
+    # Static facts are never overwritten by a run; a --quick run writes its own file so it can
+    # never replace the published block in docs/NUMBERS.md (that would break `make check`).
+    target = RESULTS / ("numbers_quick.json" if args.quick else "numbers.json")
+    for key, entry in STATIC_NUMBERS.items():
+        numbers.setdefault(key, entry)
     for extra in sorted(RESULTS.glob("numbers_*.json")):
+        if extra.name in ("numbers.json", "numbers_quick.json"):
+            continue
         numbers.update(json.loads(extra.read_text(encoding="utf-8")))
-    numbers_path.write_text(json.dumps(numbers, indent=2), encoding="utf-8")
+    target.write_text(json.dumps(numbers, indent=2), encoding="utf-8")
+
+    if args.quick:
+        print(f"[eval] quick run: numbers written to {target.name} only; "
+              "docs/NUMBERS.md and evals/REPORT.md unchanged (run `make eval` to publish)")
+        return 0
 
     print("[eval] regenerating docs/NUMBERS.md ...")
     rc = subprocess.call([sys.executable, str(ROOT / "scripts" / "extract_numbers.py")], cwd=ROOT)

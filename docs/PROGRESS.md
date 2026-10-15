@@ -251,3 +251,24 @@
 - KNOWN_ISSUES 4 (Linux scripts never executed) is now closed: the same scripts ran inside the
   image. Render remains a human step (no account yet) - documented in README "Deploy".
 - 295 tests pass; ruff PASS.
+
+---
+
+### 2026-10-16 02:05 IST | Phase P4 | F-23 docs pass (README, WALKTHROUGH, blog, submission, demo script) | STATUS: mostly done
+- README rewritten to the hackathon requirements: pitch, why-a-graph, quick start, graph data
+  model, **every Cypher/algorithm the product depends on** with purpose, REST/MCP/hook/plugin
+  install, security model, evaluation summary (NUMBERS.md only), honest limitations, deploy,
+  tracks, status table.
+- `docs/WALKTHROUGH.md`: every query and decision explained simply with runnable commands -
+  verified against the live service (blame path, invariants clean, gate reverify on a high-risk
+  push relying on a captured source).
+- `docs/BLOG-DRAFT.md` (blog side prize), `docs/submission/SUBMISSION.md` (ready-to-paste),
+  `demo/script.md` + shot list, `AI_DISCLOSURE.md` updated for this continuation.
+- Two defects found by *running the documented quick start*: `make demo` died on a stale local
+  credential file (fixed + regression tests; an unreadable file is still refused), and
+  `make eval-quick` overwrote the published `docs/NUMBERS.md` block with quick-cell values
+  (fixed: the quick run writes `numbers_quick.json`; static facts now come from
+  `evals/static_numbers.py` so a full `make eval` never drops `falkordb_version`/`python_min`/
+  `tracks_entered` again).
+- 296 tests pass; ruff, secret scan and `check_numbers` (README + blog + submission +
+  WALKTHROUGH) all PASS.

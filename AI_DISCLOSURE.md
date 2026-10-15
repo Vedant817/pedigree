@@ -19,6 +19,16 @@ REST/MCP contracts, Claude hook adapter, graph workspace and synthetic demo seed
 Adapter verification used synthetic
 payloads and localhost transport tests; installed Claude Code execution was not verified.
 
+The F-12..F-16 continuation (Oct 16) used **Codex through T3 Code** with **gpt-6.1-sol**
+again, plus role-specialist subagents (architect, red-team, domain researcher, QA). It
+implemented the capture-trust consult and ADR-008, the F-13/15 isolation and concurrency
+suites, the E1/E2 evaluation harness, the deployment container, and the README /
+WALKTHROUGH / blog / submission documents. Two architect subagents failed on provider rate
+limits and their analysis was completed by the orchestrator in a documented role-switch
+(`docs/consults/007-capture-trust/architect.md` states this on its first line); a provider
+quota also blocked installed-runtime capture, which is recorded in
+`docs/consults/opencode-spike.md` instead of being papered over.
+
 ## What the human did (not the AI)
 
 - Chose the project, its scope and the time-boxed plan (the design pack this repository

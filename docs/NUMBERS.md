@@ -20,7 +20,7 @@ e1_irreversible_recall_b2 = 0.2231   # evals/run_e1.py
 e1_irreversible_recall_b4 = 1.0   # evals/run_e1.py
 e1_irreversible_recall_b5 = 1.0   # evals/run_e1.py
 e1_irreversible_recall_p = 1.0   # evals/run_e1.py
-e1_machine = Windows-11-10.0.26300-SP0; Intel64 Family 6 Model 191 Stepping 2, GenuineIntel; 15.7 GB RAM; python 3.12.15; falkor 42201; commit 6fff1c4   # evals/machineinfo.py
+e1_machine = Windows-11-10.0.26300-SP0; Intel64 Family 6 Model 191 Stepping 2, GenuineIntel; 15.7 GB RAM; python 3.12.15; falkor 42201; commit 1f902d6   # evals/machineinfo.py
 e1_over_invalidation_b0 = 0.0334   # evals/run_e1.py
 e1_over_invalidation_b1 = 0.0181   # evals/run_e1.py
 e1_over_invalidation_b2 = 0.0036   # evals/run_e1.py
@@ -58,6 +58,10 @@ e2_window_over_flag_k100 = 5.7193   # evals/run_e2.py (bootstrap CI)
 e2_window_over_flag_k25 = 5.7193   # evals/run_e2.py (bootstrap CI)
 e2_window_over_flag_k5 = 4.4628   # evals/run_e2.py (bootstrap CI)
 e2_window_over_flag_k50 = 5.7193   # evals/run_e2.py (bootstrap CI)
+falkordb_module_version = 42201   # pedigree db status / MODULE LIST on v4.22.1
+falkordb_version = 4.22.1   # scripts/fetch-falkordb.sh (pinned)
+python_min = 3.11   # pyproject.toml requires-python
+tracks_entered = 2   # docs/DECISIONS.md ADR-000
 <!-- NUMBERS:END -->
 
 ## How to add a number

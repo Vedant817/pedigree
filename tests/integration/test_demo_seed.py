@@ -94,7 +94,8 @@ def test_registry_credential_is_saved_once_and_reused(fresh_graph, tmp_path, cap
 
 def test_stale_local_credential_is_replaced_not_fatal(fresh_graph, tmp_path):
     """A local credential file for a tenant that no longer exists blocks re-seeding (devex fix:
-    the documented quick-start died on `FileExistsError`); it must be replaced by a fresh token."""
+    the documented quick-start died on `FileExistsError`); a file whose token still resolves is
+    never overwritten."""
     from pedigree.api.registry import TenantRegistry
 
     file = Path(__file__).resolve().parents[2] / "scripts" / "seed_demo.py"
@@ -105,11 +106,20 @@ def test_stale_local_credential_is_replaced_not_fatal(fresh_graph, tmp_path):
     registry = TenantRegistry(db)
     stale = tmp_path / f"demo-{tenant}.json"
     stale.write_text(json.dumps({"tenant": tenant, "token": "ped_dead_token"}) + "\n", encoding="utf-8")
+    # an unreadable file is not "stale": it is left alone and the create refuses
+    unreadable = tmp_path / "demo-unreadabletenant.json"
+    unreadable.write_text("not json at all", encoding="utf-8")
+    with pytest.raises(FileExistsError):
+        script.ensure_demo_tenant(registry, "unreadabletenant", tmp_path)
+    assert unreadable.read_text(encoding="utf-8") == "not json at all"
     try:
         credential_file = script.ensure_demo_tenant(registry, tenant, tmp_path)
         assert credential_file == stale
         credential = json.loads(credential_file.read_text(encoding="utf-8"))
         assert credential["token"] != "ped_dead_token"
         assert registry.resolve(credential["token"]).tenant_id == tenant
+        # a live credential is never overwritten
+        assert script.ensure_demo_tenant(registry, tenant, tmp_path) == credential_file
+        assert json.loads(credential_file.read_text(encoding="utf-8"))["token"] == credential["token"]
     finally:
         db.query(registry.gname, "MATCH (t:Tenant {id:$id}) DELETE t", {"id": tenant}, op="test.cleanup")

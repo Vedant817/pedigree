@@ -28,9 +28,15 @@ def ensure_demo_tenant(registry, tenant: str, credentials_dir: Path) -> Path | N
         return file if file.exists() else None
     credentials_dir.mkdir(parents=True, exist_ok=True)
     if file.exists():
-        # The tenant is gone from the registry, so a local file can only be a stale credential
-        # (a dead token). Replace it - a live credential is never overwritten (the branch above).
-        file.unlink()
+        # The tenant is gone from the registry, so a credential file for it is stale *only if*
+        # it is readable JSON whose token no longer resolves. Anything else is left alone and
+        # the O_EXCL create below refuses - a local credential is never silently overwritten.
+        try:
+            payload = json.loads(file.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            payload = None
+        if isinstance(payload, dict) and registry.resolve(payload.get("token", "")) is None:
+            file.unlink()
     # Reserve the local destination before issuing a credential. Never overwrite.
     fd = os.open(file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     try:
