@@ -276,6 +276,15 @@ Q_GATE_NODES = """
 UNWIND $ids AS i MATCH (n:Node {id:i})
 RETURN n.id, n.status, coalesce(n.low_integrity, false), coalesce(n.conf_eff, []), n.taint_parent
 """
+# Demo preflight reads immutable identity without changing existing lifecycle state.
+Q_DEMO_IDENTITIES = """
+UNWIND $ids AS i MATCH (n:Node {id:i}) RETURN n.id, labels(n), properties(n)
+"""
+Q_DEMO_ADD_SUPPORT = """
+MATCH (m:Memory {id:$memory_id}), (s:Source {id:$source_id})
+MERGE (m)-[c:CORROBORATED_BY]->(s) ON CREATE SET c.by = $by
+RETURN m.id
+"""
 Q_GATE_SUPPORT = """
 UNWIND $ids AS i MATCH (n:Memory {id:i})-[c:CORROBORATED_BY]->(s:Source)
 RETURN n.id, s.id, s.status, c.by

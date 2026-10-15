@@ -1,0 +1,92 @@
+"""F-10 synthetic scenarios on actual FalkorDB, never recorded runtime evidence."""
+import importlib.util
+import json
+from pathlib import Path
+
+import pytest
+
+from pedigree.config import graph_name
+from pedigree.db.schema import check_invariants, node_count
+from pedigree.demo import load_scenarios, seed_scenarios
+from pedigree.engine.blame import blame
+from pedigree.engine.gate import check_action
+from pedigree.engine.ingest import get_node_statuses, record_source
+from pedigree.engine.revoke import revoke
+from pedigree.errors import InvalidArgument
+
+
+def test_seed_is_repeatable_without_touching_unrelated_data(fresh_graph):
+    db, tenant, gname = fresh_graph
+    record_source(db, gname, tenant, kind="file", id="unrelated", uri="private.txt")
+    first = seed_scenarios(db, tenant)
+    total = node_count(db, gname)
+    second = seed_scenarios(db, tenant)
+    assert first["created"] > 0
+    assert second["created"] == 0
+    assert node_count(db, gname) == total
+    assert get_node_statuses(db, gname, ["unrelated"]) == {"unrelated": "ok"}
+    assert check_invariants(db, gname, expected_tenant=tenant) == []
+
+
+@pytest.mark.parametrize("scenario_id", ["S1", "S8"])
+def test_scenario_manifest_matches_real_revoke(fresh_graph, scenario_id):
+    db, tenant, gname = fresh_graph
+    seed_scenarios(db, tenant)
+    scenario = next(s for s in load_scenarios() if s["id"] == scenario_id)
+    result = revoke(db, gname, tenant, root_id=scenario["root_id"], reason="synthetic demo")
+    assert get_node_statuses(db, gname, list(scenario["expected_after_revoke"])) == scenario["expected_after_revoke"]
+    assert sorted(a["id"] for a in result["irreversible"]) == scenario["expected_irreversible"]
+    if scenario_id == "S1":
+        explanation = blame(db, gname, "demo_s1_push")
+        root = next(root for root in explanation["roots"] if root["id"] == scenario["root_id"])
+        assert root["path"] == scenario["expected_push_blame_path"]
+    assert check_invariants(db, gname, expected_tenant=tenant) == []
+    before = node_count(db, gname)
+    assert seed_scenarios(db, tenant)["created"] == 0
+    assert node_count(db, gname) == before
+    assert get_node_statuses(db, gname, list(scenario["expected_after_revoke"])) == scenario["expected_after_revoke"]
+    if scenario_id == "S8":
+        gate = check_action(db, gname, {"tool": "Edit", "risk": "medium", "effect": "reversible"},
+                            relied_on=["demo_s8_dependent"])
+        assert gate["decision"] == "allow"
+        high = check_action(db, gname, {"tool": "git push", "risk": "high", "effect": "irreversible"},
+                            relied_on=["demo_s8_dependent"])
+        assert high["decision"] == "reverify"
+        assert any(reason["code"] == "untrusted_influence" for reason in high["reasons"])
+
+
+def test_seed_invalid_tenant_rejected_before_db_use():
+    with pytest.raises(InvalidArgument):
+        seed_scenarios(None, "user:other")
+
+
+def test_fixture_ids_are_disjoint_and_synthetic():
+    scenarios = load_scenarios()
+    ids = [node["id"] for scenario in scenarios for node in scenario["nodes"]]
+    assert len(ids) == len(set(ids))
+    assert all(scenario["synthetic"] is True for scenario in scenarios)
+    assert graph_name("demo") == "ped:demo"
+
+
+def test_registry_credential_is_saved_once_and_reused(fresh_graph, tmp_path, capsys):
+    from pedigree.api.registry import TenantRegistry
+
+    file = Path(__file__).resolve().parents[2] / "scripts" / "seed_demo.py"
+    spec = importlib.util.spec_from_file_location("seed_demo", file)
+    script = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(script)
+    db, tenant, _gname = fresh_graph
+    registry = TenantRegistry(db)
+    try:
+        credential_file = script.ensure_demo_tenant(registry, tenant, tmp_path)
+        original = credential_file.read_bytes()
+        credential = json.loads(original)
+        assert registry.resolve(credential["token"]).tenant_id == tenant
+        assert script.ensure_demo_tenant(registry, tenant, tmp_path) == credential_file
+        assert credential_file.read_bytes() == original
+        credential_file.unlink()
+        assert script.ensure_demo_tenant(registry, tenant, tmp_path) is None
+        assert registry.resolve(credential["token"]).tenant_id == tenant
+        assert credential["token"] not in capsys.readouterr().out
+    finally:
+        db.query(registry.gname, "MATCH (t:Tenant {id:$id}) DELETE t", {"id": tenant}, op="test.cleanup")

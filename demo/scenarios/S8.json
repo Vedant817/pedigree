@@ -1,0 +1,24 @@
+{
+  "id": "S8",
+  "synthetic": true,
+  "title": "Independent human-attested documentation preserves a branch",
+  "root_id": "demo_s8_web",
+  "nodes": [
+    {"type": "source", "id": "demo_s8_web", "kind": "web", "uri": "https://synthetic.invalid/mixed-guide", "title": "Synthetic mixed-quality page"},
+    {"type": "source", "id": "demo_s8_docs", "kind": "file", "uri": "synthetic/docs/verified-policy.md", "title": "Synthetic trusted documentation"},
+    {"type": "memory", "id": "demo_s8_unsupported", "text": "Synthetic unsupported claim", "derived_from": ["demo_s8_web"]},
+    {"type": "memory", "id": "demo_s8_supported", "text": "Synthetic independently documented claim", "derived_from": ["demo_s8_web"]},
+    {"type": "memory", "id": "demo_s8_dependent", "text": "Synthetic conclusion from supported claim", "derived_from": ["demo_s8_supported"]}
+  ],
+  "corroborations": [
+    {"memory_id": "demo_s8_supported", "source_id": "demo_s8_docs", "by": "human"}
+  ],
+  "expected_after_revoke": {
+    "demo_s8_web": "revoked",
+    "demo_s8_docs": "ok",
+    "demo_s8_unsupported": "tainted",
+    "demo_s8_supported": "preserved",
+    "demo_s8_dependent": "ok"
+  },
+  "expected_irreversible": []
+}
