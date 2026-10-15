@@ -8,7 +8,19 @@ from __future__ import annotations
 
 from typing import Any
 
+from .config import SOURCE_KINDS
+
 SUPPORTED_RUNTIME = {"claude-code", "opencode", "generic"}
+
+#: Event `kind` values that identify a Source without an explicit `type` (kind-only payloads
+#: from hooks would otherwise be dropped entirely - audit finding, docs/qa/F-07.md).
+SOURCE_KIND_ALIASES = frozenset(SOURCE_KINDS)
+
+
+def _source_kind(event: dict[str, Any]) -> str:
+    """`source_kind` first, then `kind` when it is a real source kind; `web` last (docs/01 §7.3)."""
+    raw = event.get("source_kind") or event.get("kind")
+    return raw if raw in SOURCE_KINDS else "web"
 
 
 def normalize_event(runtime: str, event: dict[str, Any]) -> dict[str, Any] | None:
@@ -16,10 +28,12 @@ def normalize_event(runtime: str, event: dict[str, Any]) -> dict[str, Any] | Non
         runtime = "generic"
     kind = (event.get("type") or event.get("kind") or "").lower()
     base = {"session_id": event.get("session_id")}
-    if kind in ("source_read", "source", "source.create"):
+    if kind in ("source_read", "source", "source.create") or (
+        kind in SOURCE_KIND_ALIASES and "type" not in event
+    ):
         spec = {
             "op": "source",
-            "kind": event.get("source_kind", "web"),
+            "kind": _source_kind(event),
             "uri": event.get("uri"),
             "title": event.get("title"),
             "id": event.get("id"),
