@@ -314,7 +314,7 @@ Rationale and the track-count ambiguity: `docs/DECISIONS.md` ADR-000.
 | F-09 | lineage workspace (graph view, revoke preview/confirm, gate form) | done | `tests/integration/test_ui_api.py`, `tests/security/test_ui_boundary.py` | `docs/qa/F-09.md` PASS |
 | F-10 | scenario JSON + `make demo` | done | `tests/integration/test_demo_seed.py`, `test_demo_qa.py` | `docs/qa/F-10.md` PASS |
 | F-11 | gate (`check_action`, `/v1/gate`, hook deny/ask, policy.yaml) | done | `tests/unit/test_gate.py`, `tests/integration/test_gate_*.py` | `docs/qa/F-11.md` PASS |
-| F-12 | confidentiality labels + scenario S6 | todo | - | gate rule 2 shipped; scenario pending |
+| F-12 | confidentiality labels + scenario S6 | done | `tests/integration/test_confidentiality.py` | `docs/qa/F-12.md` PASS |
 | F-13 | isolation hardening | implementing | `tests/security/test_capture_trust.py`, `test_acl_mechanism.py` | capture trust closed (ADR-008); ACL wiring open |
 | F-14 | evaluation harness + NUMBERS pipeline | implementing | `tests/evals/*` | E1 + E2 done (`evals/REPORT.md`); E3-E6 pending |
 | F-15 | isolation/concurrency suite | implementing | `tests/integration/test_isolation_concurrency.py` | stress + ACL mechanism green; ACL wiring open |

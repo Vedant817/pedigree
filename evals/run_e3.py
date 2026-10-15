@@ -61,10 +61,27 @@ def replay(scenario: dict, client: TestClient, headers: dict) -> dict:
             "by": support.get("by", "human")})
         assert r.status_code == 200, r.text
 
-    revoke = client.post("/v1/revoke", headers=headers,
-                         json={"root_id": scenario["root_id"], "reason": "synthetic scenario"})
-    assert revoke.status_code == 200, revoke.text
-    return {"created": created, "revoke": revoke.json()}
+    # a fixture revokes its root only when it declares what the revoke should produce; a
+    # gate-only scenario (S6) must be evaluated with its lineage intact
+    if scenario.get("expected_after_revoke"):
+        revoke = client.post("/v1/revoke", headers=headers,
+                             json={"root_id": scenario["root_id"], "reason": "synthetic scenario"})
+        assert revoke.status_code == 200, revoke.text
+    else:
+        revoke = None
+    result = {"created": created, "revoke": revoke.json() if revoke is not None else None}
+
+    # gate expectations declared by the fixture (docs/03 section 5: gate:{step:verdict})
+    verdicts = {}
+    for step in scenario.get("expected_gate", []):
+        body = {"action": {**step["action"], "effect": step["action"].get("effect", "reversible"),
+                           "risk": step["action"].get("risk", "low")},
+                "relied_on": step["relied_on"]}
+        response = client.post("/v1/gate", headers=headers, json=body)
+        assert response.status_code == 200, response.text
+        verdicts[step["step"]] = response.json()["decision"]
+    result["gate"] = verdicts
+    return result
 
 
 def gate_verdict(scenario: dict, client: TestClient, headers: dict, node_id: str, tool: str,
@@ -101,15 +118,17 @@ def run(client: TestClient, db: Db, registry: TenantRegistry, settings: Settings
             problems = assert_expected(scenario, db, gname)
             if problems:
                 failures.extend(f"{scenario['id']}: {p}" for p in problems)
-            # gate probes: a high-risk push relying on the tainted branch must not be allowed
-            root = scenario["root_id"]
-            verdict = gate_verdict(scenario, client, headers,
-                                   node_id=next((m for m, ps in
-                                                 _parents(scenario).items() if root in ps), root),
-                                   tool="Bash", risk="high", effect="irreversible")
-            if verdict == "allow":
-                failures.append(f"{scenario['id']}: gate allowed a high-risk push built on the "
-                                f"revoked branch")
+            # gate expectations declared by the fixture (docs/03 section 5: gate:{step:verdict})
+            for step in scenario.get("expected_gate", []):
+                action = {**step["action"], "effect": step["action"].get("effect", "reversible"),
+                          "risk": step["action"].get("risk", "low")}
+                response = client.post("/v1/gate", headers=headers,
+                                       json={"action": action, "relied_on": step["relied_on"]})
+                assert response.status_code == 200, response.text
+                verdict = response.json()["decision"]
+                if verdict != step["decision"]:
+                    failures.append(f"{scenario['id']}: gate step {step['step']} expected "
+                                    f"{step['decision']}, got {verdict}")
         finally:
             db.query(registry.gname, "MATCH (t:Tenant {id:$id}) DELETE t", {"id": tenant})
             try:

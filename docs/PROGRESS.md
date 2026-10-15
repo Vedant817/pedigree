@@ -278,3 +278,20 @@
   residual rather than softening it).
 - `make eval` 80 s end-to-end (E1 -> E2 -> E4 -> E3 -> numbers -> NUMBERS.md -> REPORT.md ->
   check_numbers); 300 tests pass; ruff/secret/numbers PASS.
+
+---
+
+### 2026-10-16 03:25 IST | Phase P2 | F-12 confidentiality + S6 | STATUS: done
+- `demo/scenarios/S6.json`: HR source -> summary memory -> public README write, with four
+  `expected_gate` steps (public blocked, default audience blocked, tag audience allowed, superset
+  allowed).
+- `tests/integration/test_confidentiality.py`: tag inheritance, transitive inheritance, the
+  audience boundary (a partial superset is still blocked - the missing tag is what blocks), and the
+  hook `deny` mapping. `docs/qa/F-12.md`.
+- E3 now revokes a root only when the fixture declares `expected_after_revoke`; a gate scenario
+  (S6) is replayed with its lineage intact, and every `expected_gate` step is asserted through
+  `/v1/gate` (`tests/evals/test_e3_scenarios.py::test_scenario_gate_expectations_hold`).
+- Two fixture-level bugs fixed while doing it: the seeder's preflight compared `conf` against an
+  empty list (a fixture that declares a tag collided with itself on re-seed), and a test asserted
+  the old node count for the demo seed.
+- 307 passed, 1 skipped; ruff PASS; `make eval` green; demo tenant re-seeded with S1/S6/S8.

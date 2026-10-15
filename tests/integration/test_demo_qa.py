@@ -108,7 +108,7 @@ def test_qa_cli_credential_not_in_output_and_ignored(fresh_graph):
         original = credential_path.read_bytes()
         token = json.loads(original)["token"]
         assert token not in first.stdout + first.stderr
-        assert '"created": 11' in first.stdout
+        assert '"created": 14' in first.stdout
         second = subprocess.run(command, env=env, capture_output=True, text=True, timeout=20, check=True)
         assert token not in second.stdout + second.stderr
         assert '"created": 0' in second.stdout

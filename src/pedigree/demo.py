@@ -35,7 +35,7 @@ def _preflight_existing(db, gname: str, tenant: str, nodes: list[dict]) -> set[s
         if nid not in existing:
             continue
         labels, actual = existing[nid]
-        expected = {"id": nid, "tenant": tenant, "conf": []}
+        expected = {"id": nid, "tenant": tenant, "conf": list(node.get("conf", []))}
         kind = node["type"]
         if kind == "source":
             expected.update({"kind": node["kind"], "uri": node.get("uri"), "title": node.get("title"),
