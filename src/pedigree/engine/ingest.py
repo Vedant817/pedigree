@@ -15,6 +15,7 @@ import hashlib
 import secrets
 import time
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 
 from ..config import (
     LIMITS,
@@ -64,6 +65,14 @@ def new_id(prefix: str) -> str:
 
 def sha256_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def derived_source_id(tenant: str, uri: str) -> str:
+    """Stable node id for a hash-less capture (ADR-008): the artifact uri names the Source.
+    Enforced by the Node(id) unique constraint, so concurrent identical captures converge
+    (a MERGE keyed on a NULL content_hash does not - NULLs are exempt from the pair
+    constraint, measured with 10 concurrent writers)."""
+    return "src_" + hashlib.sha256(f"{tenant}|{uri}".encode()).hexdigest()[:16]
 
 
 def _dedupe(seq) -> list[str]:
@@ -161,13 +170,25 @@ def record_source(
         # caller-supplied id names the node at creation only; it never forks the same
         # content into two nodes.
         if uri and content_hash:
-            res = db.query(gname, Q.Q_SOURCE_MERGE_HASHED,
-                           {"tenant": tenant, "uri": uri, "hash": content_hash.lower(),
-                            "props": props, "now": now or now_ms()},
-                           op="ingest.source", trace=trace)
-        elif uri:
+            try:
+                res = db.query(gname, Q.Q_SOURCE_MERGE_HASHED,
+                               {"tenant": tenant, "uri": uri, "hash": content_hash.lower(),
+                                "props": props, "now": now or now_ms()},
+                               op="ingest.source", trace=trace)
+            except Conflict:
+                # a concurrent writer created the same artifact first: read it back, so the
+                # caller converges on that node instead of seeing an error
+                back = db.ro_query(gname, Q.Q_SOURCE_BY_ARTIFACT,
+                                   {"tenant": tenant, "uri": uri, "hash": content_hash.lower()},
+                                   op="ingest.source_readback", trace=trace).result_set or []
+                if not back:
+                    raise
+                res = SimpleNamespace(result_set=[back[0]])
+        elif uri and not id:
+            # hash-less capture: identity is the derived id, enforced by Node(id)
+            props["id"] = derived_source_id(tenant, uri)
             res = db.query(gname, Q.Q_SOURCE_MERGE_URI,
-                           {"tenant": tenant, "uri": uri, "props": props, "now": now or now_ms()},
+                           {"derived": props["id"], "props": props, "now": now or now_ms()},
                            op="ingest.source", trace=trace)
         else:
             res = db.query(

@@ -22,7 +22,7 @@ that is not `done` here.
 | F-12 | P1 | Confidentiality labels + scenario S6 | todo | - | - |
 | F-13 | P1 | Isolation hardening: per-tenant ACL users, rate limits, quotas, metrics, structured logs | implementing | tests/security/test_security_F05.py, tests/security/test_security_F06.py, tests/security/test_capture_trust.py, tests/integration/test_source_identity.py | capture trust closed (ADR-008): `docs/consults/007-capture-trust/decision.md`; rate limits/quota/metrics shipped in F-05; ACL users + structured logs remain (F-15/F-16) |
 | F-14 | P1 | Eval harness: generator, independent oracle, baselines B0-B5, E1, E2, stats, NUMBERS pipeline | implementing | tests/evals/test_oracle_agreement.py, tests/evals/test_stats.py, tests/evals/test_baselines.py | `evals/REPORT.md` (generated): E1 done (18 cells x 30 seeds, 6 systems); E2 capture fidelity next |
-| F-15 | P1 | E5 isolation/concurrency suite (hypothesis + threads + invariants + ACL) | todo | - | - |
+| F-15 | P1 | E5 isolation/concurrency suite (hypothesis + threads + invariants + ACL) | implementing | tests/integration/test_isolation_concurrency.py (3), tests/security/test_acl_mechanism.py (skipped without the deployment secret), tests/evals/test_oracle_agreement.py (1000 DAGs) | API isolation matrix + 20 tenants x 8 writers + revoke/ingest race PASS; ACL mechanism verified, wiring open (KNOWN_ISSUES 18) |
 | F-16 | P1 | Deployment: Dockerfile (Ubuntu 24.04 single container), compose, Render, seed-on-boot | todo | - | - |
 | F-17 | P2 | What-if (`GRAPH.COPY`) + checkpoint/restore | todo | - | - |
 | F-18 | P2 | `audit_sources` (PageRank + descendant counts) | todo | - | - |

@@ -52,19 +52,26 @@ RETURN n.id, n.status, n.low_integrity, n.conf_eff
 """
 
 # --- derived Source identity (consult 007 / ADR-008) --------------------------
-# One node per (tenant, uri, content_hash) - or per (tenant, uri) when the caller sent no
-# hash - so repeated reads of the same artifact converge instead of minting new ids. The
-# composite unique constraint Source(uri, content_hash) (schema.ensure_source_identity)
-# makes the MERGE atomic and idempotent; the uri-only constraint is deliberately absent
-# because it rejects a legitimately changed page (measured on FalkorDB v4.22.1).
+# One node per (tenant, uri, content_hash): the composite unique constraint makes the MERGE
+# atomic and idempotent, so repeated reads of the same artifact converge and the same uri with
+# a new hash is a new version whose old hash stays revocable. A uri-only constraint is
+# deliberately absent: it rejects a legitimately changed page (measured on v4.22.1).
 Q_SOURCE_MERGE_HASHED = """
 MERGE (n:Node:Source {tenant:$tenant, uri:$uri, content_hash:$hash})
 ON CREATE SET n = $props, n.created_at = $now
 RETURN n.id, n.status, n.low_integrity, n.conf_eff
 """
+# Hash-less captures carry no content identity, so the key is a server-derived node id
+# (sha256 of tenant|uri): the Node(id) unique constraint makes it atomic under concurrency,
+# which a MERGE on (tenant, uri) alone is not - NULL content_hash is exempt from the pair
+# constraint (measured: 10 concurrent MERGEs produced 50 nodes).
 Q_SOURCE_MERGE_URI = """
-MERGE (n:Node:Source {tenant:$tenant, uri:$uri})
+MERGE (n:Node:Source {id:$derived})
 ON CREATE SET n = $props, n.created_at = $now
+RETURN n.id, n.status, n.low_integrity, n.conf_eff
+"""
+Q_SOURCE_BY_ARTIFACT = """
+MATCH (n:Source {tenant:$tenant, uri:$uri, content_hash:$hash})
 RETURN n.id, n.status, n.low_integrity, n.conf_eff
 """
 

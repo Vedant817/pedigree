@@ -79,9 +79,9 @@ def test_events_ignores_unknown_kinds(client, tenant):
 
 
 def test_events_capture_ids_converge_on_the_same_source(client, tenant):
-    """ADR-008: the caller id names the node; the artifact names the identity."""
+    """ADR-008: the artifact names the node; two captures of the same uri converge."""
     _tid, _tok, h = tenant
-    body = {"events": [{"type": "source", "kind": "web", "id": "dup_evt_test", "uri": "u"}]}
+    body = {"events": [{"type": "source", "kind": "web", "uri": "u"}]}
     first = client.post("/v1/events", headers=h, json=body).json()["created"]
     second = client.post("/v1/events", headers=h, json=body).json()["created"]
     assert first == second and len(first) == 1

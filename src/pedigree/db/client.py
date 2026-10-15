@@ -9,6 +9,7 @@ Design rules (docs/02 section 4):
 
 from __future__ import annotations
 
+import threading
 import time
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
@@ -108,27 +109,38 @@ def chunks(xs: Sequence[Any] | Iterable[Any], n: int = CHUNK) -> Iterator[list[A
 
 # --- connection -------------------------------------------------------------
 class Db:
-    def __init__(self, settings: Settings | None = None) -> None:
+    """FalkorDB access with **one connection per thread**.
+
+    The FastAPI threadpool and the eval/concurrency suites drive many threads through one
+    `Db` instance; a single shared connection serialises them and turns load into timeouts
+    (measured in `tests/integration/test_isolation_concurrency.py`: 160 writers on one
+    connection produced `unavailable`). Connections are created lazily per thread and dropped
+    again by `reset()`.
+    """
+
+    def __init__(self, settings: Settings | None = None):
         self.settings = settings or get_settings()
-        self._client: FalkorDB | None = None
+        self._local = threading.local()
 
     @property
     def client(self) -> FalkorDB:
-        if self._client is None:
-            self._client = FalkorDB(
+        client = getattr(self._local, "client", None)
+        if client is None:
+            client = FalkorDB(
                 host=self.settings.falkor_host,
                 port=self.settings.falkor_port,
                 username=self.settings.falkor_username or None,
                 password=self.settings.falkor_password or None,
             )
-        return self._client
+            self._local.client = client
+        return client
 
     def select(self, gname: str):
         return self.client.select_graph(gname)
 
     def reset(self) -> None:
-        """Drop the cached connection (tests / connection recovery)."""
-        self._client = None
+        """Drop this thread's cached connection (tests / connection recovery)."""
+        self._local = threading.local()
 
     # -- introspection -------------------------------------------------------
     def ping(self) -> bool:
