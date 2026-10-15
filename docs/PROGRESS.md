@@ -1,21 +1,48 @@
 # CURRENT STATE (overwritten after every feature / checkpoint)
 
-- **Phase:** P0 - Foundation + spikes (Phase 0 acceptance tests ALL green; tagged `phase-0` at commit fd948a0)
-- **Last green commit:** 9ec9c3d
+- **Phase:** P0 complete -> P1 vertical slice in progress (Thu 20:20 IST; Phase 0 window ran to 23:30)
+- **Last green commit:** 8a45d0e (F-07: mark complete) — working tree carries uncommitted F-11 WIP
 - **Environment:** Windows 11 dev host; Python 3.12.15 (uv `.venv`); Docker Desktop 29.8.2 running
   FalkorDB `falkordb/falkordb:v4.22.1` (pinned; mandatory args); Node v24.13.1; 108 GB free disk.
 - **Deadlines:** feature freeze Sun 2026-10-18 15:00 IST; submit target Sun 21:00 IST; hard stop 23:59 IST.
-- **Test state:** **62 passed** (full suite, real FalkorDB) | `make check` green | AT0.1-AT0.6 verified
-  on a clean clone (`scripts/clean_clone_check.sh` PASS) | secret-scan `--history` gate green.
-- **Features [done]:** F-01 (schema/skeleton/self-heal round-2 PASS), F-02 (ingest), F-03 (revoke).
+- **Test state:** **94 passed** (full suite, real FalkorDB, incl. uncommitted F-11 WIP: `import`-clean)
+  | `make check` green (ruff + pytest + secret scan `--history` + numbers) | AT0.1-AT0.6 verified on a
+  clean clone (`scripts/clean_clone_check.sh` PASS).
+- **Features [done]:** F-01 (QA PASS round 2), F-02 (PASS), F-03 (PASS), F-04 (PASS),
+  F-05 + F-06 (PASS incl. red-team hardening), F-07 (**QA evidence missing** -> `docs/qa/F-07.md`
+  being written now; FEATURES.md will be corrected to `qa` until it lands).
+- **In flight (uncommitted):** F-11 gate prototype (`src/pedigree/engine/gate.py`,
+  `src/pedigree/api/routes/gate.py`, schemas/config/queries deltas). It does not yet match
+  docs/01 §6.6 (verdict set, reasons[], ancestor check, no_lineage) and has no tests -> it is WIP,
+  not done; next actions below close it.
 - **Next 3 actions:**
-  1. F-04 blame + impact (tests -> implement -> verify) -> `docs/qa/F-04.md`.
-  2. Phase 1 P0 slice begins: F-05 REST API + registry + tenant auth; F-06 MCP; F-07/F-08 capture adapters.
-  3. F-10 scenario JSON + `seed_demo.py` seeder.
-- **Blockers:** none open. Independent `qa-senior` subagent round 2 hit the provider's free-tier
-  rate limit (not a product defect); first findings covered by role-switch re-verification.
+  1. Write `docs/qa/F-07.md` from fresh re-runs (role-switch QA; subagent provider was rate-limited).
+  2. F-11 gate: spec `docs/features/F-11-gate.md` -> failing tests -> implement per §6.6
+     (4 verdicts, `reasons[]`, ancestor BFS check, `policy.yaml` classifier, MCP `check_action`,
+     hook deny/ask mapping) -> QA + red-team -> commit.
+  3. F-08 OpenCode plugin (`.opencode/plugins/pedigree.ts`) then F-09 UI v1, F-10 scenarios/`make demo`.
+- **Blockers:** none open. Provider free-tier rate limits interrupted two QA rounds (not product
+  defects); fallback per docs/04 §12 (role-switch with fresh-shell re-runs).
 - **Human pending (batch 1 reply outstanding):** GitHub repo + remote URL, Discord answer, dogfood
   runtime choice, optional API keys in `.env`; Render account (Fri) not yet needed.
+
+---
+
+### 2026-10-15 19:34-20:10 IST | Phase P0->P1 | F-04, F-05, F-06, security pass, F-07 | STATUS: done (F-07 QA gap)
+- Landed F-04 blame+impact (`44c2635`; 14 tests; `docs/qa/F-04.md` PASS), F-05 REST API + tenant
+  registry + bearer auth (`ae24a98`; `docs/qa/F-05.md` PASS), F-06 MCP stdio+streamable-http
+  (`554a991`, `821c679`; `docs/qa/F-06.md` PASS), red-team/security hardening for F-05/F-06
+  (`fb13e3a`: Content-Length validation, reserved `registry` tenant rejected, MCP token+quota,
+  REST integrity literal, CLI `mcp`; 10 security tests), F-07 `/v1/events` + `adapters.py`
+  normalisation + `/v1/artifacts/lookup` + `/v1/invariants` (`e17c956`, `8a45d0e`).
+- Suite grew 62 -> 94 tests; `make check` green throughout; no PROGRESS entries were written for this
+  stretch (documentation debt, reconciled in this entry).
+- Gaps found while reconciling (fixed by the actions in CURRENT STATE): `docs/qa/F-07.md` never
+  landed although FEATURES.md marks F-07 done; PROGRESS.md last entry was 19:55; F-11 prototype is
+  uncommitted and non-conforming to §6.6.
+- **Environment:** Windows 11 dev host; Python 3.12.15 (uv `.venv`); Docker Desktop 29.8.2 running
+  FalkorDB `falkordb/falkordb:v4.22.1` (pinned; mandatory args); Node v24.13.1; 108 GB free disk.
+- **Deadlines:** feature freeze Sun 2026-10-18 15:00 IST; submit target Sun 21:00 IST; hard stop 23:59 IST.
 
 ---
 
