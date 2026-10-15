@@ -118,9 +118,24 @@ def build_report(info: dict, numbers: dict) -> str:
     parts.append("`evals/run_e3.py` (also `tests/evals/test_e3_scenarios.py`) POSTs every")
     parts.append("authored `demo/scenarios/*.json` node through `/v1/events`, attests the")
     parts.append("corroborations with the operator credential, revokes the root through")
-    parts.append("`/v1/revoke` and asserts the fixture's expected statuses plus a gate probe: the")
-    parts.append("high-risk push built on the revoked branch is never `allow`. PASS/FAIL only - the")
-    parts.append("per-scenario expectations live in the fixtures.")
+    parts.append("`/v1/revoke` and asserts the fixture's expected statuses plus gate verdicts: the")
+    parts.append("high-risk push built on the revoked branch is never `allow`, and a private tag")
+    parts.append("reaching a public audience is `block` with its path.")
+    parts.append("")
+
+    parts.append("## E4b - FalkorDB vs SQLite traversal (honest answer)")
+    parts.append("")
+    parts.append("Same closure/ancestor queries in FalkorDB (`algo.BFS`, over the socket) and in")
+    parts.append("stdlib `sqlite3` (`WITH RECURSIVE`, in-process) on the same generated DAG, with")
+    parts.append("the closure sizes asserted equal. Scope: the traversal primitives only - not the")
+    parts.append("revoke pipeline. **Result: no crossover in the tested range; the recursive CTE is")
+    parts.append("faster at every size measured** (the graph query pays a round-trip). What FalkorDB")
+    parts.append("buys is elsewhere: one graph per tenant, `GRAPH.COPY` for an atomic what-if, and")
+    parts.append("the per-graph ACL pattern - none of which a single SQLite file gives us.")
+    parts.append("")
+    e4b = _rows(RESULTS / "e4b_falkor_vs_sqlite.csv")
+    parts.append(_table(e4b, ["nodes", "edges", "closure_nodes", "closure_sqlite_ms",
+                              "closure_falkor_ms", "ancestors_sqlite_ms", "ancestors_falkor_ms"]))
     parts.append("")
     parts.append(f"`evals/results/e1_samples.csv` ({len(samples)} rows), "
                  "`evals/results/e1_b0_theta_sweep.csv`.")
@@ -171,6 +186,13 @@ def main(argv=None) -> int:
     rc = run_e3()
     if rc != 0:
         print("[eval] E3 failed", file=sys.stderr)
+        return rc
+
+    print("[eval] E4b FalkorDB vs SQLite traversal ...")
+    from evals.run_e4b_sqlite import main as run_e4b  # noqa: PLC0415
+    rc = run_e4b(["--quick"] if args.quick else [])
+    if rc != 0:
+        print("[eval] E4b failed", file=sys.stderr)
         return rc
 
     print("[eval] merging per-experiment numbers ...")

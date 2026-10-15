@@ -35,8 +35,11 @@ Every question Pedigree answers is a graph question:
 If you remove FalkorDB, none of those stay: the product stops working. There is no
 database-agnostic fallback, and the isolation story (one graph per tenant) *is* the multi-graph
 story. A recursive SQL CTE can compute a closure - we measured that comparison honestly
-(`evals/run_e4b_sqlite.py` is the remaining item) - but the per-tenant graph namespace, the copy
-for what-if and the ACL pattern are the parts a relational store does not give us.
+(`evals/run_e4b_sqlite.py`): for the traversal primitives alone, at every size we tested, the
+stdlib `sqlite3` recursive CTE is **faster** than `algo.BFS` (the graph query pays a round-trip),
+and we report that rather than hide it. What FalkorDB buys is not the closure: it is the
+per-tenant graph namespace (cheap, real isolation), `GRAPH.COPY` for an atomic what-if, and the
+per-graph ACL pattern - none of which a single SQLite file gives us.
 
 ## Quick start (local, mandatory path)
 

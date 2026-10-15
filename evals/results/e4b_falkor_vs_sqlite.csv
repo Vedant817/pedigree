@@ -1,0 +1,14 @@
+# os=Windows-11-10.0.26300-SP0
+# cpu=Intel64 Family 6 Model 191 Stepping 2, GenuineIntel
+# cpu_count=24
+# ram_gb=15.7
+# python=3.12.15
+# falkor_module_version=42201
+# commit_sha=3f0ce23
+# rounds=3
+# sizes=[1000, 5000]
+# scope=closure + ancestor traversal primitives only
+# keys=k = key
+nodes,edges,closure_sqlite_ms,closure_falkor_ms,ancestors_sqlite_ms,ancestors_falkor_ms,closure_nodes
+820,1230,0.31,1.77,0.02,0.94,268
+4100,6136,0.53,2.77,0.01,1.39,416

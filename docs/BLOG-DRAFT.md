@@ -168,6 +168,18 @@ The bigger lesson: the interesting part of agent memory is not retrieval, it is 
 If you cannot answer "what did the agent believe because of this, and what did it do about it",
 you do not have memory - you have a cache.
 
+## One more honest measurement
+
+I picked FalkorDB because a graph felt like the right shape, so I tested that assumption rather
+than asserting it (`evals/run_e4b_sqlite.py`): the same descendant closure and ancestor queries in
+stdlib `sqlite3` with a recursive CTE versus FalkorDB's `algo.BFS`, on the same generated DAG,
+with the closure sizes asserted equal. **The CTE won at every size I measured** - the graph query
+pays a round-trip. What FalkorDB actually buys is not the traversal: it is one graph per tenant
+(real isolation, not a `WHERE tenant_id` filter), `GRAPH.COPY` for an atomic what-if, and the
+per-graph ACL key pattern. If your problem is only "find the descendants of a node", a recursive
+CTE in your existing database is the honest answer - and I would rather say that in a hackathon
+for a graph database than pretend the graph made the loop faster.
+
 *AI disclosure: this project was built with an AI coding assistant (OpenCode with a hosted model)
 under my direction, with every query, decision and measurement reviewed by me; the decisions are
 recorded in `docs/DECISIONS.md` and the evidence in `docs/qa/`. See `AI_DISCLOSURE.md`.*
