@@ -52,6 +52,7 @@ def test_acl_user_cannot_cross_tenant_namespaces(admin):
             admin.connection.execute_command(
                 "ACL", "SETUSER", f"t_{tenant}", *USER_COMMANDS,
                 f"~ped:{tenant}", f"~ped:{tenant}:wi:*")
+            assert graph.startswith("ped:")
         scoped = FalkorDB(host=s.falkor_host, port=s.falkor_port,
                           username=f"t_{a}", password=SECRET)
         assert scoped.select_graph(ga).query("RETURN 1").result_set == [[1]]
@@ -61,7 +62,10 @@ def test_acl_user_cannot_cross_tenant_namespaces(admin):
             assert "permission" in str(excinfo.value).lower() or "no permissions" in str(excinfo.value).lower()
         scoped.select_graph(ga).copy(f"{ga}:wi:1")
         scoped.select_graph(f"{ga}:wi:1").delete()
-        with pytest.raises(Exception):
+        # copying into a foreign namespace must be denied, not silently allowed
+        from redis.exceptions import NoPermissionError, ResponseError
+
+        with pytest.raises((NoPermissionError, ResponseError)):
             scoped.select_graph(ga).copy(f"{gb}:evil")
     finally:
         for graph in (ga, gb, f"{ga}:wi:1"):
@@ -72,5 +76,5 @@ def test_acl_user_cannot_cross_tenant_namespaces(admin):
         for user in (f"t_{a}", f"t_{b}"):
             try:
                 admin.connection.execute_command("ACL", "DELUSER", user)
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001, S110 - cleanup best effort
                 pass
