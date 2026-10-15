@@ -83,12 +83,16 @@ def test_qa_reseed_does_not_restore_changed_support_authority(fresh_graph):
     corroborate(db, graph, "demo_s8_supported", "demo_s8_docs", by="agent")
     revoke(db, graph, tenant, root_id="demo_s8_web")
     action = {"tool": "Edit", "risk": "medium"}
+    # Corroboration is write-once-then-upgrade (ADR-008): an agent call cannot replace a
+    # human attestation, so the human-attested branch still passes the gate.
     before = check_action(db, graph, action, relied_on=["demo_s8_supported"])["decision"]
-    assert before == "block"
+    assert before == "allow"
     seed_scenarios(db, tenant)
     after = check_action(db, graph, action, relied_on=["demo_s8_supported"])["decision"]
     print(f"RESEED support-author change: gate_before={before}; gate_after={after}")
     assert after == before
+    by = db.ro_query(graph, "MATCH ()-[c:CORROBORATED_BY]->() RETURN c.by").result_set[0][0]
+    assert by == "human"
 
 
 def test_qa_cli_credential_not_in_output_and_ignored(fresh_graph):

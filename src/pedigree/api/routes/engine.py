@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hmac
 import time
 
 from fastapi import FastAPI, Request
@@ -10,7 +11,7 @@ from ...engine.blame import blame as run_blame
 from ...engine.blame import impact as run_impact
 from ...engine.ingest import corroborate, ensure_session, record_action, record_source, remember, session_read
 from ...engine.revoke import reinstate, report, revoke
-from ...errors import PedigreeError, QuotaExceeded
+from ...errors import InvalidArgument, PedigreeError, QuotaExceeded
 from .. import auth
 from ..schemas import (
     ActionCreate,
@@ -22,6 +23,20 @@ from ..schemas import (
     SessionReadRequest,
     SourceCreate,
 )
+
+#: Source kinds whose default integrity is trusted. An agent token cannot mint them: the
+#: capture channel records everything an agent reports as untrusted, and the direct channel
+#: only accepts them with the operator credential (consult 007 / ADR-008).
+AGENT_SAFE_KINDS = frozenset({"web", "tool_output", "mcp_tool_desc", "other"})
+
+
+def operator_authorized(request: Request, settings) -> bool:
+    """True only when the deployment's operator credential is configured and matches."""
+    expected = getattr(settings, "pedigree_admin_token", "") or ""
+    if not expected:
+        return False
+    presented = request.headers.get("X-Admin-Token", "")
+    return bool(presented) and hmac.compare_digest(presented, expected)
 
 
 def register(app: FastAPI, db, registry, settings) -> None:
@@ -53,13 +68,23 @@ def register(app: FastAPI, db, registry, settings) -> None:
         tenant, gname = tenant_and_db(request)
         gate(request, tenant)
         quota(db, gname, tenant)
+        operator = operator_authorized(request, settings)
+        if payload.kind not in AGENT_SAFE_KINDS and not operator:
+            raise InvalidArgument(
+                "this source kind needs the operator credential",
+                detail={"kind": payload.kind, "header": "X-Admin-Token"},
+            )
+        # An agent token never asserts integrity; without the operator credential every
+        # recorded source is untrusted whatever the body claims (ADR-008).
+        integrity = payload.integrity if (operator and payload.integrity) else (
+            None if operator else "untrusted")
         res = record_source(
             db, gname, tenant,
             kind=payload.kind,
             uri=payload.uri,
             title=payload.title,
             content_hash=payload.content_hash,
-            integrity=payload.integrity,
+            integrity=integrity,
             conf=payload.conf,
             id=payload.id,
         )
@@ -116,8 +141,11 @@ def register(app: FastAPI, db, registry, settings) -> None:
     def do_corroborate(payload: CorroborateRequest, request: Request):
         tenant, gname = tenant_and_db(request)
         gate(request, tenant)
+        if payload.by in ("human", "scanner") and not operator_authorized(request, settings):
+            raise PedigreeError("trusted attestation needs the operator credential",
+                                code="forbidden", detail={"header": "X-Admin-Token"})
         corroborate(db, gname, payload.memory_id, payload.source_id, by=payload.by)
-        return {"ok": True}
+        return {"ok": True, "by": payload.by}
 
     @app.post("/v1/sessions")
     def ensure(payload: EnsureSessionRequest, request: Request):

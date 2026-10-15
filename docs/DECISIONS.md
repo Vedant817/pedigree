@@ -212,3 +212,47 @@ would make incomplete evidence appear complete. Throwing after writing creates a
 decision success from optional recording failure. Reversible response addition; no schema
 change. **Evidence:** `tests/security/test_F11_adversarial.py`,
 `tests/integration/test_gate_qa.py`; independent reports in `docs/qa/`.
+---
+
+## ADR-008 | 2026-10-15 | Source identity is derived from the artifact; trust needs the operator credential
+
+**Context.** Two measured capture holes (red-team consult 006/007): (1) `record_source` minted a
+new id per call, so two identical reads produced two Source nodes with the same uri, revoking one
+left its twin `ok`, and 200 identical reads burned 200 quota units; (2) authority was
+caller-asserted - any bearer-token holder (i.e. the agent) could POST `/v1/corroborate` with
+`by="human"` (which ADR-007 made the gate's trusted-support signal), mint a `web` source with
+`integrity="trusted"`, claim `kind="human"`, or overwrite a real human attestation
+(`MERGE ... SET r.by`).
+
+**Decision.** `docs/consults/007-capture-trust/decision.md`:
+1. **Derived identity.** `Source(uri)` + `Source(content_hash)` exact-match indexes and the
+   composite unique constraint `Source(uri, content_hash)` (measured expressible on v4.22.1 once
+   the indexes are OPERATIONAL; a uri-only constraint is deliberately absent - it rejects a
+   legitimately changed page). `record_source` does one atomic `MERGE` on `(tenant, uri,
+   content_hash)` - or `(tenant, uri)` without a hash - so repeated reads converge on one node and
+   the same uri with a new hash is a new version whose old hash stays revocable. A caller id names
+   the node at creation only. `POST /v1/events` resolves in-batch references through an alias map.
+2. **Structural authority.** The agent channel can only downgrade: `/v1/sources` and `/v1/events`
+   record **untrusted** for an agent token whatever the body claims (integrity/kind/runtime are not
+   credentials) and reject trusted-by-default kinds without the operator credential; MCP
+   `pedigree_record_source` always records untrusted; MCP `pedigree_corroborate` accepts only
+   `by="agent"`; REST `/v1/corroborate` accepts `human`/`scanner` only with a matching
+   `X-Admin-Token` (constant-time compare). The in-process engine keeps kind-based defaults so the
+   seeder still produces human-attested demo sources.
+3. **Write-once-then-upgrade corroboration.** `Q_CORROBORATE` keeps an existing `by` unless the new
+   value is `human|scanner`.
+
+**Alternatives.** Registry `role='human"` tenant token (rejected: on one host it moves "forge a
+string in a body" to "read a string from a file" the agent can also read, and it changes the
+registry schema). Caller-supplied stable ids only (rejected: the hook cannot mint one without
+hashing the artifact - exactly the measured 3-nodes-per-path bug). Trusting `via` tags (rejected:
+MCP writes `via='cite'`, identical to a genuine citation, measured).
+
+**Consequences.** Captured Sources are untrusted over HTTP, so gate rule 3 `untrusted_influence`
+applies to irreversible/high-risk actions built on them (friction measured later in E3b).
+KNOWN_ISSUES 11/12 close for the shipped surface; a forged capture payload and a compromised host
+stay documented residuals. **Reversible:** identity = 2 query constants + 1 DDL; authority =
+route-level gating; no revoke/blame/gate algorithm change. **Evidence:**
+`docs/consults/007-capture-trust/{redteam,domain,architect,decision}.md`,
+`tests/integration/test_source_identity.py`, `tests/security/test_capture_trust.py`.
+

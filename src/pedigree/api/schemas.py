@@ -19,6 +19,8 @@ class SourceCreate(StrictModel):
     uri: str | None = None
     title: str | None = None
     content_hash: str | None = None
+    #: Only honoured with the operator credential (`X-Admin-Token`); the agent channel is
+    #: always recorded as untrusted (consult 007 / ADR-008).
     integrity: Literal["trusted", "untrusted"] | None = None
     conf: list[str] | None = None
     id: str | None = None
@@ -55,6 +57,9 @@ class ActionCreate(StrictModel):
 
 
 class CorroborateRequest(StrictModel):
+    """`human`/`scanner` require the operator credential (`X-Admin-Token`); an agent token can
+    only assert `agent` (consult 007 / ADR-008)."""
+
     memory_id: str
     source_id: str
     by: Literal["agent", "human", "scanner"] = "agent"

@@ -78,10 +78,20 @@ def test_events_ignores_unknown_kinds(client, tenant):
     assert r.json()["created"] == []
 
 
-def test_events_conflict_on_duplicate_id(client, tenant):
+def test_events_capture_ids_converge_on_the_same_source(client, tenant):
+    """ADR-008: the caller id names the node; the artifact names the identity."""
     _tid, _tok, h = tenant
     body = {"events": [{"type": "source", "kind": "web", "id": "dup_evt_test", "uri": "u"}]}
-    assert client.post("/v1/events", headers=h, json=body).status_code == 200
-    r = client.post("/v1/events", headers=h, json=body)
+    first = client.post("/v1/events", headers=h, json=body).json()["created"]
+    second = client.post("/v1/events", headers=h, json=body).json()["created"]
+    assert first == second and len(first) == 1
+
+
+def test_events_id_conflict_for_different_content(client, tenant):
+    _tid, _tok, h = tenant
+    assert client.post("/v1/events", headers=h, json={
+        "events": [{"type": "source", "kind": "web", "id": "dup_evt2", "uri": "u1"}]}).status_code == 200
+    r = client.post("/v1/events", headers=h, json={
+        "events": [{"type": "source", "kind": "web", "id": "dup_evt2", "uri": "u2"}]})
     assert r.status_code == 409
     assert r.json()["error"]["code"] == "conflict"

@@ -31,6 +31,9 @@ def normalize_event(runtime: str, event: dict[str, Any]) -> dict[str, Any] | Non
     if kind in ("source_read", "source", "source.create") or (
         kind in SOURCE_KIND_ALIASES and "type" not in event
     ):
+        # The caller id names the node at creation; identity itself is derived from
+        # (uri, content_hash) in the engine (ADR-008), so the same artifact always
+        # converges on one node whatever id this capture used.
         spec = {
             "op": "source",
             "kind": _source_kind(event),

@@ -20,7 +20,7 @@ that is not `done` here.
 | F-10 | P0 | Scenarios S1 + S8 as JSON + `seed_demo.py` + `make demo` | done | tests/integration/test_demo_seed.py, test_demo_qa.py | docs/qa/F-10.md PASS; redteam-F-10.md PASS |
 | F-11 | P1 | Gate: `check_action` + REST `/v1/gate` + MCP + hook deny/ask + policy.yaml classifier | done | tests/unit/test_gate.py, tests/integration/test_gate_integration.py, tests/security/test_security_F11.py, tests/security/test_F11_adversarial.py, tests/integration/test_gate_qa.py, tests/unit/test_claude_hook.py | docs/qa/F-11.md PASS; docs/qa/redteam-F-11.md PASS (documented limits) |
 | F-12 | P1 | Confidentiality labels + scenario S6 | todo | - | - |
-| F-13 | P1 | Isolation hardening: per-tenant ACL users, rate limits, quotas, metrics, structured logs | todo | - | - |
+| F-13 | P1 | Isolation hardening: per-tenant ACL users, rate limits, quotas, metrics, structured logs | implementing | tests/security/test_security_F05.py, tests/security/test_security_F06.py, tests/security/test_capture_trust.py, tests/integration/test_source_identity.py | capture trust closed (ADR-008): `docs/consults/007-capture-trust/decision.md`; rate limits/quota/metrics shipped in F-05; ACL users + structured logs remain (F-15/F-16) |
 | F-14 | P1 | Eval harness: generator, independent oracle, baselines B0-B5, E1, E2, stats, NUMBERS pipeline | todo | - | - |
 | F-15 | P1 | E5 isolation/concurrency suite (hypothesis + threads + invariants + ACL) | todo | - | - |
 | F-16 | P1 | Deployment: Dockerfile (Ubuntu 24.04 single container), compose, Render, seed-on-boot | todo | - | - |

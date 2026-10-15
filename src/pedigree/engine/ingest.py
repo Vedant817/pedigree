@@ -156,10 +156,26 @@ def record_source(
         props["content_hash"] = content_hash.lower()
 
     try:
-        res = db.query(
-            gname, Q.Q_CREATE_SOURCE, {"props": props, "now": now or now_ms()}, op="ingest.source", trace=trace
-        )
+        # Derived identity: the artifact (uri [+ content_hash]) names the node, so repeated
+        # reads converge instead of minting a second Source (consult 007 / ADR-008). A
+        # caller-supplied id names the node at creation only; it never forks the same
+        # content into two nodes.
+        if uri and content_hash:
+            res = db.query(gname, Q.Q_SOURCE_MERGE_HASHED,
+                           {"tenant": tenant, "uri": uri, "hash": content_hash.lower(),
+                            "props": props, "now": now or now_ms()},
+                           op="ingest.source", trace=trace)
+        elif uri:
+            res = db.query(gname, Q.Q_SOURCE_MERGE_URI,
+                           {"tenant": tenant, "uri": uri, "props": props, "now": now or now_ms()},
+                           op="ingest.source", trace=trace)
+        else:
+            res = db.query(
+                gname, Q.Q_CREATE_SOURCE, {"props": props, "now": now or now_ms()}, op="ingest.source", trace=trace
+            )
     except Conflict as exc:
+        # The caller's id already belongs to different content - an identity conflict,
+        # never a silent duplicate.
         raise Conflict("source id already exists", detail={"id": node_id}) from exc
     row = res.result_set[0]
     warnings: list[str] = []

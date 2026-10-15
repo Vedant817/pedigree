@@ -25,6 +25,10 @@ Q_INDEX_MEMORY_ARTIFACT = "CREATE INDEX FOR (n:Memory) ON (n.artifact_key)"
 Q_INDEX_ACTION_ARTIFACT = "CREATE INDEX FOR (n:Action) ON (n.artifact_key)"
 Q_INDEX_REVOCATION_ROOT = "CREATE INDEX FOR (n:Revocation) ON (n.root_id)"
 Q_INDEX_REVOCATION_STATE = "CREATE INDEX FOR (n:Revocation) ON (n.state)"
+#: Supporting exact-match indexes for the Source identity constraint (ADR-008). A uri-only
+#: constraint is deliberately absent: it rejects a legitimately changed page (measured).
+Q_INDEX_SOURCE_URI = "CREATE INDEX FOR (s:Source) ON (s.uri)"
+Q_INDEX_SOURCE_HASH = "CREATE INDEX FOR (s:Source) ON (s.content_hash)"
 Q_INDEXES = "CALL db.indexes()"
 
 # --- lookups ----------------------------------------------------------------
@@ -44,6 +48,23 @@ Q_ARTIFACT_LOOKUP_ACTION = (
 # --- create: sources (roots) -------------------------------------------------
 Q_CREATE_SOURCE = """
 CREATE (n:Node:Source) SET n = $props, n.created_at = $now
+RETURN n.id, n.status, n.low_integrity, n.conf_eff
+"""
+
+# --- derived Source identity (consult 007 / ADR-008) --------------------------
+# One node per (tenant, uri, content_hash) - or per (tenant, uri) when the caller sent no
+# hash - so repeated reads of the same artifact converge instead of minting new ids. The
+# composite unique constraint Source(uri, content_hash) (schema.ensure_source_identity)
+# makes the MERGE atomic and idempotent; the uri-only constraint is deliberately absent
+# because it rejects a legitimately changed page (measured on FalkorDB v4.22.1).
+Q_SOURCE_MERGE_HASHED = """
+MERGE (n:Node:Source {tenant:$tenant, uri:$uri, content_hash:$hash})
+ON CREATE SET n = $props, n.created_at = $now
+RETURN n.id, n.status, n.low_integrity, n.conf_eff
+"""
+Q_SOURCE_MERGE_URI = """
+MERGE (n:Node:Source {tenant:$tenant, uri:$uri})
+ON CREATE SET n = $props, n.created_at = $now
 RETURN n.id, n.status, n.low_integrity, n.conf_eff
 """
 
@@ -85,9 +106,15 @@ def q_create_orphan(label: str) -> str:
 
 
 # --- corroboration ----------------------------------------------------------
+# Write-once-then-upgrade: an existing `by` survives an agent call (the agent channel can
+# only downgrade, never delete a human/scanner attestation) but a human/scanner value
+# replaces an agent one (consult 007 / ADR-008).
 Q_CORROBORATE = """
 MATCH (m:Memory {id:$m}), (s:Source {id:$s})
-MERGE (m)-[r:CORROBORATED_BY]->(s) SET r.by = $by
+MERGE (m)-[r:CORROBORATED_BY]->(s)
+SET r.by = CASE WHEN r.by IS NULL THEN $by
+                WHEN $by IN ['human','scanner'] THEN $by
+                ELSE r.by END
 RETURN m.id, s.id
 """
 

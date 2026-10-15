@@ -5,6 +5,7 @@ from __future__ import annotations
 from mcp.server.mcpserver import MCPServer
 
 from .api.registry import TenantRegistry
+from .api.routes.engine import AGENT_SAFE_KINDS
 from .config import get_settings, graph_name
 from .db.client import Db
 from .db.schema import ensure_schema, node_count
@@ -70,8 +71,12 @@ class PedigreeMCPServer:
         @srv.tool()
         def pedigree_record_source(tenant_id: str | None = None, token: str | None = None,
                                   kind: str = "web", uri: str | None = None, title: str | None = None,
-                                  integrity: str | None = None, id: str | None = None,
+                                  id: str | None = None,
                                   conf: list[str] | None = None) -> dict:
+            if kind not in AGENT_SAFE_KINDS:
+                return {"ok": False, "error": {"code": "invalid_argument",
+                                               "message": "this source kind needs the capture channel",
+                                               "detail": {"kind": kind, "channel": "POST /v1/events"}}}
             tid, gname = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": tid}}
@@ -79,8 +84,10 @@ class PedigreeMCPServer:
             if node_count(self.db, gname) >= cap:
                 return {"ok": False, "error": {"code": "quota_exceeded", "message": "node cap exceeded"}}
             def go():
+                # MCP has no operator credential (tools must not accept one), so every source
+                # an agent records is untrusted regardless of kind (ADR-008).
                 r = record_source(self.db, gname, tid, kind=kind, uri=uri, title=title,
-                                  integrity=integrity, conf=conf, id=id)
+                                  integrity="untrusted", conf=conf, id=id)
                 return {"id": r.id, "status": r.status, "low_integrity": r.low_integrity,
                         "warnings": r.warnings}
             return _call(go)
@@ -126,11 +133,18 @@ class PedigreeMCPServer:
 
         @srv.tool()
         def pedigree_corroborate(tenant_id: str | None = None, token: str | None = None,
-                                memory_id: str = "", source_id: str = "", by: str = "agent") -> dict:
+                                 memory_id: str = "", source_id: str = "",
+                                 by: str = "agent") -> dict:
+            if by != "agent":
+                # MCP has no operator credential, so it can only assert agent support;
+                # human/scanner authority needs the operator header on the REST route (ADR-008).
+                return {"ok": False, "error": {"code": "forbidden",
+                                               "message": "trusted attestation needs the operator credential",
+                                               "detail": {"by": str(by)[:16]}}}
             tid, gname = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": tid}}
-            return _call(lambda: (corroborate(self.db, gname, memory_id, source_id, by=by), {"ok": True})[1])
+            return _call(lambda: (corroborate(self.db, gname, memory_id, source_id, by="agent"), {"ok": True})[1])
 
         @srv.tool()
         def pedigree_check_action(token: str | None = None, tool: str = "", summary: str = "",

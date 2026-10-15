@@ -51,8 +51,46 @@ def create_unique_constraint(db: Db, gname: str, label: str = "Node", prop: str 
             raise RuntimeError(f"constraint creation failed: {exc}") from exc
 
 
+def _has_index(db: Db, gname: str, label: str, prop: str) -> bool:
+    for row in db.ro_query(gname, Q.Q_INDEXES, {}, op="schema.indexes").result_set or []:
+        cells = [c.decode() if isinstance(c, bytes) else str(c) for c in row]
+        if any(label == c for c in cells) and any(prop == c for c in cells):
+            return True
+    return False
+
+
+def ensure_source_identity(db: Db, gname: str) -> str:
+    """Source identity index + composite unique constraint (consult 007 / ADR-008).
+
+    One Source node per `(uri, content_hash)`: repeated reads of the same artifact converge,
+    the same uri with a new content hash becomes a new version node. The uri-only constraint
+    is deliberately NOT created - it rejects a legitimately changed page (measured on v4.22.1).
+    Returns "ok", or "unavailable" when a pre-existing graph already holds duplicate pairs
+    (recorded limitation; identity still works, the store just cannot enforce it).
+    """
+    for stmt in (Q.Q_INDEX_SOURCE_URI, Q.Q_INDEX_SOURCE_HASH):
+        prop = "uri" if stmt is Q.Q_INDEX_SOURCE_URI else "content_hash"
+        if not _has_index(db, gname, "Source", prop):
+            create_index(db, gname, stmt)
+    try:
+        wait_indexes(db, gname)
+    except TimeoutError:
+        return "unavailable"
+    try:
+        db.admin_raw("GRAPH.CONSTRAINT", "CREATE", gname, "UNIQUE", "NODE", "Source",
+                     "PROPERTIES", "2", "uri", "content_hash")
+    except Exception as exc:  # noqa: BLE001 - idempotent DDL, or duplicate data
+        msg = str(exc).lower()
+        if any(b in msg for b in DDL_BENIGN):
+            return "ok"
+        if "constraint" in msg or "duplicate" in msg:
+            return "unavailable"
+        raise RuntimeError(f"source identity constraint creation failed: {exc}") from exc
+    return "ok"
+
+
 def ensure_schema(db: Db, gname: str, *, label: str = "Node") -> dict:
-    """Idempotent per-tenant schema. Returns {index_wait_s, n_indexes}."""
+    """Idempotent per-tenant schema. Returns {index_wait_s, n_indexes, source_identity}."""
     t0 = time.time()
     create_index(db, gname, Q.Q_INDEX_NODE_ID if label == "Node" else Q.Q_INDEX_TENANT_ID)
     if label == "Node":
@@ -63,8 +101,10 @@ def ensure_schema(db: Db, gname: str, *, label: str = "Node") -> dict:
     wait_indexes(db, gname)
     create_unique_constraint(db, gname, label=label, prop="id")
     wait_indexes(db, gname)
+    identity = ensure_source_identity(db, gname) if label == "Node" else "n/a"
     rows = db.ro_query(gname, Q.Q_INDEXES, {}, op="schema.indexes").result_set or []
-    return {"index_wait_s": round(time.time() - t0, 3), "n_indexes": len(rows)}
+    return {"index_wait_s": round(time.time() - t0, 3), "n_indexes": len(rows),
+            "source_identity": identity}
 
 
 def ensure_registry_schema(db: Db) -> dict:

@@ -144,3 +144,31 @@
   full eval/isolation/ACL/deployment work and human release tasks remain. No push performed.
 - Execution policy blocked cleanup of ignored build/browser artifacts; left local/ignored.
   Temporary clean clones remain in OS temp. Current state lists exact next three actions.
+---
+
+### 2026-10-16 01:05 IST | Phase P1 | F-07 audit fix + consult 007 capture trust (ADR-008) | STATUS: done
+- F-07 capture audit round 2: source-kind fidelity fixed (`source_kind` > `kind` > `web`; kind-only
+  events no longer dropped), 10 new adapter unit tests; `docs/qa/F-07.md` PASS.
+- Consult 007 (`docs/consults/007-capture-trust/`): domain-researcher + red-team (real FalkorDB
+  probes) + senior-architect (role-switch, subagent failed 3x on provider errors; the orchestrator
+  wrote it from its own measured probe `scratch/probe_identity.py`). Unanimous direction, ADR-008.
+- Shipped (ADR-008): Source identity derived from `(uri, content_hash)` - exact-match indexes +
+  composite unique constraint (measured expressible on v4.22.1), one atomic MERGE so repeated reads
+  converge and the same uri with a new hash is a new version whose old hash stays revocable; capture
+  ids can no longer fork a node or escape revocation; `/v1/events` resolves in-batch aliases.
+- Authority is structural: agent tokens record untrusted whatever the body claims (integrity/kind/
+  runtime are not credentials), trusted-by-default kinds are rejected without the operator credential,
+  MCP `corroborate` accepts only `by="agent"`, REST `corroborate` accepts `human`/`scanner` only with
+  a matching `X-Admin-Token`, and `CORROBORATED_BY` is write-once-then-upgrade (an agent edge can be
+  upgraded, never downgraded).
+- Tests: 281 passed (was 254) - `tests/integration/test_source_identity.py` (7),
+  `tests/security/test_capture_trust.py` (14), plus `test_events`/`test_demo_qa` contract updates.
+  `make check` green (ruff + pytest + secret scan `--history` + numbers).
+- KNOWN_ISSUES 11/12 closed for the shipped surface; new residuals 16/17 documented.
+- **Environment:** Windows 11 dev host; Python 3.12.15 (uv `.venv`); FalkorDB v4.22.1 (Docker,
+  pinned); Node v24.13.1.
+- **Deadlines:** feature freeze Sun 2026-10-18 15:00 IST; submit target Sun 21:00 IST.
+- **Next 3 actions:**
+  1. F-14 spec + E1/E2 independent oracle + baselines + NUMBERS pipeline (`make eval`).
+  2. F-15 isolation/concurrency (ACL users, hypothesis + threads, invariants) and F-16 deploy path.
+  3. F-23 README/blog/video/submission pack once the numbers exist.

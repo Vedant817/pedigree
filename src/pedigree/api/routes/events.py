@@ -10,6 +10,7 @@ from ...engine.ingest import artifact_lookup as lookup_fn
 from ...engine.ingest import ensure_session, read_window, record_action, record_source, remember, session_read
 from ...errors import TooLarge
 from .. import auth
+from ..routes.engine import operator_authorized
 from ..schemas import EventsPayload
 
 
@@ -26,14 +27,26 @@ def register(app: FastAPI, db, registry, settings) -> None:
             )
         spec_list = normalize_events(payload.runtime, {"session_id": payload.session_id, "events": payload.events})
         created: list[str] = []
+        # In-batch alias map: a capture id names a node, but identity is derived from the
+        # artifact (ADR-008), so later events in the same batch that reference the id are
+        # rewritten to the canonical node id.
+        aliases: dict[str, str] = {}
+
+        def resolve(value):
+            return aliases.get(value, value) if isinstance(value, str) else value
+
         for spec in spec_list:
             op = spec.get("op")
             sid = spec.get("session_id")
             if op == "session":
                 ensure_session(db, gname, tenant, sid, runtime=payload.runtime or spec.get("runtime", "other"))
             elif op == "session_read":
-                session_read(db, gname, sid, spec.get("node_id"))
+                session_read(db, gname, sid, resolve(spec.get("node_id")))
             elif op == "source":
+                # The capture channel never asserts trust for an agent token: integrity is
+                # forced to untrusted unless the operator credential is presented. A claimed
+                # `runtime`/`kind`/`integrity` in the payload is not a credential (ADR-008).
+                operator = operator_authorized(request, settings)
                 res = record_source(
                     db,
                     gname,
@@ -41,11 +54,13 @@ def register(app: FastAPI, db, registry, settings) -> None:
                     kind=spec.get("kind", "web"),
                     uri=spec.get("uri"),
                     title=spec.get("title"),
-                    integrity=spec.get("integrity"),
+                    integrity=spec.get("integrity") if operator else "untrusted",
                     content_hash=spec.get("content_hash"),
                     conf=spec.get("conf"),
                     id=spec.get("id"),
                 )
+                if spec.get("id"):
+                    aliases[spec["id"]] = res.id
                 created.append(res.id)
             elif op == "memory":
                 res = remember(
@@ -53,8 +68,8 @@ def register(app: FastAPI, db, registry, settings) -> None:
                     gname,
                     tenant,
                     text=spec.get("text", ""),
-                    derived_from=spec.get("derived_from") or [],
-                    corroborated_by=spec.get("corroborated_by") or [],
+                    derived_from=[resolve(x) for x in (spec.get("derived_from") or [])],
+                    corroborated_by=[resolve(x) for x in (spec.get("corroborated_by") or [])],
                     artifact=spec.get("artifact"),
                     artifact_key=spec.get("artifact_key"),
                     id=spec.get("id"),
@@ -63,7 +78,7 @@ def register(app: FastAPI, db, registry, settings) -> None:
                 )
                 created.append(res.id)
             elif op == "action":
-                parents = spec.get("relied_on") or (
+                parents = [resolve(x) for x in (spec.get("relied_on") or [])] or (
                     read_window(db, gname, sid, settings.pedigree_read_window) if sid else [])
                 effect, risk = classify_action(load_policy(settings.pedigree_policy_file),
                                                 spec.get("tool", "unknown"), spec.get("summary", ""),
