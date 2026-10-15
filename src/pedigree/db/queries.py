@@ -203,6 +203,13 @@ MATCH (n) WHERE (CASE WHEN n:Source THEN 1 ELSE 0 END
 RETURN count(n) AS n
 """
 Q_INV_BAD_STATUS = "MATCH (n) WHERE NOT n.status IN $allowed RETURN count(n) AS n"
+# Every :Node entity carries a status property except :Revocation, whose lifecycle property
+# is `state` (running|done) - QA finding 2026-10-15: `NOT n.status IN [...]` is NULL for a
+# missing property, so absence was invisible. See docs/KNOWN_ISSUES.md.
+Q_INV_MISSING_STATUS = """
+MATCH (n:Node) WHERE n.status IS NULL AND NOT n:Revocation
+RETURN count(n) AS n
+"""
 Q_INV_NO_ID = "MATCH (n) WHERE n.id IS NULL RETURN count(n) AS n"
 Q_INV_MISSING_FEEDS = """
 MATCH (c:Node)-[:DERIVED_FROM]->(p:Node)

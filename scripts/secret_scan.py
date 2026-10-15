@@ -99,8 +99,12 @@ def scan_history(root: Path) -> int:
         cwd=root,
         capture_output=True,
         text=True,
+        # Windows locale is cp1252, but history contains bytes that are not valid
+        # cp1252 (verified: OffsetError on 0x8f) - force utf-8 with replacement.
+        encoding="utf-8",
+        errors="replace",
     )
-    if proc.returncode != 0:
+    if proc.returncode != 0 or proc.stdout is None:
         print("[secret-scan] git history unavailable (no commits yet?)")
         return 0
     findings = 0
@@ -115,7 +119,6 @@ def scan_history(root: Path) -> int:
             print(f"[secret-scan] history {commit} -> {name} (secret length {length})")
             findings += 1
     return findings
-
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="scan tracked files for secrets")

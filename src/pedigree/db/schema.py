@@ -103,6 +103,7 @@ def check_invariants(
         (Q.Q_INV_BAD_TYPE, "node without a known type label", None),
         (Q.Q_INV_MULTI_TYPE, "node with more than one type label", None),
         (Q.Q_INV_BAD_STATUS, "node with unknown status", {"allowed": list(STATUS_ALL)}),
+        (Q.Q_INV_MISSING_STATUS, "node without a status property", None),
         (Q.Q_INV_NO_ID, "node without id", None),
         (Q.Q_INV_MISSING_FEEDS, "DERIVED_FROM without mirrored FEEDS", None),
         (Q.Q_INV_MISSING_DERIVED, "FEEDS without mirrored DERIVED_FROM", None),

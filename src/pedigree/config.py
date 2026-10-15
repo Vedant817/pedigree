@@ -108,6 +108,13 @@ def graph_name(tenant: str) -> str:
     return f"ped:{tenant}"
 
 
+def validate_tenant(tenant: str) -> str:
+    """Assert a tenant id at an engine boundary (F-05 will derive it from the token only)."""
+    if not isinstance(tenant, str) or not TENANT_RE.fullmatch(tenant):
+        raise InvalidArgument("invalid tenant id", detail={"tenant": str(tenant)[:64]})
+    return tenant
+
+
 def whatif_graph_name(tenant: str, token: str) -> str:
     base = graph_name(tenant)
     if not isinstance(token, str) or not WI_TOKEN_RE.fullmatch(token):

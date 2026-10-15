@@ -25,6 +25,7 @@ from ..config import (
     get_settings,
     validate_artifact,
     validate_id,
+    validate_tenant,
 )
 from ..db import queries as Q
 from ..db.client import Db, Trace, chunks
@@ -127,6 +128,7 @@ def record_source(
 ) -> IngestResult:
     if kind not in SOURCE_KINDS:
         raise InvalidArgument("unknown source kind", detail={"kind": str(kind)[:32]})
+    tenant = validate_tenant(tenant)
     integrity = integrity or default_integrity(kind)
     if integrity not in ("trusted", "untrusted"):
         raise InvalidArgument("invalid integrity", detail={"integrity": str(integrity)[:16]})
@@ -189,6 +191,7 @@ def remember(
 ) -> IngestResult:
     if mkind not in MEMORY_KINDS:
         raise InvalidArgument("unknown memory kind", detail={"mkind": str(mkind)[:32]})
+    tenant = validate_tenant(tenant)
     if not isinstance(text, str) or len(text) > LIMITS["text_len"]:
         raise TooLarge("memory text too long", detail={"limit": LIMITS["text_len"]})
     if via not in VIA_VALUES:
@@ -282,6 +285,7 @@ def record_action(
 ) -> IngestResult:
     if not isinstance(tool, str) or not tool or len(tool) > 128:
         raise InvalidArgument("invalid tool name")
+    tenant = validate_tenant(tenant)
     if len(summary) > LIMITS["summary_len"]:
         raise TooLarge("summary too long", detail={"limit": LIMITS["summary_len"]})
     if effect is not None and effect not in ("reversible", "irreversible", "unknown"):

@@ -12,7 +12,7 @@ import collections
 import threading
 import time
 
-from ..config import LIMITS, REVOCABLE
+from ..config import LIMITS, REVOCABLE, validate_tenant
 from ..db import queries as Q
 from ..db.client import Db, Trace, chunks
 from ..errors import InvalidArgument, NotFoundInGraph, PedigreeError, TooLarge
@@ -89,6 +89,7 @@ def revoke(
 ) -> dict:
     if kind not in ("revoke", "supersede"):
         raise InvalidArgument("invalid revocation kind")
+    tenant = validate_tenant(tenant)
     if len(reason) > LIMITS["reason_len"]:
         raise TooLarge("reason too long", detail={"limit": LIMITS["reason_len"]})
     exists, labels = node_exists(db, gname, root_id, trace)
@@ -256,6 +257,7 @@ def reinstate(
     trace: Trace | None = None,
 ) -> dict:
     """Undo a revocation: reset the root and its descendants, then re-resolve the rest."""
+    tenant = validate_tenant(tenant)
     exists, labels = node_exists(db, gname, root_id, trace)
     if not exists:
         raise NotFoundInGraph("unknown id", detail={"id": root_id})

@@ -66,6 +66,20 @@ def test_invariants_detect_unknown_status(fresh_graph):
     assert any("unknown status" in v for v in violations), violations
 
 
+def test_invariants_detect_missing_status(fresh_graph):
+    """QA finding: a node with NO status property was invisible to the old check
+    (`NOT n.status IN [...]` is NULL for a missing property)."""
+    db, tenant, gname = fresh_graph
+    db.query(
+        gname,
+        "CREATE (:Node:Memory {id:'nostatus', tenant:$t, created_at:1})",
+        {"t": tenant},
+        op="test.corrupt",
+    )
+    violations = check_invariants(db, gname)
+    assert any("without a status property" in v for v in violations), violations
+
+
 def test_invariants_detect_broken_mirror(fresh_graph):
     db, tenant, gname = fresh_graph
     s = record_source(db, gname, tenant, kind="web", id="s1")

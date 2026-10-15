@@ -10,17 +10,35 @@ CYPHER_KEYWORDS = ("MATCH", "CREATE", "MERGE", "UNWIND", "SET ", "DELETE", "RETU
 
 
 def _dynamic_literals(tree: ast.AST):
-    """Yield (lineno, literal) for every interpolated string (f-string / .format receiver)."""
+    """Yield (lineno, literal) for every INTERPOLATED string.
+
+    Covers f-strings, .format()/.replace()/.join() on literal receivers, string
+    concatenation and %-formatting (QA finding 2026-10-15: the first version evaded
+    concatenation, %, join and replace).
+    """
     for node in ast.walk(tree):
         if isinstance(node, ast.JoinedStr):
             text = "".join(
                 v.value for v in node.values if isinstance(v, ast.Constant) and isinstance(v.value, str)
             )
             yield node.lineno, text
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "format":
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
             recv = node.func.value
-            if isinstance(recv, ast.Constant) and isinstance(recv.value, str):
+            if (
+                isinstance(recv, ast.Constant)
+                and isinstance(recv.value, str)
+                and node.func.attr in ("format", "replace", "join")
+            ):
                 yield node.lineno, recv.value
+                if node.func.attr == "join":  # risky strings live in the argument list
+                    for sub in ast.walk(node):
+                        if isinstance(sub, ast.Constant) and isinstance(sub.value, str):
+                            yield sub.lineno, sub.value
+        if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Add, ast.Mod)):
+            for side in (node.left, node.right):
+                for sub in ast.walk(side):
+                    if isinstance(sub, ast.Constant) and isinstance(sub.value, str):
+                        yield sub.lineno, sub.value
 
 
 def test_no_interpolated_cypher_anywhere():
