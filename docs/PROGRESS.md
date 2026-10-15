@@ -295,3 +295,17 @@
   empty list (a fixture that declares a tag collided with itself on re-seed), and a test asserted
   the old node count for the demo seed.
 - 307 passed, 1 skipped; ruff PASS; `make eval` green; demo tenant re-seeded with S1/S6/S8.
+
+---
+
+### 2026-10-16 04:10 IST | Phase P3 | F-17 what-if (GRAPH.COPY) | STATUS: done
+- `src/pedigree/engine/whatif.py`: `GRAPH.COPY` of the tenant graph (indexes kept), the **real**
+  revoke engine on the copy for each root, a status diff against the original, the affected and
+  irreversible actions, then the copy deleted in a `finally` - a what-if can never leave the real
+  lineage changed. Per-tenant concurrency capped, and copies this process does not track (crash
+  leftovers) are reaped on the next call.
+- REST `POST /v1/whatif` + MCP `pedigree_whatif`; `tests/integration/test_whatif.py` (5):
+  the diff matches what a real revoke produces (same engine, same graph shape), the real graph is
+  byte-identical afterwards, stale copies are reaped, empty/oversized root lists are rejected, and
+  both interfaces return the same counts.
+- 312 passed, 1 skipped; ruff PASS.

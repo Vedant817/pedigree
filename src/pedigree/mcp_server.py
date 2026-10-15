@@ -14,6 +14,7 @@ from .engine.blame import impact as run_impact
 from .engine.gate import check_action
 from .engine.ingest import corroborate, record_action, record_source, remember
 from .engine.revoke import reinstate, report, revoke
+from .engine.whatif import whatif
 from .errors import PedigreeError
 
 
@@ -200,6 +201,14 @@ class PedigreeMCPServer:
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": tid}}
             return _call(lambda: run_impact(self.db, gname, node_id, max_depth=max_depth))
+
+        @srv.tool()
+        def pedigree_whatif(tenant_id: str | None = None, token: str | None = None,
+                            roots: list[str] | None = None) -> dict:
+            tid, gname = self._resolve(tenant_id, token)
+            if gname is None:
+                return {"ok": False, "error": {"code": "unauthorized", "message": tid}}
+            return _call(lambda: whatif(self.db, gname, tid, roots or [], reason="what-if"))
 
         @srv.tool()
         def pedigree_report(tenant_id: str | None = None, token: str | None = None) -> dict:

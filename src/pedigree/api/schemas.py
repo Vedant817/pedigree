@@ -65,6 +65,11 @@ class CorroborateRequest(StrictModel):
     by: Literal["agent", "human", "scanner"] = "agent"
 
 
+class WhatIfRequest(StrictModel):
+    roots: list[str] = Field(default_factory=list, max_length=8)
+    reason: str = Field(default="what-if", max_length=300)
+
+
 class RevokeRequest(StrictModel):
     root_id: str
     reason: str = ""

@@ -11,6 +11,7 @@ from ...engine.blame import blame as run_blame
 from ...engine.blame import impact as run_impact
 from ...engine.ingest import corroborate, ensure_session, record_action, record_source, remember, session_read
 from ...engine.revoke import reinstate, report, revoke
+from ...engine.whatif import whatif
 from ...errors import InvalidArgument, PedigreeError, QuotaExceeded
 from .. import auth
 from ..schemas import (
@@ -22,6 +23,7 @@ from ..schemas import (
     RevokeRequest,
     SessionReadRequest,
     SourceCreate,
+    WhatIfRequest,
 )
 
 #: Source kinds whose default integrity is trusted. An agent token cannot mint them: the
@@ -169,6 +171,12 @@ def register(app: FastAPI, db, registry, settings) -> None:
         out = revoke(db, gname, tenant, root_id=payload.root_id, reason=payload.reason,
                     dry_run=payload.dry_run, kind=payload.kind)
         return out
+
+    @app.post("/v1/whatif")
+    def do_whatif(payload: WhatIfRequest, request: Request):
+        tenant, gname = tenant_and_db(request)
+        gate(request, tenant)
+        return whatif(db, gname, tenant, payload.roots, reason=payload.reason)
 
     @app.post("/v1/reinstate")
     def do_reinstate(payload: ReinstateRequest, request: Request):
