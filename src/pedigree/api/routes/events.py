@@ -3,9 +3,11 @@ from __future__ import annotations
 from fastapi import FastAPI, Request
 
 from ...adapters import normalize_events
+from ...config import LIMITS
 from ...db.schema import check_invariants
 from ...engine.ingest import artifact_lookup as lookup_fn
 from ...engine.ingest import ensure_session, record_action, record_source, remember, session_read
+from ...errors import TooLarge
 from .. import auth
 from ..schemas import EventsPayload
 
@@ -16,6 +18,11 @@ def register(app: FastAPI, db, registry, settings) -> None:
         auth.authenticate(request)
         tenant = request.state.tenant_id
         gname = request.state.graph_name
+        if len(payload.events) > LIMITS["events_per_request"]:
+            raise TooLarge(
+                "too many events in one request",
+                detail={"limit": LIMITS["events_per_request"], "got": len(payload.events)},
+            )
         spec_list = normalize_events(payload.runtime, {"session_id": payload.session_id, "events": payload.events})
         created: list[str] = []
         for spec in spec_list:

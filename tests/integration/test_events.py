@@ -53,3 +53,35 @@ def test_events_lifecycle(client, tenant):
     assert "violations" in inv
     lookup = client.get("/v1/artifacts/lookup?key=none", headers=h)
     assert lookup.status_code == 200
+
+
+def test_events_requires_auth(client):
+    r = client.post("/v1/events", json={"events": []})
+    assert r.status_code == 401
+
+
+def test_events_rejects_oversized_batch(client, tenant):
+    _tid, _tok, h = tenant
+    ev = {"runtime": "generic", "session_id": "s9", "events": [
+        {"type": "session_read", "session_id": "s9", "node_id": "n"} for _ in range(501)]}
+    r = client.post("/v1/events", headers=h, json=ev)
+    assert r.status_code == 413
+    assert r.json()["error"]["code"] == "too_large"
+
+
+def test_events_ignores_unknown_kinds(client, tenant):
+    _tid, _tok, h = tenant
+    r = client.post("/v1/events", headers=h, json={
+        "runtime": "generic", "session_id": "s8",
+        "events": [{"type": "not_a_real_event", "x": 1}]})
+    assert r.status_code == 200
+    assert r.json()["created"] == []
+
+
+def test_events_conflict_on_duplicate_id(client, tenant):
+    _tid, _tok, h = tenant
+    body = {"events": [{"type": "source", "kind": "web", "id": "dup_evt_test", "uri": "u"}]}
+    assert client.post("/v1/events", headers=h, json=body).status_code == 200
+    r = client.post("/v1/events", headers=h, json=body)
+    assert r.status_code == 409
+    assert r.json()["error"]["code"] == "conflict"
