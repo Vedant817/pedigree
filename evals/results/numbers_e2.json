@@ -1,0 +1,137 @@
+{
+  "e2_leakage_edge_drop_1pct": {
+    "value": 0.012,
+    "ci95": [
+      0.007,
+      0.0204
+    ],
+    "n": 1082,
+    "source": "evals/run_e2.py"
+  },
+  "e2_leakage_edge_drop_2pct": {
+    "value": 0.0434,
+    "ci95": [
+      0.0328,
+      0.0573
+    ],
+    "n": 1082,
+    "source": "evals/run_e2.py"
+  },
+  "e2_leakage_edge_drop_5pct": {
+    "value": 0.1414,
+    "ci95": [
+      0.1219,
+      0.1634
+    ],
+    "n": 1082,
+    "source": "evals/run_e2.py"
+  },
+  "e2_leakage_edge_drop_10pct": {
+    "value": 0.2412,
+    "ci95": [
+      0.2167,
+      0.2676
+    ],
+    "n": 1082,
+    "source": "evals/run_e2.py"
+  },
+  "e2_window_over_flag_k5": {
+    "value": 4.4628,
+    "ci95": [
+      3.6132,
+      5.511
+    ],
+    "n": 1082,
+    "source": "evals/run_e2.py (bootstrap CI)"
+  },
+  "e2_window_extra_actions_k5": {
+    "value": 3.2771,
+    "ci95": [
+      2.1802,
+      4.7553
+    ],
+    "n": 348,
+    "source": "evals/run_e2.py (bootstrap CI)"
+  },
+  "e2_window_over_flag_k10": {
+    "value": 5.4526,
+    "ci95": [
+      4.2547,
+      7.024
+    ],
+    "n": 1082,
+    "source": "evals/run_e2.py (bootstrap CI)"
+  },
+  "e2_window_extra_actions_k10": {
+    "value": 3.3551,
+    "ci95": [
+      2.2373,
+      4.866
+    ],
+    "n": 348,
+    "source": "evals/run_e2.py (bootstrap CI)"
+  },
+  "e2_window_over_flag_k25": {
+    "value": 5.7193,
+    "ci95": [
+      4.5381,
+      7.2714
+    ],
+    "n": 1082,
+    "source": "evals/run_e2.py (bootstrap CI)"
+  },
+  "e2_window_extra_actions_k25": {
+    "value": 3.3747,
+    "ci95": [
+      2.2621,
+      4.876
+    ],
+    "n": 348,
+    "source": "evals/run_e2.py (bootstrap CI)"
+  },
+  "e2_window_over_flag_k50": {
+    "value": 5.7193,
+    "ci95": [
+      4.5381,
+      7.2714
+    ],
+    "n": 1082,
+    "source": "evals/run_e2.py (bootstrap CI)"
+  },
+  "e2_window_extra_actions_k50": {
+    "value": 3.3747,
+    "ci95": [
+      2.2621,
+      4.876
+    ],
+    "n": 348,
+    "source": "evals/run_e2.py (bootstrap CI)"
+  },
+  "e2_window_over_flag_k100": {
+    "value": 5.7193,
+    "ci95": [
+      4.5381,
+      7.2714
+    ],
+    "n": 1082,
+    "source": "evals/run_e2.py (bootstrap CI)"
+  },
+  "e2_window_extra_actions_k100": {
+    "value": 3.3747,
+    "ci95": [
+      2.2621,
+      4.876
+    ],
+    "n": 348,
+    "source": "evals/run_e2.py (bootstrap CI)"
+  },
+  "e2_exact_leakage": {
+    "value": 0.0,
+    "ci95": [
+      0.0,
+      0.0035
+    ],
+    "n": 1082,
+    "source": "evals/run_e2.py"
+  }
+}

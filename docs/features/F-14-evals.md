@@ -59,3 +59,16 @@ sets), so the in-process shortcut is proven equivalent rather than assumed.
 ## Evidence needed
 - `make eval` exit 0 with CSVs + `evals/REPORT.md`; `docs/NUMBERS.md` block regenerated;
   `make check` still green; eval-statistician review of the design before any big run.
+
+## Status
+
+E1 + E2 are implemented and green (`evals/REPORT.md` generated from a real run):
+`make eval` 71 s, `make eval-quick` 4 s, 35 numbers in `docs/NUMBERS.md` with 95% CIs.
+E1: 18 cells x 30 seeds x 6 systems; oracle agrees with `engine/compute.py` on 1000 random
+DAGs and the in-process predicate matches a real FalkorDB revoke on 3 shapes.
+E2: edge drops d in {1,2,5,10}% (one draw stream per seed, monotone) and read windows
+K in {5,10,25,50,100}; the window sweep saturates around K=25 because the modelled session
+(5 actions per bucket) fits inside it - reported as-is.
+Still open in this feature: E3 (scenario replay through the HTTP API), E4/E4b (latency +
+SQLite comparison), E5 (isolation/concurrency), E6 (real-trace case study), and the
+eval-statistician sign-off before the big E4 run.

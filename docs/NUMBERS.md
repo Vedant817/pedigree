@@ -20,7 +20,7 @@ e1_irreversible_recall_b2 = 0.2231   # evals/run_e1.py
 e1_irreversible_recall_b4 = 1.0   # evals/run_e1.py
 e1_irreversible_recall_b5 = 1.0   # evals/run_e1.py
 e1_irreversible_recall_p = 1.0   # evals/run_e1.py
-e1_machine = Windows-11-10.0.26300-SP0; Intel64 Family 6 Model 191 Stepping 2, GenuineIntel; 15.7 GB RAM; python 3.12.15; falkor 42201; commit abaa581   # evals/machineinfo.py
+e1_machine = Windows-11-10.0.26300-SP0; Intel64 Family 6 Model 191 Stepping 2, GenuineIntel; 15.7 GB RAM; python 3.12.15; falkor 42201; commit 66a0dfd   # evals/machineinfo.py
 e1_over_invalidation_b0 = 0.0334   # evals/run_e1.py
 e1_over_invalidation_b1 = 0.0181   # evals/run_e1.py
 e1_over_invalidation_b2 = 0.0036   # evals/run_e1.py
@@ -41,6 +41,21 @@ e1_recall_b5 = 1.0   # evals/run_e1.py
 e1_recall_p = 1.0   # evals/run_e1.py
 e1_seeds_per_cell = 30   # evals
 e1_systems = 6   # evals
+e2_exact_leakage = 0.0   # evals/run_e2.py
+e2_leakage_edge_drop_10pct = 0.2412   # evals/run_e2.py
+e2_leakage_edge_drop_1pct = 0.012   # evals/run_e2.py
+e2_leakage_edge_drop_2pct = 0.0434   # evals/run_e2.py
+e2_leakage_edge_drop_5pct = 0.1414   # evals/run_e2.py
+e2_window_extra_actions_k10 = 3.3551   # evals/run_e2.py (bootstrap CI)
+e2_window_extra_actions_k100 = 3.3747   # evals/run_e2.py (bootstrap CI)
+e2_window_extra_actions_k25 = 3.3747   # evals/run_e2.py (bootstrap CI)
+e2_window_extra_actions_k5 = 3.2771   # evals/run_e2.py (bootstrap CI)
+e2_window_extra_actions_k50 = 3.3747   # evals/run_e2.py (bootstrap CI)
+e2_window_over_flag_k10 = 5.4526   # evals/run_e2.py (bootstrap CI)
+e2_window_over_flag_k100 = 5.7193   # evals/run_e2.py (bootstrap CI)
+e2_window_over_flag_k25 = 5.7193   # evals/run_e2.py (bootstrap CI)
+e2_window_over_flag_k5 = 4.4628   # evals/run_e2.py (bootstrap CI)
+e2_window_over_flag_k50 = 5.7193   # evals/run_e2.py (bootstrap CI)
 <!-- NUMBERS:END -->
 
 ## How to add a number

@@ -87,7 +87,20 @@ def build_report(info: dict, numbers: dict) -> str:
     cols = ["cell", "system", "recall", "over_invalidation", "preserved_correct",
             "action_recall", "irreversible_recall", "n_seeds"]
     parts.append(_table(semantics, cols))
-    parts.append("### Raw per-seed samples")
+    parts.append("")
+    parts.append("## E2 - capture fidelity (edge drops and conservative read windows)")
+    parts.append("")
+    parts.append("Model, stated plainly: (a) *precise capture with missing edges* drops each")
+    parts.append("DERIVED_FROM edge independently with probability d (one draw stream per seed, so a")
+    parts.append("higher rate always drops a superset of the edges); (b) *conservative read-window")
+    parts.append("capture* gives every write its true parents plus up to K carried-over reads from the")
+    parts.append("same modelled session (docs/01 section 7.3 \"last K READ targets\"; 5 actions per")
+    parts.append("session, which is why the K sweep saturates around 25). E2 is a model of capture")
+    parts.append("error, not a measurement of real runtime coverage (that is E6, small n).")
+    parts.append("")
+    e2 = _rows(RESULTS / "e2_capture.csv")
+    parts.append(_table(e2, ["kind", "param", "recall", "leakage", "over_flag_ratio",
+                             "extra_actions", "n_g", "n_actions"]))
     parts.append("")
     parts.append(f"`evals/results/e1_samples.csv` ({len(samples)} rows), "
                  "`evals/results/e1_b0_theta_sweep.csv`.")
@@ -119,6 +132,20 @@ def main(argv=None) -> int:
         print("[eval] E1 failed", file=sys.stderr)
         return rc
 
+    print("[eval] E2 capture fidelity ...")
+    from evals.run_e2 import main as run_e2  # noqa: PLC0415
+    rc = run_e2(["--quick"] if args.quick else [])
+    if rc != 0:
+        print("[eval] E2 failed", file=sys.stderr)
+        return rc
+
+    print("[eval] merging per-experiment numbers ...")
+    numbers_path = RESULTS / "numbers.json"
+    numbers = json.loads(numbers_path.read_text(encoding="utf-8")) if numbers_path.exists() else {}
+    for extra in sorted(RESULTS.glob("numbers_*.json")):
+        numbers.update(json.loads(extra.read_text(encoding="utf-8")))
+    numbers_path.write_text(json.dumps(numbers, indent=2), encoding="utf-8")
+
     print("[eval] regenerating docs/NUMBERS.md ...")
     rc = subprocess.call([sys.executable, str(ROOT / "scripts" / "extract_numbers.py")], cwd=ROOT)
     if rc != 0:
@@ -131,8 +158,6 @@ def main(argv=None) -> int:
         return rc
 
     info = machineinfo.collect()
-    numbers_path = RESULTS / "numbers.json"
-    numbers = json.loads(numbers_path.read_text(encoding="utf-8")) if numbers_path.exists() else {}
     report = build_report(info, numbers)
     (ROOT / "evals" / "REPORT.md").write_text(report, encoding="utf-8")
     print("[eval] wrote evals/REPORT.md and docs/NUMBERS.md")
