@@ -1,0 +1,82 @@
+{
+  "e4_rounds": {
+    "value": 5,
+    "source": "evals/run_e4.py"
+  },
+  "e4_machine": {
+    "value": "Windows-11-10.0.26300-SP0",
+    "source": "evals/machineinfo.py"
+  },
+  "e4_revoke_real_p50_n820": {
+    "value": 119.12,
+    "source": "evals/run_e4.py (820 nodes)"
+  },
+  "e4_revoke_real_p95_n820": {
+    "value": 160.44,
+    "source": "evals/run_e4.py (820 nodes)"
+  },
+  "e4_blame_p50_n820": {
+    "value": 5.37,
+    "source": "evals/run_e4.py (820 nodes)"
+  },
+  "e4_impact_p50_n820": {
+    "value": 13.7,
+    "source": "evals/run_e4.py (820 nodes)"
+  },
+  "e4_gate_p50_n820": {
+    "value": 2.07,
+    "source": "evals/run_e4.py (820 nodes)"
+  },
+  "e4_build_n820": {
+    "value": 1297.1,
+    "source": "evals/run_e4.py (820 nodes)"
+  },
+  "e4_revoke_real_p50_n2460": {
+    "value": 323.05,
+    "source": "evals/run_e4.py (2460 nodes)"
+  },
+  "e4_revoke_real_p95_n2460": {
+    "value": 536.73,
+    "source": "evals/run_e4.py (2460 nodes)"
+  },
+  "e4_blame_p50_n2460": {
+    "value": 5.54,
+    "source": "evals/run_e4.py (2460 nodes)"
+  },
+  "e4_impact_p50_n2460": {
+    "value": 16.31,
+    "source": "evals/run_e4.py (2460 nodes)"
+  },
+  "e4_gate_p50_n2460": {
+    "value": 2.29,
+    "source": "evals/run_e4.py (2460 nodes)"
+  },
+  "e4_build_n2460": {
+    "value": 4118.2,
+    "source": "evals/run_e4.py (2460 nodes)"
+  },
+  "e4_revoke_real_p50_n8200": {
+    "value": 1039.29,
+    "source": "evals/run_e4.py (8200 nodes)"
+  },
+  "e4_revoke_real_p95_n8200": {
+    "value": 1798.94,
+    "source": "evals/run_e4.py (8200 nodes)"
+  },
+  "e4_blame_p50_n8200": {
+    "value": 6.34,
+    "source": "evals/run_e4.py (8200 nodes)"
+  },
+  "e4_impact_p50_n8200": {
+    "value": 17.72,
+    "source": "evals/run_e4.py (8200 nodes)"
+  },
+  "e4_gate_p50_n8200": {
+    "value": 3.0,
+    "source": "evals/run_e4.py (8200 nodes)"
+  },
+  "e4_build_n8200": {
+    "value": 15098.2,
+    "source": "evals/run_e4.py (8200 nodes)"
+  }
+}

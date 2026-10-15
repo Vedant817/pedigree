@@ -102,6 +102,17 @@ def build_report(info: dict, numbers: dict) -> str:
     parts.append(_table(e2, ["kind", "param", "recall", "leakage", "over_flag_ratio",
                              "extra_actions", "n_g", "n_actions"]))
     parts.append("")
+    parts.append("## E4 - latency (real FalkorDB, real engine calls)")
+    parts.append("")
+    parts.append("One throwaway graph per size, built through the engine, then the real engine")
+    parts.append("timed over rounds (the real revoke uses a different root per round, because a")
+    parts.append("second revoke of the same root is idempotent by design). `build_ms` is the")
+    parts.append("per-node write path through the engine, not a bulk loader - reported as-is.")
+    parts.append("")
+    e4 = _rows(RESULTS / "e4_latency.csv")
+    parts.append(_table(e4, ["nodes", "build_ms", "revoke_dry_p50_ms", "revoke_real_p50_ms",
+                             "revoke_real_p95_ms", "blame_p50_ms", "impact_p50_ms", "gate_p50_ms"]))
+    parts.append("")
     parts.append(f"`evals/results/e1_samples.csv` ({len(samples)} rows), "
                  "`evals/results/e1_b0_theta_sweep.csv`.")
     parts.append("")
@@ -137,6 +148,13 @@ def main(argv=None) -> int:
     rc = run_e2(["--quick"] if args.quick else [])
     if rc != 0:
         print("[eval] E2 failed", file=sys.stderr)
+        return rc
+
+    print("[eval] E4 latency (real engine, sizes capped by this host) ...")
+    from evals.run_e4 import main as run_e4  # noqa: PLC0415
+    rc = run_e4(["--quick"] if args.quick else [])
+    if rc != 0:
+        print("[eval] E4 failed", file=sys.stderr)
         return rc
 
     print("[eval] merging per-experiment numbers ...")
