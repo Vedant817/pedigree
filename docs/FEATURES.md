@@ -21,7 +21,7 @@ that is not `done` here.
 | F-11 | P1 | Gate: `check_action` + REST `/v1/gate` + MCP + hook deny/ask + policy.yaml classifier | done | tests/unit/test_gate.py, tests/integration/test_gate_integration.py, tests/security/test_security_F11.py, tests/security/test_F11_adversarial.py, tests/integration/test_gate_qa.py, tests/unit/test_claude_hook.py | docs/qa/F-11.md PASS; docs/qa/redteam-F-11.md PASS (documented limits) |
 | F-12 | P1 | Confidentiality labels + scenario S6 | todo | - | - |
 | F-13 | P1 | Isolation hardening: per-tenant ACL users, rate limits, quotas, metrics, structured logs | implementing | tests/security/test_security_F05.py, tests/security/test_security_F06.py, tests/security/test_capture_trust.py, tests/integration/test_source_identity.py | capture trust closed (ADR-008): `docs/consults/007-capture-trust/decision.md`; rate limits/quota/metrics shipped in F-05; ACL users + structured logs remain (F-15/F-16) |
-| F-14 | P1 | Eval harness: generator, independent oracle, baselines B0-B5, E1, E2, stats, NUMBERS pipeline | todo | - | - |
+| F-14 | P1 | Eval harness: generator, independent oracle, baselines B0-B5, E1, E2, stats, NUMBERS pipeline | implementing | tests/evals/test_oracle_agreement.py, tests/evals/test_stats.py, tests/evals/test_baselines.py | `evals/REPORT.md` (generated): E1 done (18 cells x 30 seeds, 6 systems); E2 capture fidelity next |
 | F-15 | P1 | E5 isolation/concurrency suite (hypothesis + threads + invariants + ACL) | todo | - | - |
 | F-16 | P1 | Deployment: Dockerfile (Ubuntu 24.04 single container), compose, Render, seed-on-boot | todo | - | - |
 | F-17 | P2 | What-if (`GRAPH.COPY`) + checkpoint/restore | todo | - | - |

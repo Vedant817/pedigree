@@ -1,0 +1,283 @@
+{
+  "e1_grid_cells": 18,
+  "e1_seeds_per_cell": 30,
+  "e1_systems": 6,
+  "e1_b0_theta": {
+    "value": 0.475,
+    "source": "evals/run_e1.py (calibration)"
+  },
+  "e1_machine": {
+    "value": "Windows-11-10.0.26300-SP0; Intel64 Family 6 Model 191 Stepping 2, GenuineIntel; 15.7 GB RAM; python 3.12.15; falkor 42201; commit abaa581",
+    "source": "evals/machineinfo.py"
+  },
+  "e1_recall_p": {
+    "value": 1.0,
+    "ci95": [
+      0.9998,
+      1.0
+    ],
+    "n": 18629,
+    "source": "evals/run_e1.py"
+  },
+  "e1_recall_b0": {
+    "value": 0.4714,
+    "ci95": [
+      0.4643,
+      0.4786
+    ],
+    "n": 18629,
+    "source": "evals/run_e1.py"
+  },
+  "e1_recall_b1": {
+    "value": 0.3546,
+    "ci95": [
+      0.3477,
+      0.3615
+    ],
+    "n": 18629,
+    "source": "evals/run_e1.py"
+  },
+  "e1_recall_b2": {
+    "value": 0.1862,
+    "ci95": [
+      0.1806,
+      0.1918
+    ],
+    "n": 18629,
+    "source": "evals/run_e1.py"
+  },
+  "e1_recall_b4": {
+    "value": 1.0,
+    "ci95": [
+      0.9998,
+      1.0
+    ],
+    "n": 18629,
+    "source": "evals/run_e1.py"
+  },
+  "e1_recall_b5": {
+    "value": 1.0,
+    "ci95": [
+      0.9998,
+      1.0
+    ],
+    "n": 18629,
+    "source": "evals/run_e1.py"
+  },
+  "e1_over_invalidation_p": {
+    "value": 0.0,
+    "ci95": [
+      0.0,
+      0.0
+    ],
+    "n": 121771,
+    "source": "evals/run_e1.py"
+  },
+  "e1_over_invalidation_b0": {
+    "value": 0.0334,
+    "ci95": [
+      0.0324,
+      0.0344
+    ],
+    "n": 121771,
+    "source": "evals/run_e1.py"
+  },
+  "e1_over_invalidation_b1": {
+    "value": 0.0181,
+    "ci95": [
+      0.0174,
+      0.0189
+    ],
+    "n": 121771,
+    "source": "evals/run_e1.py"
+  },
+  "e1_over_invalidation_b2": {
+    "value": 0.0036,
+    "ci95": [
+      0.0033,
+      0.0039
+    ],
+    "n": 121771,
+    "source": "evals/run_e1.py"
+  },
+  "e1_over_invalidation_b4": {
+    "value": 0.0493,
+    "ci95": [
+      0.0481,
+      0.0505
+    ],
+    "n": 121771,
+    "source": "evals/run_e1.py"
+  },
+  "e1_over_invalidation_b5": {
+    "value": 0.9557,
+    "ci95": [
+      0.9545,
+      0.9568
+    ],
+    "n": 121771,
+    "source": "evals/run_e1.py"
+  },
+  "e1_action_recall_p": {
+    "value": 1.0,
+    "ci95": [
+      0.9993,
+      1.0
+    ],
+    "n": 5629,
+    "source": "evals/run_e1.py"
+  },
+  "e1_action_recall_b0": {
+    "value": 0.5607,
+    "ci95": [
+      0.5477,
+      0.5736
+    ],
+    "n": 5629,
+    "source": "evals/run_e1.py"
+  },
+  "e1_action_recall_b1": {
+    "value": 0.4194,
+    "ci95": [
+      0.4066,
+      0.4324
+    ],
+    "n": 5629,
+    "source": "evals/run_e1.py"
+  },
+  "e1_action_recall_b2": {
+    "value": 0.2258,
+    "ci95": [
+      0.2151,
+      0.2369
+    ],
+    "n": 5629,
+    "source": "evals/run_e1.py"
+  },
+  "e1_action_recall_b4": {
+    "value": 1.0,
+    "ci95": [
+      0.9993,
+      1.0
+    ],
+    "n": 5629,
+    "source": "evals/run_e1.py"
+  },
+  "e1_action_recall_b5": {
+    "value": 1.0,
+    "ci95": [
+      0.9993,
+      1.0
+    ],
+    "n": 5629,
+    "source": "evals/run_e1.py"
+  },
+  "e1_irreversible_recall_p": {
+    "value": 1.0,
+    "ci95": [
+      0.9966,
+      1.0
+    ],
+    "n": 1134,
+    "source": "evals/run_e1.py"
+  },
+  "e1_irreversible_recall_b0": {
+    "value": 0.5423,
+    "ci95": [
+      0.5132,
+      0.5711
+    ],
+    "n": 1134,
+    "source": "evals/run_e1.py"
+  },
+  "e1_irreversible_recall_b1": {
+    "value": 0.4136,
+    "ci95": [
+      0.3853,
+      0.4425
+    ],
+    "n": 1134,
+    "source": "evals/run_e1.py"
+  },
+  "e1_irreversible_recall_b2": {
+    "value": 0.2231,
+    "ci95": [
+      0.1998,
+      0.2482
+    ],
+    "n": 1134,
+    "source": "evals/run_e1.py"
+  },
+  "e1_irreversible_recall_b4": {
+    "value": 1.0,
+    "ci95": [
+      0.9966,
+      1.0
+    ],
+    "n": 1134,
+    "source": "evals/run_e1.py"
+  },
+  "e1_irreversible_recall_b5": {
+    "value": 1.0,
+    "ci95": [
+      0.9966,
+      1.0
+    ],
+    "n": 1134,
+    "source": "evals/run_e1.py"
+  },
+  "e1_preserved_correct_p": {
+    "value": 1.0,
+    "ci95": [
+      0.9973,
+      1.0
+    ],
+    "n": 1401,
+    "source": "evals/run_e1.py"
+  },
+  "e1_preserved_correct_b0": {
+    "value": 0.0,
+    "ci95": [
+      0.0,
+      0.0027
+    ],
+    "n": 1401,
+    "source": "evals/run_e1.py"
+  },
+  "e1_preserved_correct_b1": {
+    "value": 0.0,
+    "ci95": [
+      0.0,
+      0.0027
+    ],
+    "n": 1401,
+    "source": "evals/run_e1.py"
+  },
+  "e1_preserved_correct_b2": {
+    "value": 0.0,
+    "ci95": [
+      0.0,
+      0.0027
+    ],
+    "n": 1401,
+    "source": "evals/run_e1.py"
+  },
+  "e1_preserved_correct_b4": {
+    "value": 0.0,
+    "ci95": [
+      0.0,
+      0.0027
+    ],
+    "n": 1401,
+    "source": "evals/run_e1.py"
+  },
+  "e1_preserved_correct_b5": {
+    "value": 0.0,
+    "ci95": [
+      0.0,
+      0.0027
+    ],
+    "n": 1401,
+    "source": "evals/run_e1.py"
+  }
+}

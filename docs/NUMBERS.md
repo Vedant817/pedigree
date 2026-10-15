@@ -6,10 +6,41 @@ must appear below, with the script that produced it. `make check` enforces this 
 `make eval` exists, F-14). Unflattering values are kept - never rounded away.
 
 <!-- NUMBERS:BEGIN -->
-falkordb_version = 4.22.1
-falkordb_module_version = 42201
-python_min = 3.11
-tracks_entered = 2
+e1_action_recall_b0 = 0.5607   # evals/run_e1.py
+e1_action_recall_b1 = 0.4194   # evals/run_e1.py
+e1_action_recall_b2 = 0.2258   # evals/run_e1.py
+e1_action_recall_b4 = 1.0   # evals/run_e1.py
+e1_action_recall_b5 = 1.0   # evals/run_e1.py
+e1_action_recall_p = 1.0   # evals/run_e1.py
+e1_b0_theta = 0.475   # evals/run_e1.py (calibration)
+e1_grid_cells = 18   # evals
+e1_irreversible_recall_b0 = 0.5423   # evals/run_e1.py
+e1_irreversible_recall_b1 = 0.4136   # evals/run_e1.py
+e1_irreversible_recall_b2 = 0.2231   # evals/run_e1.py
+e1_irreversible_recall_b4 = 1.0   # evals/run_e1.py
+e1_irreversible_recall_b5 = 1.0   # evals/run_e1.py
+e1_irreversible_recall_p = 1.0   # evals/run_e1.py
+e1_machine = Windows-11-10.0.26300-SP0; Intel64 Family 6 Model 191 Stepping 2, GenuineIntel; 15.7 GB RAM; python 3.12.15; falkor 42201; commit abaa581   # evals/machineinfo.py
+e1_over_invalidation_b0 = 0.0334   # evals/run_e1.py
+e1_over_invalidation_b1 = 0.0181   # evals/run_e1.py
+e1_over_invalidation_b2 = 0.0036   # evals/run_e1.py
+e1_over_invalidation_b4 = 0.0493   # evals/run_e1.py
+e1_over_invalidation_b5 = 0.9557   # evals/run_e1.py
+e1_over_invalidation_p = 0.0   # evals/run_e1.py
+e1_preserved_correct_b0 = 0.0   # evals/run_e1.py
+e1_preserved_correct_b1 = 0.0   # evals/run_e1.py
+e1_preserved_correct_b2 = 0.0   # evals/run_e1.py
+e1_preserved_correct_b4 = 0.0   # evals/run_e1.py
+e1_preserved_correct_b5 = 0.0   # evals/run_e1.py
+e1_preserved_correct_p = 1.0   # evals/run_e1.py
+e1_recall_b0 = 0.4714   # evals/run_e1.py
+e1_recall_b1 = 0.3546   # evals/run_e1.py
+e1_recall_b2 = 0.1862   # evals/run_e1.py
+e1_recall_b4 = 1.0   # evals/run_e1.py
+e1_recall_b5 = 1.0   # evals/run_e1.py
+e1_recall_p = 1.0   # evals/run_e1.py
+e1_seeds_per_cell = 30   # evals
+e1_systems = 6   # evals
 <!-- NUMBERS:END -->
 
 ## How to add a number
