@@ -146,7 +146,7 @@
   Temporary clean clones remain in OS temp. Current state lists exact next three actions.
 ---
 
-### 2026-10-16 01:05 IST | Phase P1 | F-07 audit fix + consult 007 capture trust (ADR-008) | STATUS: done
+### 2026-10-16 00:05 IST | Phase P1 | F-07 audit fix + consult 007 capture trust (ADR-008) | STATUS: done
 - F-07 capture audit round 2: source-kind fidelity fixed (`source_kind` > `kind` > `web`; kind-only
   events no longer dropped), 10 new adapter unit tests; `docs/qa/F-07.md` PASS.
 - Consult 007 (`docs/consults/007-capture-trust/`): domain-researcher + red-team (real FalkorDB
@@ -175,7 +175,7 @@
 
 ---
 
-### 2026-10-16 00:30 IST | Phase P2 | F-14 E1 (contamination semantics) | STATUS: done (E2/E3 next)
+### 2026-10-16 00:15 IST | Phase P2 | F-14 E1 (contamination semantics) | STATUS: done (E2/E3 next)
 - Built `evals/`: `gen.py` (seeded DAG generator: S sources, M memories in L levels, fan-in f,
   p_corr independent corroboration, A actions 20% irreversible, parent-inheriting synthetic text),
   `oracle.py` (**independent** brute-force fixpoint ground truth), `baselines.py` (B0 TF-IDF cosine
@@ -198,7 +198,7 @@
 
 ---
 
-### 2026-10-16 01:05 IST | Phase P2 | F-14 E2 (capture fidelity) | STATUS: done (E3/E4/E5/E6 next)
+### 2026-10-16 00:35 IST | Phase P2 | F-14 E2 (capture fidelity) | STATUS: done (E3/E4/E5/E6 next)
 - `evals/run_e2.py` + report section + numbers keys: precise capture with d in {1,2,5,10}%
   of DERIVED_FROM edges dropped (one draw stream per seed so a higher rate drops a superset -
   the naive independent-per-rate version produced a non-monotone, unexplainable sweep) and the
@@ -212,7 +212,7 @@
 
 ---
 
-### 2026-10-16 01:35 IST | Phase P2 | F-15 isolation/concurrency + two identity fixes | STATUS: done (ACL wiring open)
+### 2026-10-16 00:55 IST | Phase P2 | F-15 isolation/concurrency + two identity fixes | STATUS: done (ACL wiring open)
 - `tests/integration/test_isolation_concurrency.py`: (1) API isolation matrix - tenant B gets
   404 for A's blame/impact/revoke/corroborate and `reverify` (never "safe") from the gate for
   A's ids, with A's graph provably untouched; (2) 20 tenants x 8 writer threads -> every graph
@@ -236,7 +236,7 @@
 
 ---
 
-### 2026-10-16 02:20 IST | Phase P2 | F-16 deployment path (Docker, verified) | STATUS: done locally; Render is a human step
+### 2026-10-16 01:10 IST | Phase P2 | F-16 deployment path (Docker, verified) | STATUS: done locally; Render is a human step
 - `Dockerfile` (Ubuntu 24.04, Python 3.12, pinned FalkorDB module fetched at build time and
   asserted executable, `healthcheck` on `/readyz`), `scripts/entrypoint.sh` (module check ->
   FalkorDB with the mandatory args -> wait for readiness -> optional demo seed -> uvicorn),
