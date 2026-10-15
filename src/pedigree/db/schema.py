@@ -105,6 +105,7 @@ def check_invariants(
         (Q.Q_INV_BAD_STATUS, "node with unknown status", {"allowed": list(STATUS_ALL)}),
         (Q.Q_INV_MISSING_STATUS, "node without a status property", None),
         (Q.Q_INV_NO_ID, "node without id", None),
+        (Q.Q_INV_OK_HAS_NO_BAD_PARENT, "ok node has bad parent", None),
         (Q.Q_INV_MISSING_FEEDS, "DERIVED_FROM without mirrored FEEDS", None),
         (Q.Q_INV_MISSING_DERIVED, "FEEDS without mirrored DERIVED_FROM", None),
         (Q.Q_INV_TAINTED_NO_PARENT, "tainted node without taint_parent", None),

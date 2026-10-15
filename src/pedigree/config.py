@@ -61,6 +61,7 @@ LIMITS = {
     "depth_max": 12,
     "whatif_roots": 5,
     "audit_limit": 50,
+    "events_per_request": 500,
     "chunk": 2000,
 }
 # Node ids: the pack's regex plus `_` (auto-generated ids are `src_<hex>`, `mem_<hex>`, ...;

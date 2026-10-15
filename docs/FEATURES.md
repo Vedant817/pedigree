@@ -14,11 +14,11 @@ that is not `done` here.
 | F-04 | P0 | Blame + impact (ancestors/descendants, shortest path via parent pointers, `not_in_graph`) | done | tests/unit/test_blame.py (10), tests/integration/test_blame_impact.py (4) | `docs/qa/F-04.md` (PASS) |
 | F-05 | P0 | REST API + registry graph + tenant tokens + auth + limits + errors | done | tests/integration/test_api.py (7), tests/security/test_security_F05.py (5) | `docs/qa/F-05.md` PASS |
 | F-06 | P0 | MCP server (stdio + Streamable HTTP): record_source, remember, record_action, revoke, blame, impact | done | tests/integration/test_mcp.py (2), tests/security/test_security_F06.py (5) | `docs/qa/F-06.md` PASS |
-| F-07 | P0 | Claude Code hook adapter + `/v1/events` mapping + recorded-payload fixtures + cross-session `artifact_key` link | done | tests/integration/test_events.py (1) | docs/qa/F-07.md (pending) |
+| F-07 | P0 | Claude Code hook adapter + `/v1/events` mapping + recorded-payload fixtures + cross-session `artifact_key` link | done | tests/integration/test_events.py (5) | `docs/qa/F-07.md` (PASS after 413 fix) |
 | F-08 | P0 | OpenCode plugin (`pedigree.ts`) mapped from real logged payloads | todo | - | - |
 | F-09 | P0 | UI v1: graph view, status colours, revoke dry-run/confirm, depth slider, revert list | todo | - | - |
 | F-10 | P0 | Scenarios S1 + S8 as JSON + `seed_demo.py` + `make demo` | todo | - | - |
-| F-11 | P1 | Gate: `check_action` + REST `/v1/gate` + hook deny/ask + policy.yaml classifier | todo | - | - |
+| F-11 | P1 | Gate: `check_action` + REST `/v1/gate` + MCP + hook deny/ask + policy.yaml classifier | done | tests/unit/test_gate.py, tests/integration/test_gate_integration.py, tests/security/test_security_F11.py, tests/security/test_F11_adversarial.py, tests/integration/test_gate_qa.py, tests/unit/test_claude_hook.py | docs/qa/F-11.md PASS; docs/qa/redteam-F-11.md PASS (documented limits) |
 | F-12 | P1 | Confidentiality labels + scenario S6 | todo | - | - |
 | F-13 | P1 | Isolation hardening: per-tenant ACL users, rate limits, quotas, metrics, structured logs | todo | - | - |
 | F-14 | P1 | Eval harness: generator, independent oracle, baselines B0-B5, E1, E2, stats, NUMBERS pipeline | todo | - | - |

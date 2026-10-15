@@ -347,7 +347,7 @@ def record_action(
     return result
 
 
-def corroborate(db: Db, gname: str, memory_id: str, source_id: str, *, by: str = "human", trace: Trace | None = None) -> None:
+def corroborate(db: Db, gname: str, memory_id: str, source_id: str, *, by: str = "agent", trace: Trace | None = None) -> None:
     if by not in ("agent", "human", "scanner"):
         raise InvalidArgument("invalid corroboration author", detail={"by": str(by)[:16]})
     res = db.query(

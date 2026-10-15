@@ -71,6 +71,7 @@ def create_app(db: Db | None = None, settings=None) -> FastAPI:
     routes.metrics.register(app)
     routes.engine.register(app, db, registry, settings)
     routes.events.register(app, db, registry, settings)
+    routes.gate.register(app, db, registry, settings)
     return app
 
 

@@ -13,14 +13,19 @@ domain researcher, architect, eval statistician, technical writer). AI assistant
 most of the code, tests and first drafts of documentation under specifications and
 acceptance tests that were derived from a written design pack.
 
+The F-11 continuation used **Codex through T3 Code**, running **gpt-6.1-sol**,
+with separate builder, QA and review subagents. It implemented and verified the gate,
+REST/MCP contracts and the Claude hook adapter. Adapter verification used synthetic
+payloads and localhost transport tests; installed Claude Code execution was not verified.
+
 ## What the human did (not the AI)
 
 - Chose the project, its scope and the time-boxed plan (the design pack this repository
   was built from; the plan documents are committed under `docs/`).
-- Verified the environment (FalkorDB running, tests green) at the checkpoints described
-  in `docs/05-PHASES.md` and the human checklist `docs/00-HUMAN-CHECKLIST.md`.
-- Runs and reviews the walkthrough in `docs/WALKTHROUGH.md`, can explain the graph model,
-  every Cypher query and the revocation protocol.
+- **Pending human confirmation:** verify the environment and review checkpoint evidence
+  in `docs/05-PHASES.md` and `docs/00-HUMAN-CHECKLIST.md`. Agent-run checks are not human review.
+- **Pending:** run/review the walkthrough once written, and explain the graph model,
+  Cypher queries and revocation protocol before submission.
 
 *(This section is completed by the human before submission — see `docs/00-HUMAN-CHECKLIST.md` step 9/13.)*
 

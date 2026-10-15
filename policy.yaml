@@ -1,0 +1,4 @@
+# Operator-controlled classifier overrides. Built-in defaults cover common commands.
+# Rules are ordered; first match wins. Request bodies cannot select a policy file.
+# Example rule: {tool: '^Bash$', match: 'my-deploy', effect: irreversible, risk: high}
+rules: []

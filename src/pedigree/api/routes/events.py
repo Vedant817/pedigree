@@ -5,8 +5,9 @@ from fastapi import FastAPI, Request
 from ...adapters import normalize_events
 from ...config import LIMITS
 from ...db.schema import check_invariants
+from ...engine.gate import classify_action, load_policy
 from ...engine.ingest import artifact_lookup as lookup_fn
-from ...engine.ingest import ensure_session, record_action, record_source, remember, session_read
+from ...engine.ingest import ensure_session, read_window, record_action, record_source, remember, session_read
 from ...errors import TooLarge
 from .. import auth
 from ..schemas import EventsPayload
@@ -41,6 +42,7 @@ def register(app: FastAPI, db, registry, settings) -> None:
                     uri=spec.get("uri"),
                     title=spec.get("title"),
                     integrity=spec.get("integrity"),
+                    content_hash=spec.get("content_hash"),
                     conf=spec.get("conf"),
                     id=spec.get("id"),
                 )
@@ -56,23 +58,31 @@ def register(app: FastAPI, db, registry, settings) -> None:
                     artifact=spec.get("artifact"),
                     artifact_key=spec.get("artifact_key"),
                     id=spec.get("id"),
+                    session_id=sid,
+                    via="hook" if payload.runtime in {"claude-code", "opencode"} else "agent_reported",
                 )
                 created.append(res.id)
             elif op == "action":
+                parents = spec.get("relied_on") or (
+                    read_window(db, gname, sid, settings.pedigree_read_window) if sid else [])
+                effect, risk = classify_action(load_policy(settings.pedigree_policy_file),
+                                                spec.get("tool", "unknown"), spec.get("summary", ""),
+                                                effect=spec.get("effect"), risk=spec.get("risk"))
                 res = record_action(
                     db,
                     gname,
                     tenant,
                     tool=spec.get("tool", "unknown"),
                     summary=spec.get("summary", ""),
-                    relied_on=spec.get("relied_on") or [],
+                    relied_on=parents,
                     decision=spec.get("decision"),
-                    effect=spec.get("effect"),
-                    risk=spec.get("risk"),
+                    effect=effect,
+                    risk=risk,
                     artifacts=spec.get("artifacts") or [],
                     artifact_key=spec.get("artifact_key"),
                     session_id=sid,
                     id=spec.get("id"),
+                    via="hook" if payload.runtime in {"claude-code", "opencode"} else "agent_reported",
                 )
                 created.append(res.id)
             else:

@@ -10,6 +10,7 @@ from .db.client import Db
 from .db.schema import ensure_schema, node_count
 from .engine.blame import blame as run_blame
 from .engine.blame import impact as run_impact
+from .engine.gate import check_action
 from .engine.ingest import corroborate, record_action, record_source, remember
 from .engine.revoke import reinstate, report, revoke
 from .errors import PedigreeError
@@ -125,11 +126,32 @@ class PedigreeMCPServer:
 
         @srv.tool()
         def pedigree_corroborate(tenant_id: str | None = None, token: str | None = None,
-                                memory_id: str = "", source_id: str = "", by: str = "human") -> dict:
+                                memory_id: str = "", source_id: str = "", by: str = "agent") -> dict:
             tid, gname = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": tid}}
             return _call(lambda: (corroborate(self.db, gname, memory_id, source_id, by=by), {"ok": True})[1])
+
+        @srv.tool()
+        def pedigree_check_action(token: str | None = None, tool: str = "", summary: str = "",
+                                  relied_on: list[str] | None = None, session_id: str | None = None,
+                                  effect: str | None = None, risk: str | None = None,
+                                  audience: list[str] | None = None, max_depth: int = 12,
+                                  record: bool = False) -> dict:
+            """Check lineage before an action; unknown dependencies require re-verification.
+
+            Read-only by default. Policy is configured by the service operator.
+            """
+            tid, gname = self._resolve(token=token)
+            if gname is None:
+                return {"ok": False, "error": {"code": "unauthorized"}}
+            if record and node_count(self.db, gname) >= self.registry.get_record(tid).node_cap:
+                return {"ok": False, "error": {"code": "quota_exceeded"}}
+            return _call(lambda: check_action(
+                self.db, gname, {"tool": tool, "summary": summary, "effect": effect,
+                                 "risk": risk, "audience": audience},
+                relied_on=relied_on, session_id=session_id, max_depth=max_depth,
+                policy_path=self.settings.pedigree_policy_file, record=record, tenant=tid))
 
         @srv.tool()
         def pedigree_revoke(tenant_id: str | None = None, token: str | None = None,

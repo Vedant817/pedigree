@@ -150,3 +150,65 @@ fields that can drift; `done` is not in the status vocabulary anyway).
 **Reversible:** yes (add + backfill, one query). **Evidence:**
 `tests/integration/test_schema.py::test_invariants_detect_missing_status`;
 `docs/qa/F-03.md`.
+
+---
+
+## ADR-007 | 2026-10-15 | Gate rule 1 reads materialised containment; trusted-only corroboration
+
+**Context.** docs/01 §6.6 rule 1 ("any relied node or ancestor status in
+`revoked|tainted|quarantined` -> block if risk >= medium else warn") is ambiguous: literal
+transitive ancestry would also warn/block actions relying on a `preserved` node or on an `ok`
+descendant of one, contradicting scenario S8 ("its dependent stays `ok`") and the product's
+preservation claim, while making the hook path pay a depth-12 BFS per relied id. Separately, the
+red team measured (consult 006) that agent-asserted `CORROBORATED_BY` (forged through MCP)
+launders a `preserved` status that then clears the gate, and that `by='human'` was the *default*
+at every entry point.
+
+**Decision.** Consult 006 (`docs/consults/006-gate-ancestor-scope/decision.md`, unanimous):
+1. rule 1 keys on the relied node's materialised `status` (the revoke engine already resolved
+   containment into `status` + `taint_parent`); `preserved`/`ok` pass rule 1;
+2. a `preserved` node passes only with **trusted support** (`CORROBORATED_BY.by` in
+   `human|scanner`); agent-asserted support gates the node exactly as `tainted`;
+3. an `ok` node whose ancestor closure contains an untrusted-support `preserved` node is
+   `reverify` at `effect='irreversible'` or `risk='high'` (path in the reason);
+4. `relied_on` empty + a session read window containing a bad node -> `reverify` (never silent
+   allow); empty window -> `allow` + `warning:no_lineage`;
+5. `by` defaults to `agent` at every entry point (engine `corroborate`, REST, MCP);
+   out-of-band callers pass `human`/`scanner` explicitly.
+New invariant `Q_INV_OK_HAS_NO_BAD_PARENT` asserts no `ok` node has a bad `DERIVED_FROM`
+parent, which is what makes reading `status` at the gate sound.
+
+**Alternatives.** (A) literal ancestry (rejected: breaks S8/demo, maximises E3b benign
+friction, per-hook BFS, and the attacker routes around it by omitting `relied_on` - measured).
+Trust any status-ok corroborator (rejected: the attacker mints the corroborating source).
+Propagate `containment_basis` in `compute_final` now (deferred: engine change that would
+re-open F-02/F-03 QA; the gate-time ancestor audit covers the same case at high risk; tracked
+in KNOWN_ISSUES for F-12/F-13).
+
+**Consequences.** The gate stays a read-only decision function over materialised status; the
+declassification signal moves from "any CORROBORATED_BY" to an out-of-band authority. **Reversible:**
+yes - the gate is read-only and reverting to (A) is one BFS per relied id.
+**Evidence:** `docs/consults/006-gate-ancestor-scope/{architect,redteam,domain,decision}.md`,
+`tests/integration/test_gate_integration.py`, `tests/security/test_security_F11.py`.
+
+---
+
+## ADR-008 | 2026-10-15 | Incomplete gate evidence requires re-verification; recording is explicit
+
+**Context.** Independent F-11 tests reproduced silent allow when untrusted support was
+deeper than the traversal bound, and an Action left behind after an unknown-session error.
+Missing dependencies discarded the gate verdict when recording failed.
+
+**Decision.** Inspect an additional BFS level: a frontier beyond the bound requires
+`reverify` with `lineage_truncated` at high risk/irreversible effect. Validate recording
+prerequisites before writing. Missing anchor/session returns the verdict plus
+`recording_error`, without an Action or invented edges. Return `action_id` only on success.
+Apply matching policy audience consistently.
+
+**Alternatives.** Unbounded traversal risks hook timeouts. Recording only known anchors
+would make incomplete evidence appear complete. Throwing after writing creates ambiguous state.
+
+**Consequences.** Deep benign ancestry can require manual verification. Callers distinguish
+decision success from optional recording failure. Reversible response addition; no schema
+change. **Evidence:** `tests/security/test_F11_adversarial.py`,
+`tests/integration/test_gate_qa.py`; independent reports in `docs/qa/`.

@@ -1,0 +1,7 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/adapters/claude/pedigree_hook.py\" prompt", "timeout": 10}]}],
+    "PreToolUse": [{"matcher": "Bash|Write|Edit|MultiEdit|mcp__.*", "hooks": [{"type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/adapters/claude/pedigree_hook.py\" pre", "timeout": 10}]}],
+    "PostToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/adapters/claude/pedigree_hook.py\" post", "timeout": 10}]}]
+  }
+}

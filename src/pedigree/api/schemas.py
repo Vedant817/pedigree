@@ -57,7 +57,7 @@ class ActionCreate(StrictModel):
 class CorroborateRequest(StrictModel):
     memory_id: str
     source_id: str
-    by: Literal["agent", "human", "scanner"] = "human"
+    by: Literal["agent", "human", "scanner"] = "agent"
 
 
 class RevokeRequest(StrictModel):
@@ -103,6 +103,22 @@ class OkResponse(BaseModel):
 
 
 class EventsPayload(StrictModel):
-    runtime: str = "generic"
+    runtime: str = Field(default="generic", max_length=64)
     session_id: str | None = None
-    events: list[dict[str, Any]] = []
+    events: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class GateAction(StrictModel):
+    tool: str = Field(min_length=1, max_length=128)
+    summary: str = Field(default="", max_length=300)
+    effect: Literal["reversible", "irreversible", "unknown"] | None = None
+    risk: Literal["low", "medium", "high"] | None = None
+    audience: list[str] | None = Field(default=None, max_length=8)
+
+
+class GateRequest(StrictModel):
+    action: GateAction
+    relied_on: list[str] = Field(default_factory=list, max_length=64)
+    session_id: str | None = Field(default=None, max_length=128)
+    max_depth: int = Field(default=12, ge=1, le=12)
+    record: bool = False

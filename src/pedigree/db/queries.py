@@ -270,3 +270,17 @@ Q_REGISTRY_UPSERT = "MERGE (t:Tenant {id:$id}) SET t.status = 'active', t.node_c
 Q_REGISTRY_BY_ID = "MATCH (t:Tenant {id:$id}) RETURN t.id, t.status, t.node_cap, t.created_at, t.token_sha256"
 Q_REGISTRY_ALL = "MATCH (t:Tenant) RETURN t.id, t.status, t.node_cap, t.created_at"
 Q_REGISTRY_SET_STATUS = "MATCH (t:Tenant {id:$id}) SET t.status = $status"
+
+# --- gate (F-11) -------------------------------------------------------------
+Q_GATE_NODES = """
+UNWIND $ids AS i MATCH (n:Node {id:i})
+RETURN n.id, n.status, coalesce(n.low_integrity, false), coalesce(n.conf_eff, []), n.taint_parent
+"""
+Q_GATE_SUPPORT = """
+UNWIND $ids AS i MATCH (n:Memory {id:i})-[c:CORROBORATED_BY]->(s:Source)
+RETURN n.id, s.id, s.status, c.by
+"""
+Q_INV_OK_HAS_NO_BAD_PARENT = """
+MATCH (n:Node {status:'ok'})-[:DERIVED_FROM]->(p:Node)
+WHERE p.status IN ['revoked','tainted','quarantined'] RETURN count(n)
+"""

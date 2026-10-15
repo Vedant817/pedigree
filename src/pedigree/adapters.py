@@ -24,6 +24,7 @@ def normalize_event(runtime: str, event: dict[str, Any]) -> dict[str, Any] | Non
             "title": event.get("title"),
             "id": event.get("id"),
             "integrity": event.get("integrity"),
+            "content_hash": event.get("content_hash"),
             "conf": event.get("conf"),
         }
     elif kind in ("memory", "memory_created", "remember"):

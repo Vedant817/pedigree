@@ -1,26 +1,23 @@
 # CURRENT STATE (overwritten after every feature / checkpoint)
 
-- **Phase:** P0 complete -> P1 vertical slice in progress (Thu 20:20 IST; Phase 0 window ran to 23:30)
-- **Last green commit:** 8a45d0e (F-07: mark complete) — working tree carries uncommitted F-11 WIP
+- **Phase:** P1 vertical slice; F-11 gate completed ahead of the phase order (Thu 21:21 IST).
+- **Last green implementation:** F-11 gate, pending commit below; prior HEAD 84ba350.
 - **Environment:** Windows 11 dev host; Python 3.12.15 (uv `.venv`); Docker Desktop 29.8.2 running
   FalkorDB `falkordb/falkordb:v4.22.1` (pinned; mandatory args); Node v24.13.1; 108 GB free disk.
 - **Deadlines:** feature freeze Sun 2026-10-18 15:00 IST; submit target Sun 21:00 IST; hard stop 23:59 IST.
-- **Test state:** **94 passed** (full suite, real FalkorDB, incl. uncommitted F-11 WIP: `import`-clean)
-  | `make check` green (ruff + pytest + secret scan `--history` + numbers) | AT0.1-AT0.6 verified on a
-  clean clone (`scripts/clean_clone_check.sh` PASS).
+- **Test state:** **202 passed** (`make check`, real FalkorDB); independent QA and review PASS.
+  History secret scan PASS. Real hook subprocess -> HTTP -> FalkorDB -> deny verified.
+  Installed Claude Code runtime remains unverified; prior P0 clean-clone proof is historical.
 - **Features [done]:** F-01 (QA PASS round 2), F-02 (PASS), F-03 (PASS), F-04 (PASS),
-  F-05 + F-06 (PASS incl. red-team hardening), F-07 (**QA evidence missing** -> `docs/qa/F-07.md`
-  being written now; FEATURES.md will be corrected to `qa` until it lands).
-- **In flight (uncommitted):** F-11 gate prototype (`src/pedigree/engine/gate.py`,
-  `src/pedigree/api/routes/gate.py`, schemas/config/queries deltas). It does not yet match
-  docs/01 §6.6 (verdict set, reasons[], ancestor check, no_lineage) and has no tests -> it is WIP,
-  not done; next actions below close it.
+  F-05 + F-06 (PASS incl. red-team hardening), F-07 API/capture mapping (QA evidence exists),
+  F-11 (QA + review PASS). F-07 installed-runtime capture/fidelity gaps remain open issue 12.
+- **In flight:** F-08 isolated OpenCode payload spike; F-10 synthetic scenario seeder.
+- **Material limits:** human/scanner authority is caller-asserted pending F-13; repeated unmatched
+  file reads can create new Source ids; hook failures are fail-open. See KNOWN_ISSUES 11-14.
 - **Next 3 actions:**
-  1. Write `docs/qa/F-07.md` from fresh re-runs (role-switch QA; subagent provider was rate-limited).
-  2. F-11 gate: spec `docs/features/F-11-gate.md` -> failing tests -> implement per §6.6
-     (4 verdicts, `reasons[]`, ancestor BFS check, `policy.yaml` classifier, MCP `check_action`,
-     hook deny/ask mapping) -> QA + red-team -> commit.
-  3. F-08 OpenCode plugin (`.opencode/plugins/pedigree.ts`) then F-09 UI v1, F-10 scenarios/`make demo`.
+  1. Commit F-11 verified implementation and check the committed tree from a fresh clone.
+  2. F-08 real-payload spike -> plugin; F-09 UI v1 using authenticated persisted graph data.
+  3. Finish F-10 scenarios/`make demo`, independent QA, then address capture authority/identity.
 - **Blockers:** none open. Provider free-tier rate limits interrupted two QA rounds (not product
   defects); fallback per docs/04 §12 (role-switch with fresh-shell re-runs).
 - **Human pending (batch 1 reply outstanding):** GitHub repo + remote URL, Discord answer, dogfood
