@@ -13,9 +13,10 @@ domain researcher, architect, eval statistician, technical writer). AI assistant
 most of the code, tests and first drafts of documentation under specifications and
 acceptance tests that were derived from a written design pack.
 
-The F-11 continuation used **Codex through T3 Code**, running **gpt-6.1-sol**,
+The F-09/F-10/F-11 continuation used **Codex through T3 Code**, running **gpt-6.1-sol**,
 with separate builder, QA and review subagents. It implemented and verified the gate,
-REST/MCP contracts and the Claude hook adapter. Adapter verification used synthetic
+REST/MCP contracts, Claude hook adapter, graph workspace and synthetic demo seeder.
+Adapter verification used synthetic
 payloads and localhost transport tests; installed Claude Code execution was not verified.
 
 ## What the human did (not the AI)

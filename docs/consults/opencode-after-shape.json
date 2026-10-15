@@ -1,0 +1,313 @@
+{
+  "captured_at": "2026-10-15T15:50:34.977311+00:00",
+  "runtime": "OpenCode",
+  "version": "1.19.0",
+  "model": "opencode/deepseek-v4.1-flash-free",
+  "catalog_cost": {
+    "input": 0,
+    "output": 0,
+    "cache_read": 0,
+    "cache_write": 0
+  },
+  "status": "blocked_free_tier_limit_no_tool_execution",
+  "tool_execute_after": null,
+  "tool_execute_before": null,
+  "observed_tool_hook_count": 0,
+  "sanitization": "Own synthetic session only; scratch paths and opaque event/session ids replaced with stable placeholders. Public provider/model identifiers retained. No credentials captured.",
+  "events": [
+    {
+      "hook": "plugin.initialized",
+      "directory": "<SYNTHETIC_PROJECT>"
+    },
+    {
+      "hook": "event",
+      "event": {
+        "id": "evt_synthetic_1",
+        "type": "session.created",
+        "properties": {
+          "sessionID": "ses_synthetic_2",
+          "info": {
+            "id": "ses_synthetic_2",
+            "slug": "brave-wizard",
+            "version": "1.19.0",
+            "projectID": "global",
+            "directory": "<SYNTHETIC_PROJECT>",
+            "path": "",
+            "title": "Synthetic F08 shape spike",
+            "permission": [
+              {
+                "permission": "question",
+                "pattern": "*",
+                "action": "deny"
+              },
+              {
+                "permission": "plan_enter",
+                "pattern": "*",
+                "action": "deny"
+              },
+              {
+                "permission": "plan_exit",
+                "pattern": "*",
+                "action": "deny"
+              }
+            ],
+            "cost": 0,
+            "tokens": {
+              "input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cache": {
+                "read": 0,
+                "write": 0
+              }
+            },
+            "time": {
+              "created": 1792079398356,
+              "updated": 1792079398356
+            }
+          }
+        }
+      }
+    },
+    {
+      "hook": "event",
+      "event": {
+        "id": "evt_synthetic_3",
+        "type": "session.updated",
+        "properties": {
+          "sessionID": "ses_synthetic_2",
+          "info": {
+            "id": "ses_synthetic_2",
+            "slug": "brave-wizard",
+            "projectID": "global",
+            "directory": "<SYNTHETIC_PROJECT>",
+            "path": "",
+            "title": "Synthetic F08 shape spike",
+            "agent": "spike",
+            "model": {
+              "id": "deepseek-v4.1-flash-free",
+              "providerID": "opencode",
+              "variant": "default"
+            },
+            "version": "1.19.0",
+            "cost": 0,
+            "tokens": {
+              "input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cache": {
+                "read": 0,
+                "write": 0
+              }
+            },
+            "permission": [
+              {
+                "permission": "question",
+                "pattern": "*",
+                "action": "deny"
+              },
+              {
+                "permission": "plan_enter",
+                "pattern": "*",
+                "action": "deny"
+              },
+              {
+                "permission": "plan_exit",
+                "pattern": "*",
+                "action": "deny"
+              }
+            ],
+            "time": {
+              "created": 1792079398356,
+              "updated": 1792079398499
+            }
+          }
+        }
+      }
+    },
+    {
+      "hook": "event",
+      "event": {
+        "id": "evt_synthetic_4",
+        "type": "session.updated",
+        "properties": {
+          "sessionID": "ses_synthetic_2",
+          "info": {
+            "id": "ses_synthetic_2",
+            "slug": "brave-wizard",
+            "projectID": "global",
+            "directory": "<SYNTHETIC_PROJECT>",
+            "path": "",
+            "title": "Synthetic F08 shape spike",
+            "agent": "spike",
+            "model": {
+              "id": "deepseek-v4.1-flash-free",
+              "providerID": "opencode",
+              "variant": "default"
+            },
+            "version": "1.19.0",
+            "cost": 0,
+            "tokens": {
+              "input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cache": {
+                "read": 0,
+                "write": 0
+              }
+            },
+            "permission": [
+              {
+                "permission": "question",
+                "pattern": "*",
+                "action": "deny"
+              },
+              {
+                "permission": "plan_enter",
+                "pattern": "*",
+                "action": "deny"
+              },
+              {
+                "permission": "plan_exit",
+                "pattern": "*",
+                "action": "deny"
+              }
+            ],
+            "time": {
+              "created": 1792079398356,
+              "updated": 1792079398511
+            }
+          }
+        }
+      }
+    },
+    {
+      "hook": "event",
+      "event": {
+        "id": "evt_synthetic_5",
+        "type": "session.status",
+        "properties": {
+          "sessionID": "ses_synthetic_2",
+          "status": {
+            "type": "busy"
+          }
+        }
+      }
+    },
+    {
+      "hook": "event",
+      "event": {
+        "id": "evt_synthetic_6",
+        "type": "session.updated",
+        "properties": {
+          "sessionID": "ses_synthetic_2",
+          "info": {
+            "id": "ses_synthetic_2",
+            "slug": "brave-wizard",
+            "projectID": "global",
+            "directory": "<SYNTHETIC_PROJECT>",
+            "path": "",
+            "title": "Synthetic F08 shape spike",
+            "agent": "spike",
+            "model": {
+              "id": "deepseek-v4.1-flash-free",
+              "providerID": "opencode",
+              "variant": "default"
+            },
+            "version": "1.19.0",
+            "summary": {
+              "additions": 0,
+              "deletions": 0,
+              "files": 0
+            },
+            "cost": 0,
+            "tokens": {
+              "input": 0,
+              "output": 0,
+              "reasoning": 0,
+              "cache": {
+                "read": 0,
+                "write": 0
+              }
+            },
+            "permission": [
+              {
+                "permission": "question",
+                "pattern": "*",
+                "action": "deny"
+              },
+              {
+                "permission": "plan_enter",
+                "pattern": "*",
+                "action": "deny"
+              },
+              {
+                "permission": "plan_exit",
+                "pattern": "*",
+                "action": "deny"
+              }
+            ],
+            "time": {
+              "created": 1792079398356,
+              "updated": 1792079399929
+            }
+          }
+        }
+      }
+    },
+    {
+      "hook": "event",
+      "event": {
+        "id": "evt_synthetic_7",
+        "type": "session.diff",
+        "properties": {
+          "sessionID": "ses_synthetic_2",
+          "diff": []
+        }
+      }
+    },
+    {
+      "hook": "event",
+      "event": {
+        "id": "evt_synthetic_8",
+        "type": "session.status",
+        "properties": {
+          "sessionID": "ses_synthetic_2",
+          "status": {
+            "type": "busy"
+          }
+        }
+      }
+    },
+    {
+      "hook": "event",
+      "event": {
+        "id": "evt_synthetic_9",
+        "type": "session.status",
+        "properties": {
+          "sessionID": "ses_synthetic_2",
+          "status": {
+            "type": "retry",
+            "attempt": 1,
+            "message": "Free usage exceeded, subscribe to Go",
+            "action": {
+              "reason": "free_tier_limit",
+              "provider": "opencode",
+              "title": "Free limit reached",
+              "message": "Subscribe to OpenCode Go for reliable access to the best open-source models for $10/month.",
+              "label": "subscribe",
+              "link": "https://opencode.ai/go"
+            },
+            "next": 1792108801405
+          }
+        }
+      }
+    }
+  ],
+  "process_result": {
+    "timeout_seconds": 70,
+    "stdout": "",
+    "stderr": "",
+    "windows_launcher_cleanup": "Verified exact synthetic child command and stopped that child after launcher timeout left captured pipes open."
+  }
+}

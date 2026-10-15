@@ -1,25 +1,36 @@
 # CURRENT STATE (overwritten after every feature / checkpoint)
 
-- **Phase:** P1 vertical slice; F-11 gate completed ahead of the phase order (Thu 21:21 IST).
-- **Last green implementation:** F-11 gate, pending commit below; prior HEAD 84ba350.
+- **Phase:** P1 vertical slice; F-09/F-10/F-11 completed (Thu 21:39 IST). Phase 1 is not complete:
+  installed runtime capture remains unverified, and F-08 is blocked by its free provider quota.
+- **Last green implementation:** 4eb3a66 (F-09), preceded by 38b1376 (F-10) and 06c82f1 (F-11).
 - **Environment:** Windows 11 dev host; Python 3.12.15 (uv `.venv`); Docker Desktop 29.8.2 running
   FalkorDB `falkordb/falkordb:v4.22.1` (pinned; mandatory args); Node v24.13.1; 108 GB free disk.
 - **Deadlines:** feature freeze Sun 2026-10-18 15:00 IST; submit target Sun 21:00 IST; hard stop 23:59 IST.
-- **Test state:** **202 passed** (`make check`, real FalkorDB); independent QA and review PASS.
-  History secret scan PASS. Real hook subprocess -> HTTP -> FalkorDB -> deny verified.
-  Installed Claude Code runtime remains unverified; prior P0 clean-clone proof is historical.
+- **Test state:** **245 passed** (`make check`, real FalkorDB; 31.58s), lint/secret/numbers PASS.
+  A fresh clone+new venv of 4eb3a66 passed full pytest (245, 34.53s) and lint. Wheel built;
+  all UI static assets included. History secret scan PASS after adding new files.
+  Hook subprocess -> HTTP -> DB -> deny and actual UI -> persisted revoke -> reload verified.
 - **Features [done]:** F-01 (QA PASS round 2), F-02 (PASS), F-03 (PASS), F-04 (PASS),
   F-05 + F-06 (PASS incl. red-team hardening), F-07 API/capture mapping (QA evidence exists),
-  F-11 (QA + review PASS). F-07 installed-runtime capture/fidelity gaps remain open issue 12.
-- **In flight:** F-08 isolated OpenCode payload spike; F-10 synthetic scenario seeder.
+  F-09 (independent QA + review + builder browser proof), F-10 and F-11 (QA + review PASS).
+  F-07 installed-runtime capture/fidelity gaps remain open issue 12.
+- **Local service:** root-owned Uvicorn on 127.0.0.1:8000 (session 92866, PID19808), demo tenant
+  seeded healthy with 11 nodes. Credential is in ignored scratch/demo-demo.json; never print it.
+  Browser QA used and removed a separate random tenant; main demo was not revoked.
+- **No in-flight source edits.** OpenCode spike artifacts honestly record session startup only;
+  tool before/after payloads are null, not fabricated. No paid fallback was used.
 - **Material limits:** human/scanner authority is caller-asserted pending F-13; repeated unmatched
   file reads can create new Source ids; hook failures are fail-open. See KNOWN_ISSUES 11-14.
 - **Next 3 actions:**
-  1. Commit F-11 verified implementation and check the committed tree from a fresh clone.
-  2. F-08 real-payload spike -> plugin; F-09 UI v1 using authenticated persisted graph data.
-  3. Finish F-10 scenarios/`make demo`, independent QA, then address capture authority/identity.
-- **Blockers:** none open. Provider free-tier rate limits interrupted two QA rounds (not product
-  defects); fallback per docs/04 §12 (role-switch with fresh-shell re-runs).
+  1. F-07/F-13 capture hardening: stable Source identity across repeated reads and separated
+     human/scanner authority. Write consult + failing repros before changing these trust boundaries.
+  2. Verify installed Claude runtime with own synthetic capture if an already-authorized free path
+     is available; F-08 remains blocked until free quota returns. Do not invent tool payloads.
+  3. F-14 E1/E2 independent oracle/eval pipeline, then F-15 isolation/ACL and F-16 local/deploy path.
+- **Blockers:** F-08 free_tier_limit (OpenCode1.19.0, free DeepSeek model: Free usage exceeded,
+  subscribe to Go). Browser automation connection dropped twice during S8; Playwright CLI fallback
+  completed the remaining local proof. Execution policy blocked deletion of ignored build/browser
+  artifacts; left ignored. Temporary clone venvs remain in OS temp; no user data was deleted.
 - **Human pending (batch 1 reply outstanding):** GitHub repo + remote URL, Discord answer, dogfood
   runtime choice, optional API keys in `.env`; Render account (Fri) not yet needed.
 
@@ -100,3 +111,36 @@
   ADR-003 (Makefile -> cross-platform Python CLI) recorded in `docs/DECISIONS.md`.
 - `docker pull falkordb/falkordb:v4.22.1` OK (digest sha256:b0bdcac2...).
 - Next: DB up + MODULE LIST check, F-01 tests.
+
+
+---
+
+### 2026-10-15 21:39 IST | Phase P1 | F-11 gate, F-10 scenarios, F-09 workspace | STATUS: done (scoped)
+- Resumed the original gate import failure; implemented deterministic four-verdict gate,
+  static policy classifier, trusted-support checks, bounded evidence paths, REST/MCP and
+  stdlib-only Claude hook. Independent reviews found truncation silent-allow and recording
+  partial-write defects; fixed with reverify frontier and recording prerequisite checks.
+- Commits: 06c82f1 F-11; 38b1376 F-10; 4eb3a66 F-09. Docs/spike reconciliation follows.
+- F-10: synthetic S1/S8, private ignored credential, idempotent seeding. QA found unrelated
+  fixture-id attestation and support-author overwrite; fixed whole-fixture preflight and
+  ON CREATE support author. Main demo seeded healthy; repeated make demo creates nothing.
+- F-09: static offline graph workspace, bounded authenticated graph projection, safe text
+  sinks, token only in memory, preview/confirm, blame/impact/depth, manual action report,
+  real gate form. Actual browser persistence + S8 preservation + medium allow/high reverify;
+  native keyboard focus retained; mobile no overflow; screenshots are local/ignored.
+- Tests: make check -> 245 passed in31.58s, Ruff PASS, secret scan PASS, numbers PASS.
+  Fresh clone+new venv at4eb3a66 -> full pytest245 passed in34.53s and Ruff PASS.
+  uv build --wheel -> success; ZIP inspection confirms all required UI assets present.
+  F-11 earlier fresh clone ->202 passed; no graph mocks substituted for real FalkorDB.
+- QA: docs/qa/F-11.md, F-10.md, F-09.md PASS for declared scope;
+  docs/qa/redteam-F-11.md, redteam-F-10.md, redteam-F-09.md PASS with residual limits.
+  Builder browser evidence: docs/qa/F-09-browser.md. Independent reviewer operated its own
+  read-only browser tab; root's destructive fixture and registry row were removed.
+- OpenCode spike: installed1.19.0, free model advertised zero prices; genuine isolated
+  plugin/session events captured, provider quota prevented tool execution. F-08 blocked;
+  docs/consults/opencode-spike.md and opencode-after-shape.json contain exact limitation.
+- Numbers produced: no benchmark CSV. Test timings/counts above are command evidence only.
+- Not release-ready: installed capture proof, source identity continuity, authority separation,
+  full eval/isolation/ACL/deployment work and human release tasks remain. No push performed.
+- Execution policy blocked cleanup of ignored build/browser artifacts; left local/ignored.
+  Temporary clean clones remain in OS temp. Current state lists exact next three actions.
