@@ -1,19 +1,17 @@
-from __future__ import annotations
 
 """Model Context Protocol server (F-06): wraps the same engine as HTTP."""
-
-import asyncio
-from typing import Any
+from __future__ import annotations
 
 from mcp.server.mcpserver import MCPServer
 
+from .api.registry import TenantRegistry
 from .config import get_settings, graph_name
 from .db.client import Db
 from .db.schema import ensure_schema
-from .engine.blame import blame as run_blame, impact as run_impact
-from .engine.ingest import record_action, record_source, remember, corroborate
+from .engine.blame import blame as run_blame
+from .engine.blame import impact as run_impact
+from .engine.ingest import corroborate, record_action, record_source, remember
 from .engine.revoke import reinstate, report, revoke
-from .api.registry import TenantRegistry
 from .errors import PedigreeError
 
 
