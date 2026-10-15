@@ -100,3 +100,9 @@ class EventResponse(BaseModel):
 
 class OkResponse(BaseModel):
     detail: Any = None
+
+
+class EventsPayload(StrictModel):
+    runtime: str = "generic"
+    session_id: str | None = None
+    events: list[dict[str, Any]] = []

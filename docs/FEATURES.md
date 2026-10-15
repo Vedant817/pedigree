@@ -14,7 +14,7 @@ that is not `done` here.
 | F-04 | P0 | Blame + impact (ancestors/descendants, shortest path via parent pointers, `not_in_graph`) | done | tests/unit/test_blame.py (10), tests/integration/test_blame_impact.py (4) | `docs/qa/F-04.md` (PASS) |
 | F-05 | P0 | REST API + registry graph + tenant tokens + auth + limits + errors | done | tests/integration/test_api.py (7), tests/security/test_security_F05.py (5) | `docs/qa/F-05.md` PASS |
 | F-06 | P0 | MCP server (stdio + Streamable HTTP): record_source, remember, record_action, revoke, blame, impact | done | tests/integration/test_mcp.py (2), tests/security/test_security_F06.py (5) | `docs/qa/F-06.md` PASS |
-| F-07 | P0 | Claude Code hook adapter + `/v1/events` mapping + recorded-payload fixtures + cross-session `artifact_key` link | todo | - | - |
+| F-07 | P0 | Claude Code hook adapter + `/v1/events` mapping + recorded-payload fixtures + cross-session `artifact_key` link | qa | tests/integration/test_events.py (1) | docs/qa/F-07.md (pending) |
 | F-08 | P0 | OpenCode plugin (`pedigree.ts`) mapped from real logged payloads | todo | - | - |
 | F-09 | P0 | UI v1: graph view, status colours, revoke dry-run/confirm, depth slider, revert list | todo | - | - |
 | F-10 | P0 | Scenarios S1 + S8 as JSON + `seed_demo.py` + `make demo` | todo | - | - |
