@@ -35,8 +35,13 @@ def _register_error_handlers(app: FastAPI) -> None:
 class BodySizeMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         cl = request.headers.get("content-length")
-        if cl and int(cl) > 256 * 1024:
-            return JSONResponse(status_code=413, content={"error": {"code": "too_large", "message": "body too large"}})
+        if cl:
+            try:
+                size = int(cl)
+            except (ValueError, TypeError):
+                return JSONResponse(status_code=400, content={"error": {"code": "invalid_argument", "message": "invalid content-length"}})
+            if size < 0 or size > 256 * 1024:
+                return JSONResponse(status_code=413, content={"error": {"code": "too_large", "message": "body too large"}})
         return await call_next(request)
 
 

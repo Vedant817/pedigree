@@ -160,6 +160,11 @@ def main(argv: list[str] | None = None) -> int:
     p_serve.add_argument("--host", default="127.0.0.1")
     p_serve.add_argument("--port", type=int, default=8000)
 
+    p_mcp = sub.add_parser("mcp", help="run the MCP server")
+    p_mcp.add_argument("--transport", choices=["stdio", "streamable-http", "sse"], default="stdio")
+    p_mcp.add_argument("--host", default="127.0.0.1")
+    p_mcp.add_argument("--port", type=int, default=8011)
+
     sub.add_parser("seed", help="seed the demo tenant (synthetic scenarios)")
     sub.add_parser("version", help="print version")
 
@@ -169,6 +174,15 @@ def main(argv: list[str] | None = None) -> int:
         return {"start": db_start, "stop": db_stop, "status": db_status}[args.action](settings)
     if args.cmd == "serve":
         return serve(settings, args.host, args.port)
+    if args.cmd == "mcp":
+        from .mcp_server import build_mcp
+
+        srv = build_mcp(
+            settings,
+            default_tenant_id=os.getenv("PEDIGREE_MCP_TENANT"),
+            default_tenant_token=os.getenv("PEDIGREE_MCP_TOKEN"),
+        )
+        return srv.run(args.transport, args.host, args.port) or 0
     if args.cmd == "seed":
         from . import __version__  # noqa: F401  (import check)
 

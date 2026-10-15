@@ -7,7 +7,7 @@ from mcp.server.mcpserver import MCPServer
 from .api.registry import TenantRegistry
 from .config import get_settings, graph_name
 from .db.client import Db
-from .db.schema import ensure_schema
+from .db.schema import ensure_schema, node_count
 from .engine.blame import blame as run_blame
 from .engine.blame import impact as run_impact
 from .engine.ingest import corroborate, record_action, record_source, remember
@@ -38,19 +38,21 @@ class PedigreeMCPServer:
         if token:
             rec = self.registry.resolve(token)
             if rec is None:
-                return None, "invalid token"
+                return None, None
             if tenant_id is not None and tenant_id != rec.tenant_id:
-                return None, "token/tenant mismatch"
+                return None, None
             tid = rec.tenant_id
         else:
             if tenant_id is None:
                 tenant_id = self.default_tenant_id
+            if self.default_tenant_id is None or tenant_id != self.default_tenant_id:
+                return None, None
             if not tenant_id:
-                return None, "tenant_id required"
+                return None, None
             try:
                 self.registry.get_record(tenant_id)
             except Exception:
-                return None, "unknown tenant"
+                return None, None
             tid = tenant_id
         gname = graph_name(tid)
         ensure_schema(self.db, gname)
@@ -72,6 +74,9 @@ class PedigreeMCPServer:
             tid, gname = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": tid}}
+            cap = self.registry.get_record(tid).node_cap
+            if node_count(self.db, gname) >= cap:
+                return {"ok": False, "error": {"code": "quota_exceeded", "message": "node cap exceeded"}}
             def go():
                 r = record_source(self.db, gname, tid, kind=kind, uri=uri, title=title,
                                   integrity=integrity, conf=conf, id=id)
@@ -87,6 +92,9 @@ class PedigreeMCPServer:
             tid, gname = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": tid}}
+            cap = self.registry.get_record(tid).node_cap
+            if node_count(self.db, gname) >= cap:
+                return {"ok": False, "error": {"code": "quota_exceeded", "message": "node cap exceeded"}}
             def go():
                 r = remember(self.db, gname, tid, text=text, mkind=mkind, derived_from=derived_from or [],
                             corroborated_by=corroborated_by or [], artifact=artifact,
@@ -104,6 +112,9 @@ class PedigreeMCPServer:
             tid, gname = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": tid}}
+            cap = self.registry.get_record(tid).node_cap
+            if node_count(self.db, gname) >= cap:
+                return {"ok": False, "error": {"code": "quota_exceeded", "message": "node cap exceeded"}}
             def go():
                 r = record_action(self.db, gname, tid, tool=tool, summary=summary,
                                   relied_on=relied_on or [], decision=decision, effect=effect,

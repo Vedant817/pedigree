@@ -19,7 +19,7 @@ class SourceCreate(StrictModel):
     uri: str | None = None
     title: str | None = None
     content_hash: str | None = None
-    integrity: Literal["low", "high"] | None = None
+    integrity: Literal["trusted", "untrusted"] | None = None
     conf: list[str] | None = None
     id: str | None = None
 

@@ -13,7 +13,9 @@ from ..config import get_settings, graph_name, validate_id
 from ..db.client import Db
 from ..db.queries import Q_REGISTRY_ALL, Q_REGISTRY_BY_ID, Q_REGISTRY_SET_STATUS, Q_REGISTRY_UPSERT
 from ..db.schema import ensure_schema
-from ..errors import Conflict, NotFoundInGraph
+from ..errors import Conflict, InvalidArgument, NotFoundInGraph
+
+RESERVED_TENANT_IDS = frozenset({"registry"})
 
 REGISTRY_TENANT = "registry"
 CACHE_TTL_S = 30.0
@@ -47,6 +49,8 @@ class TenantRegistry:
 
     def create_tenant(self, tenant_id: str, node_cap: int | None = None) -> TenantCredential:
         validate_id(tenant_id)
+        if tenant_id in RESERVED_TENANT_IDS:
+            raise InvalidArgument("reserved tenant id", detail={"id": tenant_id})
         cap = node_cap or self.settings.pedigree_node_cap
         token = f"ped_{tenant_id}_{secrets.token_urlsafe(32)}"
         digest = _sha(token)
