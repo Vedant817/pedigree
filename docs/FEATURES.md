@@ -8,10 +8,10 @@ that is not `done` here.
 
 | ID | Pri | Feature | Status | Tests | QA report |
 |---|---|---|---|---|---|
-| F-01 | P0 | Repo skeleton, config, FalkorDB start/pin/health, schema (index+constraint), `graph_name()`, Makefile, secret scan | qa | tests/unit/test_config.py, tests/integration/test_schema.py | - |
-| F-02 | P0 | Ingest engine: record_source / remember / record_action / corroborate; label inheritance; born-quarantined; parent validation | qa | tests/integration/test_core_scenario.py | - |
-| F-03 | P0 | Revoke engine: barrier -> fixpoint -> `compute_final` -> chunked write -> verify; dry run; reinstate; resume; `check_invariants` | qa | tests/integration/test_core_scenario.py, tests/unit/test_compute.py | - |
-| F-04 | P0 | Blame + impact (ancestors/descendants, shortest path via parent pointers, `not_in_graph`) | todo | - | - |
+| F-01 | P0 | Repo skeleton, config, FalkorDB start/pin/health, schema (index+constraint), `graph_name()`, Makefile, secret scan | done | tests/unit/test_config.py, tests/unit/test_secret_scan.py, tests/integration/test_schema.py, tests/integration/test_tenant_guard.py, tests/unit/test_queries_static.py | `docs/qa/F-01.md` (round 1 FAIL, round 2 PASS) |
+| F-02 | P0 | Ingest engine: record_source / remember / record_action / corroborate; label inheritance; born-quarantined; parent validation | done | tests/integration/test_core_scenario.py, tests/integration/test_tenant_guard.py | `docs/qa/F-02.md` (PASS) |
+| F-03 | P0 | Revoke engine: barrier -> fixpoint -> `compute_final` -> chunked write -> verify; dry run; reinstate; resume; `check_invariants` | done | tests/integration/test_core_scenario.py, tests/unit/test_compute.py, tests/integration/test_schema.py, tests/integration/test_tenant_guard.py | `docs/qa/F-03.md` (PASS) |
+| F-04 | P0 | Blame + impact (ancestors/descendants, shortest path via parent pointers, `not_in_graph`) | implementing | - | - |
 | F-05 | P0 | REST API + registry graph + tenant tokens + auth + limits + errors | todo | - | - |
 | F-06 | P0 | MCP server (stdio + Streamable HTTP): record_source, remember, record_action, revoke, blame, impact | todo | - | - |
 | F-07 | P0 | Claude Code hook adapter + `/v1/events` mapping + recorded-payload fixtures + cross-session `artifact_key` link | todo | - | - |

@@ -104,4 +104,49 @@ data only, never interpolated into Cypher.
 docs' own examples) or relax ids entirely (rejected: weaker injection surface control).
 
 **Consequences.** `graph_name()` is unaffected (tenant ids stay `[a-z0-9]{3,24}`).
-**Reversible:** yes. **Evidence:** `tests/unit/test_config.py`, `tests/test_ingest.py`.
+**Reversible:** yes. **Evidence:** `tests/unit/test_config.py`, `tests/integration/test_core_scenario.py`.
+
+---
+
+## ADR-005 | 2026-10-15 | Tenant ids are validated at every engine boundary (QA finding)
+
+**Context.** QA round 1 (session `ses_ec033eae7ffefekNuBi1yw4GM8`) proved that the engine
+functions accepted any `tenant` string and wrote it verbatim into node properties (e.g.
+`'not a valid tenant!'`). Injection was contained (all Cypher is parameterised), but invalid
+tenants could be persisted. F-05 will derive the tenant from the bearer token only; until
+then the engine itself must refuse bad tenants.
+
+**Decision.** Add `config.validate_tenant()` and call it at the top of every engine entry
+point (`record_source`, `remember`, `record_action`, `revoke`, `reinstate`), before any DB
+access, so a rejected call performs **zero writes**.
+
+**Alternatives.** Rely on F-05's token mapping alone (rejected: one forgotten call site
+persists garbage); validate inside `graph_name()` only (insufficient: the engine may write
+several graphs-related properties before naming one).
+
+**Consequences.** One cheap regex check per call; invalid tenants raise typed
+`InvalidArgument`. **Reversible:** yes. **Evidence:**
+`tests/integration/test_tenant_guard.py` (bad tenant -> `InvalidArgument`, node count
+unchanged for 8 bad values x each entry point); `docs/qa/F-01.md` finding 2.
+
+---
+
+## ADR-006 | 2026-10-15 | `:Revocation` lifecycle property is `state`, not `status`
+
+**Context.** docs/01 §5 lists `status` for all entities, but a Revocation is not a belief:
+its meaningful lifecycle is `running|done` (crash recovery keys on `state='running'`).
+QA round 1 also found that `check_invariants` could not detect a *missing* `status`
+(NOT-semantics on NULL), so both a real gap and the Revocation deviation were invisible.
+
+**Decision.** Keep `state` as the single lifecycle property on `:Revocation` (no duplicate
+`status` bookkeeping) and add `Q_INV_MISSING_STATUS` ("every :Node carries a status property
+**except** :Revocation") so the gap is now detected everywhere else. The deviation from §5
+is recorded here and in `docs/KNOWN_ISSUES.md`.
+
+**Alternatives.** Add `status` to Revocation nodes duplicating `state` (rejected: two
+fields that can drift; `done` is not in the status vocabulary anyway).
+
+**Consequences.** Simpler crash-recovery reads; one documented model deviation.
+**Reversible:** yes (add + backfill, one query). **Evidence:**
+`tests/integration/test_schema.py::test_invariants_detect_missing_status`;
+`docs/qa/F-03.md`.

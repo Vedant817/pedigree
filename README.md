@@ -29,7 +29,7 @@ git clone <repo-url> && cd pedigree
 make setup          # creates .venv and installs the package (Python 3.11+)
 make start-db       # FalkorDB v4.22.1 (Docker image, or pinned .so without Docker on Linux)
 make test-quick     # runs the fast test suite against the real FalkorDB
-make demo           # seeds the demo tenant, prints the UI/MCP URLs
+make demo           # seeds the demo tenant, prints the UI/MCP URLs (F-10; seeder lands there)
 ```
 
 Full setup, the graph data model and **every Cypher query and algorithm the product
