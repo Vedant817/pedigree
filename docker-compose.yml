@@ -1,0 +1,27 @@
+# Local single-container compose (F-16): build the image and run the whole product
+# (FalkorDB 4.22.1 + REST/MCP/UI service) with the demo tenant seeded on boot.
+#
+#   PEDIGREE_ADMIN_TOKEN=choose-a-token docker compose up --build
+#   curl -s localhost:8000/readyz
+#   curl -s localhost:8000/healthz
+#
+# The credential the demo seeder writes is printed by the seed step (kept in the container's
+# filesystem, never in this file). Auth/token env is the deployment's own configuration.
+
+services:
+  pedigree:
+    build: .
+    image: pedigree:local
+    ports:
+      - "8000:8000"   # REST API + MCP mount + static UI
+      - "6379:6379"   # FalkorDB (loopback mapping; leave unpublished in production)
+    environment:
+      PEDIGREE_SEED_DEMO: "1"
+      PEDIGREE_ADMIN_TOKEN: ${PEDIGREE_ADMIN_TOKEN:?set PEDIGREE_ADMIN_TOKEN}
+      FALKOR_HOST: 127.0.0.1
+      FALKOR_PORT: "6379"
+    volumes:
+      - pedigree-data:/data
+
+volumes:
+  pedigree-data:

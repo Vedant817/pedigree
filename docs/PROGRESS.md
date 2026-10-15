@@ -233,3 +233,21 @@
 - 295 tests pass; ruff PASS.
 - KNOWN_ISSUES 18/19/20: ACL users verified-but-not-wired (service isolation is API-level),
   per-thread connection count, and engine writes assuming the per-tenant schema.
+
+---
+
+### 2026-10-16 02:20 IST | Phase P2 | F-16 deployment path (Docker, verified) | STATUS: done locally; Render is a human step
+- `Dockerfile` (Ubuntu 24.04, Python 3.12, pinned FalkorDB module fetched at build time and
+  asserted executable, `healthcheck` on `/readyz`), `scripts/entrypoint.sh` (module check ->
+  FalkorDB with the mandatory args -> wait for readiness -> optional demo seed -> uvicorn),
+  `docker-compose.yml`, `.dockerignore`.
+- **Verified on this machine**: `docker build` OK; container boots FalkorDB 4.22.1
+  (`pedigree cli db status` inside: module ver 42201 OK), seeds the demo tenant
+  (`{"created": 11, "existing": 0, "invariants": "pass", "scenarios": ["S1","S8"]}`), and serves
+  `/healthz`, `/readyz`, `/`, `/docs`, `/metrics`, `/v1/graph`, `/v1/stats`, `/v1/gate` (200;
+  a high-risk push relying on a captured source returns `reverify` + `untrusted_influence`), and the
+  demo revoke loop: dry-run `would_taint 5` with the affected actions, then the real revoke
+  `state done, tainted 5`, graph `{"ok":5,"revoked":1,"tainted":5}`.
+- KNOWN_ISSUES 4 (Linux scripts never executed) is now closed: the same scripts ran inside the
+  image. Render remains a human step (no account yet) - documented in README "Deploy".
+- 295 tests pass; ruff PASS.

@@ -1,0 +1,19 @@
+# Keep the build context small and reproducible: the image installs the package itself.
+.env
+.git
+.github
+.venv
+venv
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+.hypothesis
+.mypy_cache
+*.egg-info
+bin/
+data/
+scratch/
+node_modules/
+output/
+docs/pack/
