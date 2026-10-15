@@ -16,7 +16,7 @@ sys.path.insert(0, str(SCRIPTS))
 import secret_scan  # noqa: E402
 
 # A key-shaped value that deliberately avoids the placeholder filter (no example/fake/test...).
-PLANTED_KEY = b"aws_access_key_id = AKIA_REDACTED\n"
+PLANTED_KEY = b"aws_access_key_id = AKIA_REDACTED\n"  # secret-scan-allow (synthetic key shape for a regression test)
 # Bytes that are neither valid UTF-8 nor valid cp1252 (0x8f, 0x90) as QA observed at
 # history offset 421527; must not crash the scanner.
 NON_UTF8_BYTES = b"graph \x8f\x90 module output \x81\x8d\n"

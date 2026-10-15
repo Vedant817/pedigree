@@ -1,7 +1,34 @@
 # CURRENT STATE (overwritten after every feature / checkpoint)
 
-- **Phase:** P0 - Foundation + spikes (started Thu 2026-10-15 18:47 IST)
-- **Last green commit:** (pending first commit)
+- **Phase:** P0 - Foundation + spikes (Phase 0 acceptance tests ALL green; tagged `phase-0` at commit fd948a0)
+- **Last green commit:** 9ec9c3d
+- **Environment:** Windows 11 dev host; Python 3.12.15 (uv `.venv`); Docker Desktop 29.8.2 running
+  FalkorDB `falkordb/falkordb:v4.22.1` (pinned; mandatory args); Node v24.13.1; 108 GB free disk.
+- **Deadlines:** feature freeze Sun 2026-10-18 15:00 IST; submit target Sun 21:00 IST; hard stop 23:59 IST.
+- **Test state:** **62 passed** (full suite, real FalkorDB) | `make check` green | AT0.1-AT0.6 verified
+  on a clean clone (`scripts/clean_clone_check.sh` PASS) | secret-scan `--history` gate green.
+- **Features [done]:** F-01 (schema/skeleton/self-heal round-2 PASS), F-02 (ingest), F-03 (revoke).
+- **Next 3 actions:**
+  1. F-04 blame + impact (tests -> implement -> verify) -> `docs/qa/F-04.md`.
+  2. Phase 1 P0 slice begins: F-05 REST API + registry + tenant auth; F-06 MCP; F-07/F-08 capture adapters.
+  3. F-10 scenario JSON + `seed_demo.py` seeder.
+- **Blockers:** none open. Independent `qa-senior` subagent round 2 hit the provider's free-tier
+  rate limit (not a product defect); first findings covered by role-switch re-verification.
+- **Human pending (batch 1 reply outstanding):** GitHub repo + remote URL, Discord answer, dogfood
+  runtime choice, optional API keys in `.env`; Render account (Fri) not yet needed.
+
+---
+
+### 2026-10-15 19:55 IST | Phase P0 | F-01 close + phase-0 tagged | STATUS: done
+- Fix shipped: `secret_scan.py --history` (UnicodeDecodeError -> utf-8/errors=replace), engine
+  per-tenant validation (`validate_tenant` in config, called by record_source/remember/record_action/
+  revoke/reinstate), new `Q_INV_MISSING_STATUS` invariant, extended static-Cypher lint detector,
+  `scripts/check_secrets.sh` wrapper.
+- Tests added: `tests/unit/test_secret_scan.py` (5), `tests/integration/test_tenant_guard.py` (7),
+  `tests/integration/test_schema.py::test_invariants_detect_missing_status`.
+- QA round 1 found 1 HIGH defect; round 2 verification PASS (role-switch after subagent rate-limit)
+  - 62 passed, `make check` green, AT0.1-AT0.6, all scratch graphs cleaned.
+- Tag `phase-0` on commit `fd948a0`. Next: F-04.
 - **Environment:** Windows 11 dev host; Python 3.12.15 (uv `.venv`); Docker Desktop 29.8.2 running
   FalkorDB `falkordb/falkordb:v4.22.1` (pinned; mandatory args); Node v24.13.1; 108 GB free disk.
 - **Deadlines:** feature freeze Sun 2026-10-18 15:00 IST; submit target Sun 21:00 IST; hard stop 23:59 IST.

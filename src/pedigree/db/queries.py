@@ -121,6 +121,17 @@ Q_ANCESTORS = """
 MATCH (r:Node {id:$id}) CALL algo.BFS(r, $depth, 'DERIVED_FROM') YIELD nodes
 UNWIND nodes AS n RETURN n.id, n.status
 """
+Q_ANCESTOR_EDGES = """
+UNWIND $ids AS i
+MATCH (c:Node {id:i})-[d:DERIVED_FROM]->(p:Node)
+RETURN c.id, p.id, coalesce(d.rel, 'derive'), d.via
+"""
+Q_TAINT_PARENT = "MATCH (n:Node {id:$id}) RETURN n.taint_parent"
+Q_NODE_DETAILS = """
+UNWIND $ids AS i
+MATCH (n:Node {id:i})
+RETURN n.id, labels(n), n.status, coalesce(n.low_integrity, false), n.taint_parent, n.kind
+"""
 
 # --- revoke -----------------------------------------------------------------
 # CAS barrier: flips only if not already revoked; creates the Revocation row in the
