@@ -1,38 +1,28 @@
 # CURRENT STATE (overwritten after every feature / checkpoint)
 
-- **Phase:** P1 vertical slice; F-09/F-10/F-11 completed (Thu 21:39 IST). Phase 1 is not complete:
-  installed runtime capture remains unverified, and F-08 is blocked by its free provider quota.
-- **Last green implementation:** 4eb3a66 (F-09), preceded by 38b1376 (F-10) and 06c82f1 (F-11).
+- **Phase:** P2 -> P4 in parallel (Thu/Fri 02:40 IST). Phase 1 acceptance tests are met
+  (AT1.1-AT1.6 verified; AT1.7 dogfood capture is quota-blocked and honestly recorded).
+- **Last green implementation:** 41469e0 (F-14 E4 latency) + uncommitted E3/QA pass.
 - **Environment:** Windows 11 dev host; Python 3.12.15 (uv `.venv`); Docker Desktop 29.8.2 running
-  FalkorDB `falkordb/falkordb:v4.22.1` (pinned; mandatory args); Node v24.13.1; 108 GB free disk.
+  FalkorDB `falkordb/falkordb:v4.22.1` (pinned; mandatory args); Node v24.13.1.
 - **Deadlines:** feature freeze Sun 2026-10-18 15:00 IST; submit target Sun 21:00 IST; hard stop 23:59 IST.
-- **Test state:** **245 passed** (`make check`, real FalkorDB; 31.58s), lint/secret/numbers PASS.
-  A fresh clone+new venv of 4eb3a66 passed full pytest (245, 34.53s) and lint. Wheel built;
-  all UI static assets included. History secret scan PASS after adding new files.
-  Hook subprocess -> HTTP -> DB -> deny and actual UI -> persisted revoke -> reload verified.
-- **Features [done]:** F-01 (QA PASS round 2), F-02 (PASS), F-03 (PASS), F-04 (PASS),
-  F-05 + F-06 (PASS incl. red-team hardening), F-07 API/capture mapping (QA evidence exists),
-  F-09 (independent QA + review + builder browser proof), F-10 and F-11 (QA + review PASS).
-  F-07 installed-runtime capture/fidelity gaps remain open issue 12.
-- **Local service:** root-owned Uvicorn on 127.0.0.1:8000 (session 92866, PID19808), demo tenant
-  seeded healthy with 11 nodes. Credential is in ignored scratch/demo-demo.json; never print it.
-  Browser QA used and removed a separate random tenant; main demo was not revoked.
-- **No in-flight source edits.** OpenCode spike artifacts honestly record session startup only;
-  tool before/after payloads are null, not fabricated. No paid fallback was used.
-- **Material limits:** human/scanner authority is caller-asserted pending F-13; repeated unmatched
-  file reads can create new Source ids; hook failures are fail-open. See KNOWN_ISSUES 11-14.
+- **Test state:** **300 passed, 1 skipped** (`make check`-equivalent; the skip is the ACL test
+  without the deployment secret) | ruff PASS | secret scan `--history` PASS | numbers check PASS
+  (README + blog + submission + walkthrough against 61 values in `docs/NUMBERS.md`).
+  `make eval` 80 s, `make eval-quick` 4 s; the container boots and passes end-to-end.
+- **Features [done]:** F-01..F-07 (QA PASS), F-09, F-10, F-11 (QA PASS), F-16 (QA PASS local),
+  F-13/F-15 capture-trust and isolation scope (QA PASS with documented residuals),
+  F-14 E1/E2/E3/E4 (numbers in NUMBERS.md; E4b/E5/E6 remain).
+- **Local service:** demo tenant seeded (`scratch/demo-demo.json`, git-ignored; never print it).
 - **Next 3 actions:**
-  1. F-07/F-13 capture hardening: stable Source identity across repeated reads and separated
-     human/scanner authority. Write consult + failing repros before changing these trust boundaries.
-  2. Verify installed Claude runtime with own synthetic capture if an already-authorized free path
-     is available; F-08 remains blocked until free quota returns. Do not invent tool payloads.
-  3. F-14 E1/E2 independent oracle/eval pipeline, then F-15 isolation/ACL and F-16 local/deploy path.
-- **Blockers:** F-08 free_tier_limit (OpenCode1.19.0, free DeepSeek model: Free usage exceeded,
-  subscribe to Go). Browser automation connection dropped twice during S8; Playwright CLI fallback
-  completed the remaining local proof. Execution policy blocked deletion of ignored build/browser
-  artifacts; left ignored. Temporary clone venvs remain in OS temp; no user data was deleted.
-- **Human pending (batch 1 reply outstanding):** GitHub repo + remote URL, Discord answer, dogfood
-  runtime choice, optional API keys in `.env`; Render account (Fri) not yet needed.
+  1. Remaining eval items: E4b (SQLite closure comparison) and the E5/E6 report entries.
+  2. F-12 confidentiality scenario S6 + F-17 what-if and F-18 audit_sources (demo depth).
+  3. Phase-4 pass: docs tidy, `clean_clone_check.sh` re-run, tags `phase-0..phase-4`, and the
+     batched human message (repo remote, video, submission).
+- **Blockers:** none open. OpenCode free provider quota (F-08) and provider rate limits for
+  specialist subagents are recorded in the consults.
+- **Human pending (batch 1 reply outstanding):** GitHub repo + remote URL, Discord answer,
+  dogfood runtime choice, optional API keys in `.env`; Render account for the live URL.
 
 ---
 
@@ -272,3 +262,19 @@
   `tracks_entered` again).
 - 296 tests pass; ruff, secret scan and `check_numbers` (README + blog + submission +
   WALKTHROUGH) all PASS.
+
+---
+
+### 2026-10-16 03:00 IST | Phase P2/P4 | F-14 E3/E4 + QA reports for F-13/F-15/F-16 | STATUS: done
+- `evals/run_e3.py` + `tests/evals/test_e3_scenarios.py`: every authored scenario replayed through
+  the HTTP API (`/v1/events` per node, operator-credential attestation, `/v1/revoke`), asserting the
+  fixture's expected statuses plus gate probes (high-risk push on the revoked branch is never
+  `allow`; an unknown id is `reverify`). Found and fixed while writing it: actions link to their
+  session, so the replay now starts with `ensure_session` (without it the API correctly refuses).
+- `evals/run_e4.py`: latency for revoke/blame/impact/gate at 820/2460/8200 nodes through the real
+  engine (the real revoke is timed on a different root per round - a repeat revoke is idempotent by
+  design). The README points at the regenerated CSV instead of quoting drifting numbers.
+- QA reports written from real runs: `docs/qa/F-13.md`, `F-15.md`, `F-16.md` (each states its
+  residual rather than softening it).
+- `make eval` 80 s end-to-end (E1 -> E2 -> E4 -> E3 -> numbers -> NUMBERS.md -> REPORT.md ->
+  check_numbers); 300 tests pass; ruff/secret/numbers PASS.

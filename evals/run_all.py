@@ -113,6 +113,15 @@ def build_report(info: dict, numbers: dict) -> str:
     parts.append(_table(e4, ["nodes", "build_ms", "revoke_dry_p50_ms", "revoke_real_p50_ms",
                              "revoke_real_p95_ms", "blame_p50_ms", "impact_p50_ms", "gate_p50_ms"]))
     parts.append("")
+    parts.append("## E3 - scenario replay through the HTTP API")
+    parts.append("")
+    parts.append("`evals/run_e3.py` (also `tests/evals/test_e3_scenarios.py`) POSTs every")
+    parts.append("authored `demo/scenarios/*.json` node through `/v1/events`, attests the")
+    parts.append("corroborations with the operator credential, revokes the root through")
+    parts.append("`/v1/revoke` and asserts the fixture's expected statuses plus a gate probe: the")
+    parts.append("high-risk push built on the revoked branch is never `allow`. PASS/FAIL only - the")
+    parts.append("per-scenario expectations live in the fixtures.")
+    parts.append("")
     parts.append(f"`evals/results/e1_samples.csv` ({len(samples)} rows), "
                  "`evals/results/e1_b0_theta_sweep.csv`.")
     parts.append("")
@@ -155,6 +164,13 @@ def main(argv=None) -> int:
     rc = run_e4(["--quick"] if args.quick else [])
     if rc != 0:
         print("[eval] E4 failed", file=sys.stderr)
+        return rc
+
+    print("[eval] E3 scenario replay through the HTTP API ...")
+    from evals.run_e3 import main as run_e3  # noqa: PLC0415
+    rc = run_e3()
+    if rc != 0:
+        print("[eval] E3 failed", file=sys.stderr)
         return rc
 
     print("[eval] merging per-experiment numbers ...")
