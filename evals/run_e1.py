@@ -214,6 +214,19 @@ def _numbers(rows, grid, seeds, theta, info) -> dict:
                                 f"commit {info['commit_sha']}",
                        "source": "evals/machineinfo.py"},
     }
+    # deepest cell (L6-f3-p0.3): the number the demo/blog quote for "a cascade without support
+    # check deletes too much" - reported next to the pooled value so neither is cherry-picked.
+    for metric, key in (("over_invalidation", "e1_over_invalidation_b4_deepest_cell"),
+                        ("recall", "e1_recall_b2_deepest_cell")):
+        cell_rows = [r for r in rows if r["cell"] == "L6-f3-p0.3"
+                     and r["system"] == ("B4" if "b4" in key else "B2")
+                     and r[metric] is not None]
+        if cell_rows:
+            values = [r[metric] for r in cell_rows]
+            _mean, lo, hi = mean_ci(values, seed=23)
+            out[key] = {"value": round(sum(values) / len(values), 4),
+                        "ci95": [round(lo, 4), round(hi, 4)],
+                        "n": len(values), "source": "evals/run_e1.py (cell L6-f3-p0.3)"}
     for metric, key in (("recall", "e1_recall"), ("over_invalidation", "e1_over_invalidation"),
                         ("action_recall", "e1_action_recall"),
                         ("irreversible_recall", "e1_irreversible_recall"),

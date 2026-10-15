@@ -7,8 +7,26 @@
     "source": "evals/run_e1.py (calibration)"
   },
   "e1_machine": {
-    "value": "Windows-11-10.0.26300-SP0; Intel64 Family 6 Model 191 Stepping 2, GenuineIntel; 15.7 GB RAM; python 3.12.15; falkor 42201; commit 66a0dfd",
+    "value": "Windows-11-10.0.26300-SP0; Intel64 Family 6 Model 191 Stepping 2, GenuineIntel; 15.7 GB RAM; python 3.12.15; falkor 42201; commit 6fff1c4",
     "source": "evals/machineinfo.py"
+  },
+  "e1_over_invalidation_b4_deepest_cell": {
+    "value": 0.2777,
+    "ci95": [
+      0.2377,
+      0.3163
+    ],
+    "n": 30,
+    "source": "evals/run_e1.py (cell L6-f3-p0.3)"
+  },
+  "e1_recall_b2_deepest_cell": {
+    "value": 0.2374,
+    "ci95": [
+      0.1357,
+      0.3596
+    ],
+    "n": 30,
+    "source": "evals/run_e1.py (cell L6-f3-p0.3)"
   },
   "e1_recall_p": {
     "value": 1.0,

@@ -27,6 +27,10 @@ def ensure_demo_tenant(registry, tenant: str, credentials_dir: Path) -> Path | N
             raise ValueError("demo tenant is revoked; choose a new dedicated demo tenant")
         return file if file.exists() else None
     credentials_dir.mkdir(parents=True, exist_ok=True)
+    if file.exists():
+        # The tenant is gone from the registry, so a local file can only be a stale credential
+        # (a dead token). Replace it - a live credential is never overwritten (the branch above).
+        file.unlink()
     # Reserve the local destination before issuing a credential. Never overwrite.
     fd = os.open(file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     try:
@@ -54,8 +58,10 @@ def main() -> int:
         else:
             print("[seed] existing tenant credential retained; use the previously issued token in the UI")
         return 0
-    except Exception:
-        print("[seed] failed; check DB configuration, dedicated tenant, and local credential file", file=sys.stderr)
+    except Exception as exc:  # noqa: BLE001 - a CLI reports the reason, never a credential
+        print(f"[seed] failed: {type(exc).__name__}: {exc}", file=sys.stderr)
+        print("[seed] check DB configuration, the dedicated demo tenant and the local credential file",
+              file=sys.stderr)
         return 1
 
 
