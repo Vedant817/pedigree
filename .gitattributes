@@ -1,0 +1,13 @@
+# Shell and Python sources must stay LF everywhere (a CRLF shebang breaks Linux).
+* text=auto
+*.sh text eol=lf
+*.py text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+
+# Binaries never get line-ending conversion
+*.png binary
+*.jpg binary
+*.ico binary
+*.so binary
+*.pdf binary
