@@ -1,0 +1,5 @@
+1843896:M 15 Oct 2026 18:07:47.248 * <module> Graph 'demo_seed' processed 40000/20000 nodes
+1843896:M 15 Oct 2026 18:07:47.248 * <module> Graph 'demo_seed' processed 39998/19999 edges
+1843896:M 15 Oct 2026 18:07:47.248 * <module> Graph 'demo_seed' loading label matrices
+1843896:M 15 Oct 2026 18:07:47.249 * <module> Graph 'demo_seed' loading relation matrices
+redis-server: /FalkorDB/src/serializers/serializer_io.c:370: BufferSerializerIOv2_ReadUnsigned: Assertion `s == TYPE_ENCODE(uint64_t)' failed.

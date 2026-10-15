@@ -1,0 +1,7 @@
+graph y: nodes + index                                       bgsave_status=ok
++ unique constraint OPERATIONAL                              bgsave_status=ok
+[['MANDATORY', 'Memory', ['text'], 'NODE', 'FAILED'], ['UNIQUE', 'Memory', ['id'], 'NODE', 'OPERATIONAL']]
++ mandatory constraint in FAILED state                       bgsave_status=ok
+200k node graph                                              bgsave_status=ok
+timeout: Query timed out
+after a timed-out query                                      bgsave_status=ok

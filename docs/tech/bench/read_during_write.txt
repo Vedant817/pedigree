@@ -1,0 +1,2 @@
+reader on scale_dense  : write took 732 ms | before: n=175 p50=0.62ms p95=1.21ms p99=3.31ms max=8.03ms mean=0.78ms | during: n=12 p50=0.77ms p95=12.43ms p99=729.78ms max=729.78ms mean=62.98ms
+reader on tenant_smoke : write took 555 ms | before: n=186 p50=0.57ms p95=0.98ms p99=1.19ms max=2.32ms mean=0.60ms | during: n=14 p50=0.49ms p95=8.47ms p99=554.20ms max=554.20ms mean=41.14ms

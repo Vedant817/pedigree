@@ -1,0 +1,6 @@
+index + unique constraint                                    ok
+expected error: Index supports constraint
+after rejected DROP INDEX                                    err
+after FLUSHALL (recovery?)                                   ok
+Traceback (most recent call last):
+  File "<tech>/examples/py/bisect5.py", line 20, in <module>

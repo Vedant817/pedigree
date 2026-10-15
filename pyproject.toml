@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pedigree"
+version = "0.1.0"
+description = "git blame and git revert for what an AI agent believes - lineage, revocation and gating for agent memory, on FalkorDB"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Vedant Mahajan" }]
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "pydantic>=2.7",
+  "pydantic-settings>=2.3",
+  "prometheus-client>=0.20",
+  "falkordb==1.8.0",
+  "mcp>=2,<3",
+  "PyYAML>=6.0",
+  "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.2",
+  "pytest-timeout>=2.3",
+  "hypothesis>=6.100",
+  "ruff>=0.6",
+]
+# Linux only: supplies redis-server for the no-Docker local path (docs/09 section A).
+localdb = ["falkordblite==0.10.0"]
+
+[project.scripts]
+pedigree = "pedigree.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+  "slow: long-running tests (deselected by make test-quick)",
+  "e2e: end-to-end tests that start the service",
+]
+timeout = 300
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+# docs/tech/examples/* is the verified research prototype record - never reformat it.
+extend-exclude = ["docs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = ["E501"]

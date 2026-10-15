@@ -1,0 +1,11 @@
+nodes with vec prop                                          ok
+range idx node + rel idx (no edges of that type)             ok
++fulltext+vector                                             ok
++unique constraint                                           ok
++mandatory (async, may fail)                                 ok
+drop index err: Index supports constraint
+after failed DROP INDEX                                      err
+graph x with nested-list property                            err
+graph x mixed-type list                                      err
+graph t created by RETURN 1 only (empty key?)                err
+['y', 'x', 't']

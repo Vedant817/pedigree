@@ -1,0 +1,12 @@
+inserted 20000x384d in 7.30s
+vector index CREATE returned in 0.00s (build continues async)
+fulltext index build: 4.36s
+waited 10.59s more for async index build to become OPERATIONAL
+vector top5 (20k x 384d): n=200 p50=0.88ms p95=1.29ms p99=1.56ms max=1.65ms mean=0.93ms self-recall@1=200/200
+score semantics: cosine DISTANCE (0 = identical, lower is better): [[199, -1.19209289550781e-07], [4648, 0.801987051963806]]
+hybrid vector->graph: [[1500, 0.0, [1499, 1498, 1497]], [197, 0.785714626312256, [196, 195, 194]]]
+fulltext 'pricing'            -> 6648 hits 5.0ms
+fulltext 'refund invoice'     -> 1861 hits 2.7ms
+fulltext 'outage*'            -> 6634 hits 4.2ms
+fulltext 'memory123'          -> 1 hits 0.5ms
+post-filtered top10 (only even ids) returns 4 rows (<10 expected)

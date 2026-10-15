@@ -1,0 +1,2 @@
+DUMP bytes 950808
+RESTORE ok nodes= [[20000]]

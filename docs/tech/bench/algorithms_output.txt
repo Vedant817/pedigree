@@ -1,0 +1,34 @@
+-- descendants of 0 within 10 hops
+   [[0], [1], [2], [3], [4], [5], [6], [7], [8], [9]]
+-- ancestors (reverse arrow)
+   [[0], [1], [2], [3], [4], [5], [6], [7], [8], [9]]
+-- var-len with edge property filter (inline map only)
+   [[1], [2], [3], [4]]
+-- var-len with path predicate
+   [[1], [2]]
+-- path length + node list
+   [[3, [0, 2, 3, 4]], [4, [0, 1, 2, 3, 4]]]
+-- shortestPath
+   [[<falkordb.path.Path object at 0x7f0ecb565a90>]]
+-- shortestPath as list
+   [[7, [0, 2, 3, 4, 5, 7, 8, 9]]]
+-- allShortestPaths
+   [[2, [0, 2, 3]]]
+-- algo.BFS (unbounded, edge-type filter) from node 0
+   [[9, 9]]
+-- algo.BFS depth<=2
+   [[[1, 2, 3]]]
+-- algo.pageRank(label, relType) top3
+   [[5, 0.16860044002533], [7, 0.160282477736473], [8, 0.151248767971992]]
+-- algo.betweenness top3 (config map form)
+   [[3, 49.0], [2, 47.0], [4, 42.0]]
+-- algo.WCC components
+   [[0, 10]]
+-- algo.labelPropagation (CDLP equivalent)
+   [[4, [6, 7, 9]], [5, [5, 8]], [0, [0, 1, 2, 3, 4]]]
+-- algo.SPpaths (weighted k shortest)
+   [[8.0, 8], [8.0, 8], [7.0, 7]]
+-- algo.SSpaths (single source)
+   [[3, 3.0], [2, 2.0], [2, 2.0], [1, 1.0], [1, 1.0]]
+-- algo.MSF yields
+   [['algo.MSF']]

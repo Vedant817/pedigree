@@ -1,0 +1,16 @@
+EXPLAIN:
+Results
+    Aggregate
+        Conditional Variable Length Traverse | (m)-[@anon_0:DERIVED_FROM*1..10]->(x)
+            Node By Index Scan | (m:Memory)
+PROFILE:
+Results
+    Aggregate
+        Conditional Variable Length Traverse | (m)-[@anon_0:DERIVED_FROM*1..10]->(x)
+            Node By Index Scan | (m:Memory)
+raw GRAPH.PROFILE: ['Results | Records produced: 1, Execution time: 0.000222 ms', '    Project | Records produced: 1, Execution time: 0.000834 ms']
+timeout -> ResponseError Query timed out
+GRAPH.CONFIG GET TIMEOUT*: [['TIMEOUT', 0], ['TIMEOUT_DEFAULT', 20000], ['TIMEOUT_MAX', 60000]]
+write timeout -> ResponseError Query timed out
+memory usage of graph (GRAPH.MEMORY USAGE): ['total_graph_sz_mb', 8, 'label_matrices_sz_mb', 1, 'relation_matrices_sz_mb', 2]
+slowlog: [['1792067273', 'GRAPH.QUERY', 'UNWIND range(0,49999) AS i CREATE (:Memory {id:i})', '202.71', None]]

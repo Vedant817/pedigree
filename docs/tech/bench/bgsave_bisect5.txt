@@ -1,0 +1,34 @@
+index + unique constraint                                    ok
+expected error: Index supports constraint
+after rejected DROP INDEX                                    err
+after FLUSHALL (recovery?)                                   ok
+Traceback (most recent call last):
+  File "<tech>/examples/py/bisect5.py", line 20, in <module>
+    r.execute_command("GRAPH.CONSTRAINT","CREATE","c2","UNIQUE","NODE","M","PROPERTIES","1","id"); time.sleep(.5); save("constraint w/o explicit index")
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<tech>/.venv/lib/python3.13/site-packages/redis/client.py", line 867, in execute_command
+    return self._execute_command(*args, **options)
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "<tech>/.venv/lib/python3.13/site-packages/redis/client.py", line 889, in _execute_command
+    result = conn.retry.call_with_retry(
+        lambda: self._send_command_parse_response(
+    ...<3 lines>...
+        with_failure_count=True,
+    )
+  File "<tech>/.venv/lib/python3.13/site-packages/redis/retry.py", line 120, in call_with_retry
+    return do()
+  File "<tech>/.venv/lib/python3.13/site-packages/redis/client.py", line 890, in <lambda>
+    lambda: self._send_command_parse_response(
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        conn, command_name, *args, **options
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ),
+    ^
+  File "<tech>/.venv/lib/python3.13/site-packages/redis/client.py", line 819, in _send_command_parse_response
+    return self.parse_response(conn, command_name, **options)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<tech>/.venv/lib/python3.13/site-packages/redis/client.py", line 935, in parse_response
+    response = connection.read_response()
+  File "<tech>/.venv/lib/python3.13/site-packages/redis/connection.py", line 1437, in read_response
+    raise response
+redis.exceptions.ResponseError: missing supporting exact-match index

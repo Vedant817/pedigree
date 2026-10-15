@@ -1,0 +1,10 @@
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+const target = process.argv[2] || 'stdio';
+const transport = target === 'stdio' ? new StdioClientTransport({ command: 'node', args: ['server_ts.mjs'] }) : new StreamableHTTPClientTransport(new URL(target));
+const c = new Client({ name: 'smoke', version: '0' }); await c.connect(transport);
+console.log('tools:', (await c.listTools()).tools.map(t => t.name));
+console.log('ping:', JSON.stringify((await c.callTool({ name: 'ping', arguments: {} })).content));
+console.log('retract:', JSON.stringify((await c.callTool({ name: 'retract_source', arguments: { tenant: 'smoke', source_id: 's1', reason: 'x' } })).content));
+await c.close(); process.exit(0);

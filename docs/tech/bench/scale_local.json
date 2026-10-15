@@ -1,0 +1,71 @@
+{
+ "topology": "local",
+ "nodes": 100000,
+ "edges_derived_from": 495000,
+ "bfs_depth10": {
+  "p50_ms": 5.483003973495215,
+  "p95_ms": 7.13273900328204,
+  "affected_p50": 12323,
+  "affected_p95": 12930,
+  "affected_max": 13191
+ },
+ "cascade_write_bfs": {
+  "p50_ms": 104.41467800410464,
+  "p95_ms": 133.40659596724436,
+  "affected_p50": 12323,
+  "affected_max": 13191
+ },
+ "dependents_bfs": {
+  "p50_ms": 20.64410294406116,
+  "p95_ms": 30.14517400879413,
+  "decisions_p50": 2270,
+  "decisions_max": 2417
+ },
+ "varlen_sweep_seed0": {
+  "2": {
+   "ms": 3.8,
+   "distinct": 306,
+   "error": null
+  },
+  "3": {
+   "ms": 2.8,
+   "distinct": 1159,
+   "error": null
+  },
+  "4": {
+   "ms": 8.7,
+   "distinct": 2492,
+   "error": null
+  },
+  "5": {
+   "ms": 34.9,
+   "distinct": 3963,
+   "error": null
+  },
+  "6": {
+   "ms": 130.9,
+   "distinct": 5546,
+   "error": null
+  },
+  "8": {
+   "ms": 3107.1,
+   "distinct": 9033,
+   "error": null
+  },
+  "10": {
+   "ms": 10002.5,
+   "distinct": null,
+   "error": "Query timed out"
+  }
+ },
+ "ancestors_bfs": {
+  "p50_ms": 5.050128966104239,
+  "p95_ms": 13.294711010530591,
+  "ancestors_p50": 3275
+ },
+ "wave_cascade": {
+  "p50_ms": 448.91155004734173,
+  "p95_ms": 547.9694930254482,
+  "invalidated_p50": 12371
+ }
+}

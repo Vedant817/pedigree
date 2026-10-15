@@ -1,0 +1,36 @@
+# Secrets and local env — NEVER commit a real token
+.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.hypothesis/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+
+# FalkorDB binaries and local data (fetched by scripts/fetch-falkordb.sh)
+bin/
+data/
+*.so
+*.rdb
+*.aof
+
+# Node
+node_modules/
+
+# Raw, large eval outputs (CSV/MD results under evals/results/ ARE committed)
+evals/results/raw/
+scratch/
+
+# OS noise
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,9 @@
+expected failure: unique constraint violation on node of type Memory
+after failed multi-clause write: count = 1 (expect 1); status = valid (expect valid)
+expected failure: unique constraint violation on node of type Memory
+batch rolled back as a whole: count = 1
+MULTI/EXEC results types: ['list', 'ResponseError', 'list']
+after MULTI/EXEC with one failing command: count = 3 (tx1 and tx2 persisted => NOT all-or-nothing)
+delete+recreate same unique key in one query -> [[1]] (works: delete is applied before the create)
+CAS #1 won: 1
+CAS #2 won: 0 (0 = lost)

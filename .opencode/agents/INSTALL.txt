@@ -1,0 +1,6 @@
+Install into the repo:
+  mkdir -p .opencode/agents && cp opencode-agents/*.md .opencode/agents/
+  cp opencode-agents/opencode.json ./opencode.json      # MCP registration (disabled until the server runs) + default permissions
+Agent file name = agent name (orchestrator, builder, qa-senior, domain-researcher, senior-architect, red-team, eval-statistician, devex-reviewer, tech-writer).
+Then in OpenCode press Tab to select the `orchestrator` primary agent. Subagents are launched by the orchestrator via the Task tool (or by @mention).
+Frontmatter keys used (verified against https://opencode.ai/docs/agents/ on 2026-10-15): description (required), mode (primary|subagent|all), temperature, steps, permission {edit, bash, webfetch, websearch, task} with shorthand allow|ask|deny or glob maps (last matching rule wins). `model` is intentionally omitted: subagents inherit the primary agent's model.

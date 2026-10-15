@@ -1,0 +1,27 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "provenance_local": {
+      "type": "local",
+      "command": [
+        ".venv/bin/python",
+        "examples/mcp/server_py.py"
+      ],
+      "environment": {
+        "FALKOR_HOST": "localhost",
+        "FALKOR_PORT": "6379"
+      },
+      "enabled": true,
+      "timeout": 10000
+    },
+    "provenance_remote": {
+      "type": "remote",
+      "url": "http://127.0.0.1:8765/mcp",
+      "enabled": false,
+      "oauth": false,
+      "headers": {
+        "Authorization": "Bearer {env:MCP_TOKEN}"
+      }
+    }
+  }
+}

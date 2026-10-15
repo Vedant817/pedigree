@@ -1,0 +1,69 @@
+[dense] ingest 24.9s: nodes=105000 DERIVED_FROM=495000 FEEDS=495000 DEPENDS_ON=15000
+[dense] server used_memory delta: 76 MiB; GRAPH.MEMORY USAGE: ['total_graph_sz_mb', 55, 'label_matrices_sz_mb', 1, 'relation_matrices_sz_mb', 25, 'amortized_node_block_sz_mb', 0, 'amortized_node_attributes_by_label_sz_mb', ['Source', 0, 'Memory', 6, 'Decision', 0], 'amortized_unlabeled_nodes_attributes_sz_mb', 0, 'amortized_edge_block_sz_mb', 8, 'amortized_edge_attributes_by_type_sz_mb', ['DERIVED_FROM', 0, 'FEEDS', 0, 'DEPENDS_ON', 0], 'indices_sz_mb', 11]
+[dense] preview via algo.BFS FEEDS depth10: n=20 p50=12.38ms p95=14.14ms p99=14.98ms max=14.98ms mean=12.54ms | affected nodes: p50=64864 p95=65876 max=66481
+[dense] CASCADE WRITE via BFS (atomic, 1 query): n=20 p50=502.21ms p95=558.66ms p99=566.93ms max=566.93ms mean=495.33ms | invalidated p50=64864 max=66481
+[dense] dependent Decisions via BFS + join: n=20 p50=77.89ms p95=100.01ms p99=113.63ms max=113.63ms mean=81.46ms | decisions p50=5000 max=5000
+[dense] var-length FEEDS*1..2:      1.4 ms  distinct=202 
+[dense] var-length FEEDS*1..3:      1.5 ms  distinct=996 
+[dense] var-length FEEDS*1..4:      2.9 ms  distinct=4270 
+[dense] var-length FEEDS*1..5:     21.4 ms  distinct=12866 
+[dense] var-length FEEDS*1..6:     35.4 ms  distinct=22766 
+[dense] var-length FEEDS*1..8:    821.0 ms  distinct=42566 
+[dense] var-length FEEDS*1..10:  10005.1 ms  distinct=None Query timed out
+[dense] ancestors of level-10 memory via BFS DERIVED_FROM: n=20 p50=18.74ms p95=37.14ms p99=38.90ms max=38.90ms mean=20.68ms | ancestors p50=40891
+Traceback (most recent call last):
+  File "<tech>/.venv/lib/python3.13/site-packages/redis/connection.py", line 1413, in read_response
+    response = self._parser.read_response(
+        disable_decoding=disable_decoding, timeout=timeout
+    )
+  File "<tech>/.venv/lib/python3.13/site-packages/redis/_parsers/resp2.py", line 18, in read_response
+    result = self._read_response(
+        disable_decoding=disable_decoding, timeout=timeout
+    )
+  File "<tech>/.venv/lib/python3.13/site-packages/redis/_parsers/resp2.py", line 32, in _read_response
+    raw = self._buffer.readline(timeout=timeout)
+  File "<tech>/.venv/lib/python3.13/site-packages/redis/_parsers/socket.py", line 117, in readline
+    self._read_from_socket(timeout=timeout)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "<tech>/.venv/lib/python3.13/site-packages/redis/_parsers/socket.py", line 64, in _read_from_socket
+    data = sock.recv(socket_read_size)
+ConnectionResetError: [Errno 104] Connection reset by peer
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<tech>/examples/py/10_scale_bench.py", line 106, in <module>
+    r = g.query("MATCH (p:Memory {wave:$w, status:'invalidated'})-[:FEEDS]->(m:Memory {status:'valid'}) SET m.status='invalidated', m.wave=$w+1 RETURN count(DISTINCT m)", {"w": w}); c = r.result_set[0][0]
+  File "<tech>/.venv/lib/python3.13/site-packages/falkordb/graph.py", line 125, in query
+    return self._query(q, params=params, timeout=timeout, read_only=False)
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<tech>/.venv/lib/python3.13/site-packages/falkordb/graph.py", line 97, in _query
+    response = self.execute_command(*command)
+  File "<tech>/.venv/lib/python3.13/site-packages/redis/client.py", line 867, in execute_command
+    return self._execute_command(*args, **options)
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "<tech>/.venv/lib/python3.13/site-packages/redis/client.py", line 889, in _execute_command
+    result = conn.retry.call_with_retry(
+        lambda: self._send_command_parse_response(
+    ...<3 lines>...
+        with_failure_count=True,
+    )
+  File "<tech>/.venv/lib/python3.13/site-packages/redis/retry.py", line 132, in call_with_retry
+    raise error
+  File "<tech>/.venv/lib/python3.13/site-packages/redis/retry.py", line 120, in call_with_retry
+    return do()
+  File "<tech>/.venv/lib/python3.13/site-packages/redis/client.py", line 890, in <lambda>
+    lambda: self._send_command_parse_response(
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        conn, command_name, *args, **options
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ),
+    ^
+  File "<tech>/.venv/lib/python3.13/site-packages/redis/client.py", line 819, in _send_command_parse_response
+    return self.parse_response(conn, command_name, **options)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<tech>/.venv/lib/python3.13/site-packages/redis/client.py", line 935, in parse_response
+    response = connection.read_response()
+  File "<tech>/.venv/lib/python3.13/site-packages/redis/connection.py", line 1423, in read_response
+    raise ConnectionError(f"Error while reading from {host_error} : {e.args}")
+redis.exceptions.ConnectionError: Error while reading from localhost:6390 : (104, 'Connection reset by peer')

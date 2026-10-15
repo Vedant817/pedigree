@@ -1,0 +1,3 @@
+create_only last_status ok saves 23 consecutive_failures 0 1.3s
+create_index last_status ok saves 35 consecutive_failures 0 2.1s
+create_delete last_status ok saves 42 consecutive_failures 0 1.7s

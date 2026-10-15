@@ -1,0 +1,13 @@
+readers= 1:      279 queries/s  lat: n=400 p50=3.28ms p95=4.66ms p99=10.30ms max=22.57ms mean=3.56ms
+readers= 2:      559 queries/s  lat: n=800 p50=3.23ms p95=5.73ms p99=8.45ms max=13.02ms mean=3.56ms
+readers= 4:     1225 queries/s  lat: n=1600 p50=3.06ms p95=4.49ms p99=5.81ms max=8.32ms mean=3.21ms
+readers= 8:     1643 queries/s  lat: n=3200 p50=4.60ms p95=7.10ms p99=8.54ms max=15.99ms mean=4.79ms
+readers=16:     1562 queries/s  lat: n=6400 p50=9.02ms p95=13.35ms p99=50.38ms max=79.88ms mean=10.10ms
+reader latency BEFORE writes: n=1063 p50=3.40ms p95=5.23ms p99=12.23ms max=28.73ms mean=3.75ms
+reader latency DURING cascade writes: n=630 p50=3.91ms p95=452.79ms p99=542.79ms max=546.01ms mean=35.04ms
+cascade write latency (with 4 readers hammering): n=5 p50=524.82ms p95=561.51ms p99=561.51ms max=561.51ms mean=534.55ms
+writers=1:    5324 writes/s  lat: n=200 p50=0.12ms p95=0.41ms p99=1.30ms max=2.16ms mean=0.18ms
+writers=4:    5306 writes/s  lat: n=800 p50=0.45ms p95=0.87ms p99=1.73ms max=43.02ms mean=0.70ms
+writers=8:    8936 writes/s  lat: n=1600 p50=0.71ms p95=1.59ms p99=2.68ms max=5.30ms mean=0.82ms
+writers on 4 different graphs:    8991 writes/s  lat: n=800 p50=0.37ms p95=0.74ms p99=0.98ms max=1.74ms mean=0.41ms
+writers on 8 different graphs:    9923 writes/s  lat: n=1600 p50=0.60ms p95=1.72ms p99=2.56ms max=3.59ms mean=0.73ms

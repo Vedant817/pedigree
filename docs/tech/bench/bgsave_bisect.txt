@@ -1,0 +1,10 @@
+empty db                                                bgsave_status=ok
+plain graph, 2 nodes 1 edge                             bgsave_status=ok
++ range index                                           bgsave_status=ok
++ fulltext index                                        bgsave_status=ok
++ vector index                                          bgsave_status=ok
+graph + unique constraint                               bgsave_status=ok
+graph + relationship index (0 edges)                    bgsave_status=ok
+graph with only an index (0 nodes)                      bgsave_status=ok
+300 tiny graphs                                         bgsave_status=ok
+300 tiny graphs each with index                         bgsave_status=ok

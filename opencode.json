@@ -1,0 +1,17 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "pedigree": {
+      "type": "remote",
+      "url": "http://127.0.0.1:8000/mcp",
+      "oauth": false,
+      "headers": { "Authorization": "Bearer {env:PEDIGREE_TOKEN}" },
+      "enabled": false,
+      "timeout": 10000
+    }
+  },
+  "permission": {
+    "bash": { "*": "ask", "git status*": "allow", "git diff*": "allow", "git log*": "allow", "ls *": "allow", "rg *": "allow", "make *": "allow", "pytest*": "allow", "python*": "allow", ".venv/bin/*": "allow", "curl http://127.0.0.1*": "allow", "curl http://localhost*": "allow" },
+    "edit": "allow"
+  }
+}

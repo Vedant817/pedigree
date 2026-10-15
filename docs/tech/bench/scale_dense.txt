@@ -1,0 +1,14 @@
+[dense] ingest 25.9s: nodes=105000 DERIVED_FROM=495000 FEEDS=495000 DEPENDS_ON=15000
+[dense] server used_memory delta: 1 MiB; GRAPH.MEMORY USAGE: ['total_graph_sz_mb', 53, 'label_matrices_sz_mb', 1, 'relation_matrices_sz_mb', 30, 'amortized_node_block_sz_mb', 0, 'amortized_node_attributes_by_label_sz_mb', ['Source', 0, 'Memory', 3, 'Decision', 0], 'amortized_unlabeled_nodes_attributes_sz_mb', 0, 'amortized_edge_block_sz_mb', 8, 'amortized_edge_attributes_by_type_sz_mb', ['DERIVED_FROM', 0, 'FEEDS', 0, 'DEPENDS_ON', 0], 'indices_sz_mb', 11]
+[dense] preview via algo.BFS FEEDS depth10: n=30 p50=12.70ms p95=17.59ms p99=19.15ms max=19.15ms mean=13.33ms | affected nodes: p50=65043 p95=66217 max=66481
+[dense] CASCADE WRITE via BFS (atomic, 1 query): n=30 p50=546.19ms p95=714.15ms p99=736.82ms max=736.82ms mean=561.09ms | invalidated p50=65043 max=66481
+[dense] dependent Decisions via BFS + join: n=30 p50=83.93ms p95=106.07ms p99=120.40ms max=120.40ms mean=85.59ms | decisions p50=5000 max=5000
+[dense] var-length FEEDS*1..2:      4.9 ms  distinct=202 
+[dense] var-length FEEDS*1..3:     12.1 ms  distinct=996 
+[dense] var-length FEEDS*1..4:      8.8 ms  distinct=4270 
+[dense] var-length FEEDS*1..5:     30.4 ms  distinct=12866 
+[dense] var-length FEEDS*1..6:    118.5 ms  distinct=22766 
+[dense] var-length FEEDS*1..8:   2084.4 ms  distinct=42566 
+[dense] var-length FEEDS*1..10:  10007.4 ms  distinct=None Query timed out
+[dense] ancestors of level-10 memory via BFS DERIVED_FROM: n=30 p50=25.76ms p95=34.62ms p99=39.16ms max=39.16ms mean=26.35ms | ancestors p50=40856
+[dense] wave cascade (<=10 queries, NOT atomic overall; label-scan on wave property): n=10 p50=1241.10ms p95=1278.48ms p99=1278.48ms max=1278.48ms mean=1221.30ms | invalidated p50=64612

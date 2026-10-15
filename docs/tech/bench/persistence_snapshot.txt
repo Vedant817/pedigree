@@ -1,0 +1,6 @@
+GRAPH.COPY seed->live (20k nodes/20k edges): 167.8 ms
+live invalidated: 100 | seed invalidated: 0
+reset (delete + copy): 186.3 ms; invalidated now: 0
+indexes preserved on copy: ['Memory']
+{'aof_enabled': 1, 'rdb_last_bgsave_status': 'ok', 'rdb_saves': 0, 'aof_last_write_status': 'ok'}
+SAVE ok; last save 2026-10-15 18:08:09

@@ -1,0 +1,11 @@
+descendants of s1: [ { id: 'a' }, { id: 'b' } ]
+BFS: [ { ids: [ 'a', 'b' ] } ]
+invalidated: [ { n: 2 } ] metadata: [
+  'Properties set: 3',
+  'Properties removed: 2',
+  'Cached execution: 0',
+  'Query internal execution time: 0.609778 milliseconds'
+]
+timeout error: Query's mem consumption exceeded capacity
+graphs: 5
+vector: [ { id: 'a', score: 0 } ]

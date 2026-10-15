@@ -1,0 +1,6 @@
+denied: ped:abcd
+denied: ped:zzz
+what-if copy within own namespace: ok
+copy into foreign namespace denied: No permissions to access a key
+NOTE: GRAPH.LIST returns ALL graph names to any user with +graph.list (metadata leak) -> never expose DB creds to clients; remove +graph.list if unused.
+OK

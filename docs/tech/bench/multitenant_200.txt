@@ -1,0 +1,8 @@
+created 200 graphs (index+1 node each) in 0.19s
+create+index+node per tenant: n=200 p50=0.94ms p95=1.43ms p99=1.70ms max=2.01ms mean=0.95ms
+used_memory delta: 114061 KiB total, 570.3 KiB per empty-ish tenant graph
+isolation OK: [[0]] [[1]]
+ro_query on missing graph raises: ResponseError Invalid graph operation on empty key
+list_graphs count: 204
+indexed point read across 200 tenants (client round-trip): n=500 p50=0.45ms p95=0.81ms p99=1.09ms max=4.13ms mean=0.49ms
+delete tenant graph: 0.22 ms

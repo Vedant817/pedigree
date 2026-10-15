@@ -1,0 +1,9 @@
+revoke: {'counts': {'tainted': 5, 'preserved': 1, 'ok': 1}, 'actions': [['a_commit', 'reversible'], ['a_push', 'irreversible']], 'ms': 5.8}
+{'s_web': 'revoked', 's_doc': 'ok', 's_hr': 'ok', 'm1': 'tainted', 'm2': 'preserved', 'm3': 'tainted', 'm4': 'ok', 'm5': 'ok', 'm6': 'tainted', 'a_commit': 'tainted', 'a_push': 'tainted'}
+blame chain a_push: ['a_push', 'm6', 'm3', 'm1', 's_web']
+conf leak check -> [['m_sum']]
+load-bearing sources: [['s_web', 0.224841833114624], ['s_doc', 0.0882412120699883], ['s_hr', 0.0738274976611137]]
+copy ms: 94.6 | indexes kept: 1
+race: {'r1': 'tainted', 'r_late': 'tainted'}
+late child status at creation: quarantined
+OK

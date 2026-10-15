@@ -1,0 +1,8 @@
+empty server: rss=45 MiB used_memory=3 MiB
+after 100k nodes: rss=101 MiB used_memory=33 MiB
+after 500k edges (1 prop each): rss=363 MiB used_memory=68 MiB
+GRAPH.MEMORY USAGE: ['total_graph_sz_mb', 42, 'label_matrices_sz_mb', 1, 'relation_matrices_sz_mb', 15, 'amortized_node_block_sz_mb', 0, 'amortized_node_attributes_by_label_sz_mb', ['Memory', 5], 'amortized_unlabeled_nodes_attributes_sz_mb', 0, 'amortized_edge_block_sz_mb', 4, 'amortized_edge_attributes_by_type_sz_mb', ['DERIVED_FROM', 6], 'indices_sz_mb', 11]
+after delete graph: rss=355 MiB used_memory=3 MiB (RSS may not shrink: allocator)
+1000 tenant graphs (1 index + 1 node each): rss delta=218 MiB used_memory delta=556 MiB
+1000 point reads across 1000 tenants: 0.66 ms avg
+1000 tenant graphs, NO index, 1 node each: used_memory delta=412 MiB (422 KiB each) in 0.4s
