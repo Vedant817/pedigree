@@ -20,7 +20,12 @@ import re
 SRC = pathlib.Path(__file__).resolve().parents[2] / "src" / "pedigree"
 
 # A labelled id anchor: `MATCH (x:Memory {id:` ... (any of the six type labels).
-LABEL_ANCHOR = re.compile(r"MATCH \((\w+):(Memory|Action|Source|Session|Agent|Revocation) \{id\b")
+# Formatting-tolerant and case-insensitive: P010-QA-1 showed `Memory{id:`, `m : Memory`
+# and lowercase `match` are all valid Cypher and must not evade the lint.
+LABEL_ANCHOR = re.compile(
+    r"match\s*\(\s*\w+\s*:\s*(?:Memory|Action|Source|Session|Agent|Revocation)\s*\{\s*id\s*:",
+    re.IGNORECASE,
+)
 
 
 def test_no_label_anchored_id_lookups():
@@ -34,3 +39,27 @@ def test_no_label_anchored_id_lookups():
         "id anchors must be written on :Node so the unique index is used "
         "(MATCH (x:Node {id:...}) WHERE x:<Label>):\n" + "\n".join(offenders)
     )
+
+
+def test_anchor_regex_catches_formatting_variants():
+    """P010-QA-1: the lint must not be evadable by whitespace/case variants."""
+    variants = (
+        "MATCH (m:Memory {id:$m})",
+        "match (m:Memory {id:$m})",
+        "MATCH (m : Memory { id : $m })",
+        "MATCH (m:Memory{id:$m})",
+        "MATCH( m:Session {id: $sess})",
+    )
+    undetected = [v for v in variants if not LABEL_ANCHOR.search(v)]
+    assert not undetected, f"lint regex must catch: {undetected}"
+
+
+def test_anchor_regex_ignores_safe_forms():
+    safe = (
+        "MATCH (m:Node {id:$m}) WHERE m:Memory",
+        "MATCH (n:Memory {artifact_key:$k})",
+        "WHERE n:Memory",
+        "MATCH (n:Node) WHERE n:Memory RETURN n.id",
+    )
+    flagged = [s for s in safe if LABEL_ANCHOR.search(s)]
+    assert not flagged, f"lint regex must not flag: {flagged}"
