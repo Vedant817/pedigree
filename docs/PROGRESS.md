@@ -1,15 +1,18 @@
 # CURRENT STATE (overwritten after every feature / checkpoint)
 
-- **Phase:** P2/P3 hardening and evaluation publication; updated Fri 2026-10-16 11:00 IST.
-- **Last implementation commits:** bb9511a (F-08 review fixes incl. round-2 closure, amended
+- **Phase:** P2/P3 hardening, audit-fix program (FIX_PROMPT Phase A); updated Fri 2026-10-16 12:45 IST.
+- **Last implementation commits:** ccdd7cb (P-010 :Node(id) anchor fix, audit-fix program Phase A),
+  bb9511a (F-08 review fixes incl. round-2 closure, amended
   in place), 8dd6509 (F-08 OpenCode read-only slice incl. review hardening),
   f475979 (OpenCode ADR-009 record), a677d9f (what-if/audit containment), d7f7409 (test fixture
   ownership).
 - **Environment:** Windows 11; Python 3.12.15; pinned FalkorDB module 42201 in Docker;
   Node v24.13.1. Local core and synthetic demo require no model provider.
 - **Deadlines:** feature freeze Sun 2026-10-18 15:00 IST; target submit 21:00; hard stop 23:59.
-- **Test state:** make check: 396 passed, 1 skipped (optional ACL deployment secret absent),
-  1 xfailed (strict read-window watchdog), Ruff, tracked secret scan and numbers check PASS;
+- **Test state:** make check: 397 passed, 1 skipped (optional ACL deployment secret absent),
+  3 deselected (perf; `make check-perf` 3 passed - EXPLAIN index plans, 20 000-node revoke
+  1 376 ms, 60 020-node gate 4.0 ms), 1 xfailed (strict read-window watchdog), Ruff, tracked
+  secret scan and numbers check PASS;
   `scripts/check_secrets.sh` PASS including git history. F-08 slice: builtin Node suite 38 passed;
   hook-replay integration (live API + real FalkorDB) 3 passed; security regressions 1 passed
   + 1 strict xfail. QA round 1 FAIL (secret-scan canary + stale docs) fixed pre-push; red-team
@@ -34,9 +37,9 @@
   deletes only its own successful creates and reports cleanup failures. Independent real-DB
   sentinel survival passes. Earlier runs cannot establish that pre-existing data was preserved.
 - **Next 3 actions:**
-  1. F-08 review cycle closed (round-3 PASS in `docs/qa/F-08.md`); F-08 stays implementing — installed-runtime acceptance still unclaimed.
-  2. Resolve service ACL wiring with independent tenant-boundary QA.
-  3. Finish durable hook spool/replay and remaining release checks before feature freeze.
+  1. Audit-fix program (FIX_PROMPT): P-010 landed (`ccdd7cb`, QA in flight); next P-013 admin-token fail-closed, P-016 `pedigree mcp` invocation + `/mcp` mount, P-025 import side effects, then the Phase A review pass.
+  2. F-08 review cycle closed (round-3 PASS in `docs/qa/F-08.md`); F-08 stays implementing — installed-runtime acceptance still unclaimed.
+  3. Resolve service ACL wiring with independent tenant-boundary QA; finish durable hook spool/replay before feature freeze.
 - **Human pending:** video recording, walkthrough/architecture review, organizer track decision,
   hosted account/submission. Git origin is configured; this continuation has not pushed.
 
@@ -457,3 +460,24 @@
 - Honesty: F-08 remains implementing; hook-replay only, installed-runtime acceptance unclaimed;
   F08R2-QA-3 stays accepted fail-closed; the amended-away commits remain as dangling local,
   unreachable objects until a future `git gc` (not scanned by the history scan, not pushable).
+
+
+### 2026-10-16 12:45 IST | Phase A (FIX_PROMPT) | P-010: every id anchor on the unique :Node(id) index | STATUS: landed `ccdd7cb`; independent QA in flight
+- All eleven `MATCH (x:<TypeLabel> {id:...})` anchors rewritten to
+  `MATCH (x:Node {id:...}) WHERE x:<Label>` in `src/pedigree/db/queries.py` (corroborate,
+  session/read-window, revoke support/actions/artifacts/revocation-state, demo support, gate
+  support). EXPLAIN changes from `Node By Label Scan` to `Node By Index Scan` (probe:
+  `scratch/p010_recon_explain3.py`; all 11 index=True/labelscan=False).
+- Tests first: `tests/unit/test_query_lint.py` RED with exactly the 11 offenders, then green;
+  `tests/perf/test_revoke_scaling.py` (marker `perf`): plan assertions plus 20 000-node revoke
+  < 20 s and `check_action` with 10 relied-on ids on 60 020 nodes < 100 ms. New `make check-perf`;
+  `test-quick` now deselects `perf`.
+- Measured on pinned FalkorDB 42201: 20 000-node chain revoke 1 376 ms (19 999 tainted,
+  `check_invariants` clean); gate 4.0 ms, decision allow. The A1 target (10 000-node revoke
+  < 10 s) is met at 2x size.
+- Evidence: `make check` 397 passed / 1 skipped / 3 deselected / 1 xfailed; Ruff, tracked secret
+  scan, numbers check PASS; `make check-perf` 3 passed.
+- Honesty: query-shape/latency change only, no API or semantic change claimed; the four rewritten
+  write queries (`Q_CORROBORATE`, `Q_SESSION_READ`, `Q_REVOCATION_SET_STATE`, `Q_DEMO_ADD_SUPPORT`)
+  are covered by the existing suite plus plan assertions, not by new behaviour tests. QA re-runs
+  EXPLAIN over every query in `queries.py` and lands `docs/qa/P-010.md`.
