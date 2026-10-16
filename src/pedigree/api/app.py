@@ -87,8 +87,8 @@ def _startup_resume(db: Db, registry: TenantRegistry) -> None:
     log = logging.getLogger("pedigree.resume")
     try:
         for rec in registry.list_tenants():
-            gname = graph_name(rec.tenant_id)
             try:
+                gname = graph_name(rec.tenant_id)
                 done = resume_incomplete(db, gname)
                 if done:
                     log.info("startup-resume: finished %d revocation(s) for tenant %s",
