@@ -4,19 +4,19 @@
 # ram_gb=15.7
 # python=3.12.15
 # falkor_module_version=42201
-# commit_sha=3f0ce23
+# commit_sha=3941d85
 # seeds=30
 # drop_rates=[0, 1, 2, 5, 10]
 # windows=[5, 10, 25, 50, 100]
 # keys=k = key
-kind,param,recall,leakage,over_flag_ratio,extra_actions,n_g,n_actions
-exact,0,1.0,0.0,0.0,0.0,1082,348
-edge_drop,1,0.989229,0.010771,0.0,0.0,1082,348
-edge_drop,2,0.963107,0.036893,0.0,0.0,1082,348
-edge_drop,5,0.847417,0.152583,0.0,0.0,1082,348
-edge_drop,10,0.739394,0.260606,0.0,0.0,1082,348
-window,5,1.0,0.0,4.462834,3.277063,1082,348
-window,10,1.0,0.0,5.452606,3.355136,1082,348
-window,25,1.0,0.0,5.71932,3.374737,1082,348
-window,50,1.0,0.0,5.71932,3.374737,1082,348
-window,100,1.0,0.0,5.71932,3.374737,1082,348
+kind,param,n_seeds,ci_method,recall,recall_lo,recall_hi,recall_n_seeds,leakage,leakage_lo,leakage_hi,leakage_n_seeds,over_flag_ratio,over_flag_ratio_lo,over_flag_ratio_hi,over_flag_ratio_n_seeds,extra_actions,extra_actions_lo,extra_actions_hi,extra_actions_n_seeds,n_g,n_actions
+exact,0,30,seed bootstrap percentile 95%; 10000 resamples,1.0,1.0,1.0,29,0.0,0.0,0.0,29,0.0,0.0,0.0,29,0.0,0.0,0.0,29,1082,348
+edge_drop,1,30,seed bootstrap percentile 95%; 10000 resamples,0.989229,0.980394,0.996639,29,0.010771,0.003361,0.019606,29,0.0,0.0,0.0,29,0.0,0.0,0.0,29,1082,348
+edge_drop,2,30,seed bootstrap percentile 95%; 10000 resamples,0.963107,0.93864,0.982536,29,0.036893,0.017484,0.06136,29,0.0,0.0,0.0,29,0.0,0.0,0.0,29,1082,348
+edge_drop,5,30,seed bootstrap percentile 95%; 10000 resamples,0.847417,0.764585,0.91494,29,0.152583,0.085101,0.235469,29,0.0,0.0,0.0,29,0.0,0.0,0.0,29,1082,348
+edge_drop,10,30,seed bootstrap percentile 95%; 10000 resamples,0.739394,0.650681,0.818073,29,0.260606,0.181929,0.349425,29,0.0,0.0,0.0,29,0.0,0.0,0.0,29,1082,348
+window,5,30,seed bootstrap percentile 95%; 10000 resamples,1.0,1.0,1.0,29,0.0,0.0,0.0,29,4.462834,3.623694,5.516122,29,3.277063,2.198953,4.773876,29,1082,348
+window,10,30,seed bootstrap percentile 95%; 10000 resamples,1.0,1.0,1.0,29,0.0,0.0,0.0,29,5.452606,4.275642,7.051602,29,3.355136,2.251412,4.883704,29,1082,348
+window,25,30,seed bootstrap percentile 95%; 10000 resamples,1.0,1.0,1.0,29,0.0,0.0,0.0,29,5.71932,4.545573,7.296099,29,3.374737,2.270314,4.899747,29,1082,348
+window,50,30,seed bootstrap percentile 95%; 10000 resamples,1.0,1.0,1.0,29,0.0,0.0,0.0,29,5.71932,4.545573,7.296099,29,3.374737,2.270314,4.899747,29,1082,348
+window,100,30,seed bootstrap percentile 95%; 10000 resamples,1.0,1.0,1.0,29,0.0,0.0,0.0,29,5.71932,4.545573,7.296099,29,3.374737,2.270314,4.899747,29,1082,348

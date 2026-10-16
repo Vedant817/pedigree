@@ -8,75 +8,75 @@
     "source": "evals/machineinfo.py"
   },
   "e4_revoke_real_p50_n820": {
-    "value": 124.74,
+    "value": 123.45,
     "source": "evals/run_e4.py (820 nodes)"
   },
   "e4_revoke_real_p95_n820": {
-    "value": 163.55,
+    "value": 171.35,
     "source": "evals/run_e4.py (820 nodes)"
   },
   "e4_blame_p50_n820": {
-    "value": 5.59,
+    "value": 5.4,
     "source": "evals/run_e4.py (820 nodes)"
   },
   "e4_impact_p50_n820": {
-    "value": 13.27,
+    "value": 14.22,
     "source": "evals/run_e4.py (820 nodes)"
   },
   "e4_gate_p50_n820": {
-    "value": 2.2,
+    "value": 2.29,
     "source": "evals/run_e4.py (820 nodes)"
   },
   "e4_build_n820": {
-    "value": 1307.1,
+    "value": 1324.3,
     "source": "evals/run_e4.py (820 nodes)"
   },
   "e4_revoke_real_p50_n2460": {
-    "value": 313.09,
+    "value": 318.76,
     "source": "evals/run_e4.py (2460 nodes)"
   },
   "e4_revoke_real_p95_n2460": {
-    "value": 535.15,
+    "value": 624.49,
     "source": "evals/run_e4.py (2460 nodes)"
   },
   "e4_blame_p50_n2460": {
-    "value": 6.07,
+    "value": 5.44,
     "source": "evals/run_e4.py (2460 nodes)"
   },
   "e4_impact_p50_n2460": {
-    "value": 15.76,
+    "value": 16.85,
     "source": "evals/run_e4.py (2460 nodes)"
   },
   "e4_gate_p50_n2460": {
-    "value": 2.61,
+    "value": 2.42,
     "source": "evals/run_e4.py (2460 nodes)"
   },
   "e4_build_n2460": {
-    "value": 4148.8,
+    "value": 4091.9,
     "source": "evals/run_e4.py (2460 nodes)"
   },
   "e4_revoke_real_p50_n8200": {
-    "value": 1052.27,
+    "value": 1080.59,
     "source": "evals/run_e4.py (8200 nodes)"
   },
   "e4_revoke_real_p95_n8200": {
-    "value": 1798.32,
+    "value": 1849.42,
     "source": "evals/run_e4.py (8200 nodes)"
   },
   "e4_blame_p50_n8200": {
-    "value": 6.33,
+    "value": 6.18,
     "source": "evals/run_e4.py (8200 nodes)"
   },
   "e4_impact_p50_n8200": {
-    "value": 17.84,
+    "value": 16.85,
     "source": "evals/run_e4.py (8200 nodes)"
   },
   "e4_gate_p50_n8200": {
-    "value": 3.17,
+    "value": 2.82,
     "source": "evals/run_e4.py (8200 nodes)"
   },
   "e4_build_n8200": {
-    "value": 15420.2,
+    "value": 15264.6,
     "source": "evals/run_e4.py (8200 nodes)"
   }
 }

@@ -2,136 +2,211 @@
   "e2_leakage_edge_drop_1pct": {
     "value": 0.012,
     "ci95": [
-      0.007,
-      0.0204
+      0.0038,
+      0.0217
     ],
-    "n": 1082,
+    "n": 29,
+    "n_clusters": 29,
+    "n_items": 1082,
+    "n_clusters_total": 30,
+    "ci_method": "seed-cluster bootstrap percentile 95%; 10000 resamples",
+    "ci_scope": "conditional on the finite generator grid; degenerate bootstrap is not certainty",
     "source": "evals/run_e2.py"
   },
   "e2_leakage_edge_drop_2pct": {
     "value": 0.0434,
     "ci95": [
-      0.0328,
-      0.0573
+      0.0196,
+      0.072
     ],
-    "n": 1082,
+    "n": 29,
+    "n_clusters": 29,
+    "n_items": 1082,
+    "n_clusters_total": 30,
+    "ci_method": "seed-cluster bootstrap percentile 95%; 10000 resamples",
+    "ci_scope": "conditional on the finite generator grid; degenerate bootstrap is not certainty",
     "source": "evals/run_e2.py"
   },
   "e2_leakage_edge_drop_5pct": {
     "value": 0.1414,
     "ci95": [
-      0.1219,
-      0.1634
+      0.0847,
+      0.2104
     ],
-    "n": 1082,
+    "n": 29,
+    "n_clusters": 29,
+    "n_items": 1082,
+    "n_clusters_total": 30,
+    "ci_method": "seed-cluster bootstrap percentile 95%; 10000 resamples",
+    "ci_scope": "conditional on the finite generator grid; degenerate bootstrap is not certainty",
     "source": "evals/run_e2.py"
   },
   "e2_leakage_edge_drop_10pct": {
     "value": 0.2412,
     "ci95": [
-      0.2167,
-      0.2676
+      0.1728,
+      0.3191
     ],
-    "n": 1082,
+    "n": 29,
+    "n_clusters": 29,
+    "n_items": 1082,
+    "n_clusters_total": 30,
+    "ci_method": "seed-cluster bootstrap percentile 95%; 10000 resamples",
+    "ci_scope": "conditional on the finite generator grid; degenerate bootstrap is not certainty",
     "source": "evals/run_e2.py"
   },
   "e2_window_over_flag_k5": {
     "value": 4.4628,
     "ci95": [
-      3.6132,
-      5.511
+      3.6237,
+      5.5161
     ],
-    "n": 1082,
-    "source": "evals/run_e2.py (bootstrap CI)"
+    "n": 29,
+    "n_clusters": 29,
+    "n_items": 1082,
+    "n_clusters_total": 30,
+    "ci_method": "seed-mean bootstrap percentile 95%; 10000 resamples",
+    "ci_scope": "conditional on the finite generator grid; degenerate bootstrap is not certainty",
+    "source": "evals/run_e2.py"
   },
   "e2_window_extra_actions_k5": {
     "value": 3.2771,
     "ci95": [
-      2.1802,
-      4.7553
+      2.199,
+      4.7739
     ],
-    "n": 348,
-    "source": "evals/run_e2.py (bootstrap CI)"
+    "n": 29,
+    "n_clusters": 29,
+    "n_items": 348,
+    "n_clusters_total": 30,
+    "ci_method": "seed-mean bootstrap percentile 95%; 10000 resamples",
+    "ci_scope": "conditional on the finite generator grid; degenerate bootstrap is not certainty",
+    "source": "evals/run_e2.py"
   },
   "e2_window_over_flag_k10": {
     "value": 5.4526,
     "ci95": [
-      4.2547,
-      7.024
+      4.2756,
+      7.0516
     ],
-    "n": 1082,
-    "source": "evals/run_e2.py (bootstrap CI)"
+    "n": 29,
+    "n_clusters": 29,
+    "n_items": 1082,
+    "n_clusters_total": 30,
+    "ci_method": "seed-mean bootstrap percentile 95%; 10000 resamples",
+    "ci_scope": "conditional on the finite generator grid; degenerate bootstrap is not certainty",
+    "source": "evals/run_e2.py"
   },
   "e2_window_extra_actions_k10": {
     "value": 3.3551,
     "ci95": [
-      2.2373,
-      4.866
+      2.2514,
+      4.8837
     ],
-    "n": 348,
-    "source": "evals/run_e2.py (bootstrap CI)"
+    "n": 29,
+    "n_clusters": 29,
+    "n_items": 348,
+    "n_clusters_total": 30,
+    "ci_method": "seed-mean bootstrap percentile 95%; 10000 resamples",
+    "ci_scope": "conditional on the finite generator grid; degenerate bootstrap is not certainty",
+    "source": "evals/run_e2.py"
   },
   "e2_window_over_flag_k25": {
     "value": 5.7193,
     "ci95": [
-      4.5381,
-      7.2714
+      4.5456,
+      7.2961
     ],
-    "n": 1082,
-    "source": "evals/run_e2.py (bootstrap CI)"
+    "n": 29,
+    "n_clusters": 29,
+    "n_items": 1082,
+    "n_clusters_total": 30,
+    "ci_method": "seed-mean bootstrap percentile 95%; 10000 resamples",
+    "ci_scope": "conditional on the finite generator grid; degenerate bootstrap is not certainty",
+    "source": "evals/run_e2.py"
   },
   "e2_window_extra_actions_k25": {
     "value": 3.3747,
     "ci95": [
-      2.2621,
-      4.876
+      2.2703,
+      4.8997
     ],
-    "n": 348,
-    "source": "evals/run_e2.py (bootstrap CI)"
+    "n": 29,
+    "n_clusters": 29,
+    "n_items": 348,
+    "n_clusters_total": 30,
+    "ci_method": "seed-mean bootstrap percentile 95%; 10000 resamples",
+    "ci_scope": "conditional on the finite generator grid; degenerate bootstrap is not certainty",
+    "source": "evals/run_e2.py"
   },
   "e2_window_over_flag_k50": {
     "value": 5.7193,
     "ci95": [
-      4.5381,
-      7.2714
+      4.5456,
+      7.2961
     ],
-    "n": 1082,
-    "source": "evals/run_e2.py (bootstrap CI)"
+    "n": 29,
+    "n_clusters": 29,
+    "n_items": 1082,
+    "n_clusters_total": 30,
+    "ci_method": "seed-mean bootstrap percentile 95%; 10000 resamples",
+    "ci_scope": "conditional on the finite generator grid; degenerate bootstrap is not certainty",
+    "source": "evals/run_e2.py"
   },
   "e2_window_extra_actions_k50": {
     "value": 3.3747,
     "ci95": [
-      2.2621,
-      4.876
+      2.2703,
+      4.8997
     ],
-    "n": 348,
-    "source": "evals/run_e2.py (bootstrap CI)"
+    "n": 29,
+    "n_clusters": 29,
+    "n_items": 348,
+    "n_clusters_total": 30,
+    "ci_method": "seed-mean bootstrap percentile 95%; 10000 resamples",
+    "ci_scope": "conditional on the finite generator grid; degenerate bootstrap is not certainty",
+    "source": "evals/run_e2.py"
   },
   "e2_window_over_flag_k100": {
     "value": 5.7193,
     "ci95": [
-      4.5381,
-      7.2714
+      4.5456,
+      7.2961
     ],
-    "n": 1082,
-    "source": "evals/run_e2.py (bootstrap CI)"
+    "n": 29,
+    "n_clusters": 29,
+    "n_items": 1082,
+    "n_clusters_total": 30,
+    "ci_method": "seed-mean bootstrap percentile 95%; 10000 resamples",
+    "ci_scope": "conditional on the finite generator grid; degenerate bootstrap is not certainty",
+    "source": "evals/run_e2.py"
   },
   "e2_window_extra_actions_k100": {
     "value": 3.3747,
     "ci95": [
-      2.2621,
-      4.876
+      2.2703,
+      4.8997
     ],
-    "n": 348,
-    "source": "evals/run_e2.py (bootstrap CI)"
+    "n": 29,
+    "n_clusters": 29,
+    "n_items": 348,
+    "n_clusters_total": 30,
+    "ci_method": "seed-mean bootstrap percentile 95%; 10000 resamples",
+    "ci_scope": "conditional on the finite generator grid; degenerate bootstrap is not certainty",
+    "source": "evals/run_e2.py"
   },
   "e2_exact_leakage": {
     "value": 0.0,
     "ci95": [
       0.0,
-      0.0035
+      0.0
     ],
-    "n": 1082,
+    "n": 29,
+    "n_clusters": 29,
+    "n_items": 1082,
+    "n_clusters_total": 30,
+    "ci_method": "seed-cluster bootstrap percentile 95%; 10000 resamples",
+    "ci_scope": "conditional on the finite generator grid; degenerate bootstrap is not certainty",
     "source": "evals/run_e2.py"
   }
 }
