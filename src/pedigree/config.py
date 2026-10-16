@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 from functools import lru_cache
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .errors import InvalidArgument
@@ -80,6 +81,7 @@ class Settings(BaseSettings):
 
     pedigree_admin_token: str = ""
     pedigree_env: str = "dev"  # dev|test|local are lenient; anything else refuses empty/default admin tokens
+    pedigree_public_docs: bool = False
     pedigree_secret: str = ""
     pedigree_node_cap: int = 200_000
     pedigree_store_text: bool = False
@@ -96,6 +98,22 @@ class Settings(BaseSettings):
     # read/write query timeouts (ms)
     read_timeout_ms: int = 5_000
     write_timeout_ms: int = 15_000
+
+    @model_validator(mode="after")
+    def _check_timeouts(self) -> "Settings":  # noqa: UP037
+        for name in ("read_timeout_ms", "write_timeout_ms"):
+            val = getattr(self, name)
+            if val < 1 or val > 60_000:
+                raise ValueError(f"{name} must be between 1 and 60000")
+        return self
+
+    @model_validator(mode="after")
+    def _check_timeouts(self) -> "Settings":  # noqa: UP037
+        for name in ("read_timeout_ms", "write_timeout_ms"):
+            v = getattr(self, name)
+            if v < 1 or v > 60_000:
+                raise ValueError(f"{name} must be between 1 and 60000")
+        return self
 
 
 DEV_ENVS = {"dev", "test", "local"}

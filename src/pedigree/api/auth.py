@@ -9,7 +9,6 @@ from fastapi import Request
 from ..config import graph_name
 from ..db.schema import ensure_schema, node_count
 from ..errors import PedigreeError
-from .registry import TenantRegistry
 
 
 def _ensure(db, gname):
@@ -46,11 +45,14 @@ class _AuthResult(t.TypedDict):
     tenant_id: str
 
 def authenticate(request: Request):
-    registry: TenantRegistry = request.app.state.registry
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         raise PedigreeError("missing or invalid Authorization", code="unauthorized")
-    token = auth.removeprefix("Bearer ").strip()
+    raw = auth.removeprefix("Bearer ")
+    token = raw.strip()
+    if (not token) or (token != raw) or (" " in raw):
+        raise PedigreeError("missing or invalid Authorization", code="unauthorized")
+    registry = request.app.state.registry
     rec = registry.resolve(token)
     if rec is None:
         raise PedigreeError("invalid token", code="unauthorized", detail={})

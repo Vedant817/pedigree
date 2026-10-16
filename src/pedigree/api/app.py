@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.staticfiles import StaticFiles
 
-from ..config import admin_token_problem, get_settings
+from ..config import DEV_ENVS, admin_token_problem, get_settings
 from ..db.client import Db
 from ..errors import PedigreeError
 from . import routes
@@ -104,6 +104,12 @@ def _startup_resume(db: Db, registry: TenantRegistry) -> None:
         log.warning("startup-resume: scan failed", exc_info=True)
 
 
+def _docs_url(settings: object) -> str | None:
+    if settings.pedigree_env.lower() in DEV_ENVS or getattr(settings, "pedigree_public_docs", False):
+        return "/docs"
+    return None
+
+
 def create_app(db: Db | None = None, settings=None) -> FastAPI:
     settings = settings or get_settings()
     problem = admin_token_problem(settings)
@@ -127,7 +133,7 @@ def create_app(db: Db | None = None, settings=None) -> FastAPI:
             ).start()
             yield
 
-    app = FastAPI(title="Pedigree API", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="Pedigree API", version="0.1.0", lifespan=lifespan, docs_url=_docs_url(settings))
     app.state.db = db
     app.state.settings = settings
     app.state.registry = registry
@@ -137,7 +143,7 @@ def create_app(db: Db | None = None, settings=None) -> FastAPI:
     app.add_middleware(CorrelationMiddleware)
     routes.health.register(app, db)
     routes.admin.register(app, registry, settings)
-    routes.metrics.register(app)
+    routes.metrics.register(app, settings)
     routes.engine.register(app, db, registry, settings)
     routes.events.register(app, db, registry, settings)
     routes.gate.register(app, db, registry, settings)
