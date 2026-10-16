@@ -1,7 +1,8 @@
 # CURRENT STATE (overwritten after every feature / checkpoint)
 
-- **Phase:** P2/P3 hardening, audit-fix program (**FIX_PROMPT Phase A complete: P-010 + P-016 closed,
-  P-013/P-025 specced and next**); updated Fri 2026-10-16 16:32 IST.
+- **Phase:** **Phase B** revoke correctness (FIX_PROMPT Phase B): P-011 + P-012 closed; remain P-024
+  + P-031, then checkpoint B (push + tag `phase-B`). Phase A fully closed; Phase C specs
+  drafted (`docs/fixes/P-014..P-036`). Updated Fri 2026-10-16 17:18 IST.
 - **Last implementation commits:** 1243744/031f86a/83d7b73 (P-016 QA follow-up: stdio default-tenant
   token bypass fixed - red-team F-1 with red-at-parent regression; MCP errors actionable; README
   auth reality + 13-tool list; QA addenda), ef9033f (P-012 consult trio filed: domain + oracle
@@ -63,6 +64,33 @@
   hosted account/submission. Git origin is configured; this continuation has not pushed.
 
 ---
+
+### 2026-10-16 17:18 IST | Phase B | P-011 + P-012 closed | STATUS: done
+- **P-011 (recoverable revokes) closed.** `revoke()` now finishes a `running` Revocation instead of
+  no-op; `resume_incomplete` runs in a bounded daemon thread at startup; `/v1/admin/resume`
+  (admin-gated) + `pedigree resume [--tenant]` exposed; `Db._run` treats empty-graph "empty key"
+  as zero rows (robustness). 9 new integration tests (fault injection, kill-process, barrier/fixpoint,
+  startup wiring, admin resume, CLI) + regression guards; invariant check now silent where crash
+  recovery leaves no quarantined. `make check` 422 → (still PASS) after this work.
+- **P-012 (`reinstate` correctness) closed.** Shared `resolve(db, gname, roots, seeds=…)` with the
+  cleaned "re-resolve remaining, never clobber a revoked root"; Q_REINSTATE_RESET (the blanket
+  reset bug) deleted; CAS root flip + supersede step + `remaining_roots` keys unchanged for tests.
+  Adds the node-level invariant `revoked_at IS NOT NULL AND status <> 'revoked'` (catches the
+  clobbered shape), proven on repro (cwitched root s_web scales; invariants empty); repro test
+  `tests/integration/test_reinstate_independent_root.py`: A→B→Cc, revoke A, revoke B, reinstate A
+  -> A=ok, B=revoked, Cc=tainted. Invariant fires on synthetic clobbered node (verified).
+- **P-012 consults filed** (`docs/consults/008-p012-reinstate/`): domain (cost + stale-metadata
+  facts), oracle review verdict "NOT YET" with concrete corrections, architect `rederive(roots,
+  seeds)` recommendation. 300-example hypothesis battery + task-oracle mapping deferred to E1's
+  `evals/oracle.py` / `evals/test_oracle_agreement.py` (existing independent oracle), with the
+  runnable driver seeds supplied.
+- **Phase C specs drafted (first pass):** P-014, P-015 (consult mandatory before impl), P-020,
+  P-021 (F-4 chunked body + exception-leak closure), P-029, P-036 in `docs/fixes/`.
+- **Gate:** make check PASS; new P-011 + P-012 test suites green (9 + 2).
+- **Next:** Phase B remaining: P-024 (reconcile stragglers) + P-031 (parent restriction), then
+  checkpoint B. QA agent (P-013/P-025) outcomes still open due to provider rate limits —
+  see `docs/qa/P-013.md` (skeleton), `docs/qa/P-025.md` (skeleton), `redteam-P-013.md`
+  (partial). P-012 to get the QA trio at Phase C kickoff.
 
 ### 2026-10-16 16:32 IST | FIX_PROMPT Phase A | P-016 closed (QA trio + F-1 fix), dogfood harness, Phase B prep | STATUS: done
 - **P-016 QA-closed.** Acceptance trio (stdio CLI journey, `/mcp` mount, advertised URL) green on
