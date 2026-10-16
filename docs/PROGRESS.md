@@ -1,7 +1,13 @@
 # CURRENT STATE (overwritten after every feature / checkpoint)
 
-- **Phase:** P2/P3 hardening, audit-fix program (FIX_PROMPT Phase A); updated Fri 2026-10-16 13:35 IST.
-- **Last implementation commits:** 32ebaeb (P-010 anchor-lint closure rounds; QA-closed),
+- **Phase:** P2/P3 hardening, audit-fix program (**FIX_PROMPT Phase A complete: P-010 + P-016 closed,
+  P-013/P-025 specced and next**); updated Fri 2026-10-16 16:32 IST.
+- **Last implementation commits:** 1243744/031f86a/83d7b73 (P-016 QA follow-up: stdio default-tenant
+  token bypass fixed - red-team F-1 with red-at-parent regression; MCP errors actionable; README
+  auth reality + 13-tool list; QA addenda), ef9033f (P-012 consult trio filed: domain + oracle
+  review + architect), 0e36767 (dogfood harness + `make dogfood`), 0e27023 (P-025 spec),
+  a2cb57b (P-013 spec), 44cf5bf (P-011 spec), 561b7e2 (P-016 fix + acceptance tests, QA-closed),
+  32ebaeb (P-010 anchor-lint closure rounds; QA-closed),
   ccdd7cb (P-010 :Node(id) anchor fix, audit-fix program Phase A),
   bb9511a (F-08 review fixes incl. round-2 closure, amended
   in place), 8dd6509 (F-08 OpenCode read-only slice incl. review hardening),
@@ -10,20 +16,24 @@
 - **Environment:** Windows 11; Python 3.12.15; pinned FalkorDB module 42201 in Docker;
   Node v24.13.1. Local core and synthetic demo require no model provider.
 - **Deadlines:** feature freeze Sun 2026-10-18 15:00 IST; target submit 21:00; hard stop 23:59.
-- **Test state:** make check: 399 passed, 1 skipped (optional ACL deployment secret absent),
+- **Test state:** make check: 406 passed, 1 skipped (optional ACL deployment secret absent),
   3 deselected (perf; `make check-perf` 3 passed - EXPLAIN index plans, 20 000-node revoke
   1 376 ms, 60 020-node gate 4.0 ms; P-010 QA re-measured 1 371.9 ms / 2.1-4.3 ms on its own
-  harness), 1 xfailed (strict read-window watchdog), Ruff, tracked
-  secret scan and numbers check PASS;
-  `scripts/check_secrets.sh` PASS including git history. F-08 slice: builtin Node suite 38 passed;
-  hook-replay integration (live API + real FalkorDB) 3 passed; security regressions 1 passed
-  + 1 strict xfail. QA round 1 FAIL (secret-scan canary + stale docs) fixed pre-push; red-team
-  F-08 findings fixed/disclosed; round-2 re-verification FAIL (the review-evidence commit itself
-  reintroduced the canary literal) fixed by redaction + amend (`a2b7fc4` -> `bb9511a`) plus one
-  fail-closed over-denial fixed; round-3 independent re-confirmation PASS.
-  Independent what-if/audit QA: 45 passed; test-fixture ownership QA: 11 passed. Full serialized
-  evaluation PASS; independent scoped F-14 statistical signoff PASS. Fresh local clone of 72c7650,
-  new venv and editable dev install: make check PASS, 391 passed, 1 skipped in 38.86s.
+  harness), 1 xfailed (strict read-window watchdog), Ruff, tracked secret scan and numbers
+  check PASS; `scripts/check_secrets.sh` PASS including git history.
+  **P-016 QA-closed:** acceptance trio green (stdio journey, `/mcp` mount, advertised
+  `http://127.0.0.1:8000/mcp` URL); qa-senior PASS (`docs/qa/P-016.md`, 20 adversarial cases,
+  zero graph leaks) plus devex (`docs/qa/devex-P-016.md`) and red-team
+  (`docs/qa/redteam-P-016.md`) reports; red-team F-1 (stdio ignored `PEDIGREE_MCP_TOKEN`) fixed
+  (`83d7b73`) with red-at-parent regression `tests/security/test_p016_stdio_token.py`;
+  F-2/F-3/F-5 -> P-015 scope, F-4 -> P-021.
+  **Dogfood harness live:** `make dogfood` (21 heavy-user scenarios + P-id expectation table):
+  PASS=12 FAIL=0 EXPECTED-FAIL=9 STALE=0 SKIP=1, exit 0; `--strict` exits 1 by design; S19
+  1 500-node revoke 156 ms server-side, invariants clean.
+  F-08 slice: builtin Node suite 38 passed; hook-replay integration (live API + real FalkorDB)
+  3 passed; security regressions 1 passed + 1 strict xfail; round-3 independent re-confirmation
+  PASS. Independent what-if/audit QA: 45 passed; test-fixture ownership QA: 11 passed. Full
+  serialized evaluation PASS; independent scoped F-14 statistical signoff PASS.
 - **Verified scope:** F-01..F-07, F-09..F-12, F-16 local container, F-17 what-if subset,
   F-18 PageRank/exact reach. Checkpoint/restore and WCC remain unbuilt.
   F-13/F-15 service ACL wiring remains open. E1/E2 synthetic semantics/capture model,
@@ -39,13 +49,48 @@
   deletes only its own successful creates and reports cleanup failures. Independent real-DB
   sentinel survival passes. Earlier runs cannot establish that pre-existing data was preserved.
 - **Next 3 actions:**
-  1. Audit-fix program (FIX_PROMPT): P-010 QA-closed (`docs/qa/P-010.md`); next P-013 admin-token fail-closed, P-016 `pedigree mcp` invocation + `/mcp` mount, P-025 import side effects, then the Phase A review pass.
-  2. F-08 review cycle closed (round-3 PASS in `docs/qa/F-08.md`); F-08 stays implementing — installed-runtime acceptance still unclaimed.
-  3. Resolve service ACL wiring with independent tenant-boundary QA; finish durable hook spool/replay before feature freeze; P010-QA-2 (`ped:mcp*` test-graph leak) queued with test hygiene.
+  1. Audit-fix program (FIX_PROMPT Phase A closing): P-010 and P-016 QA-closed; next **P-013**
+     admin-token fail-closed (spec `docs/fixes/P-013.md`, red tests planned), then **P-025**
+     import side effects (spec `docs/fixes/P-025.md`), then the Phase A checkpoint + push
+     decision.
+  2. Phase B revoke correctness: P-011 spec ready (`docs/fixes/P-011.md`); P-012 consult trio
+     filed (`docs/consults/008-p012-reinstate/`: domain facts + oracle review verdict "NOT YET"
+     with corrections + architect `rederive(roots, seeds)` recommendation); P-024/P-031 specs
+     ready. B1 executes after Phase A review.
+  3. F-08 review cycle closed (round-3 PASS in `docs/qa/F-08.md`); F-08 stays implementing —
+     installed-runtime acceptance still unclaimed; service ACL wiring (F-13/F-15) remains open.
 - **Human pending:** video recording, walkthrough/architecture review, organizer track decision,
   hosted account/submission. Git origin is configured; this continuation has not pushed.
 
 ---
+
+### 2026-10-16 16:32 IST | FIX_PROMPT Phase A | P-016 closed (QA trio + F-1 fix), dogfood harness, Phase B prep | STATUS: done
+- **P-016 QA-closed.** Acceptance trio (stdio CLI journey, `/mcp` mount, advertised URL) green on
+  frozen `561b7e2`; qa-senior PASS (red-at-parent reproduced: `Settings.try_query` AttributeError +
+  `POST /mcp` 405; 20 adversarial cases typed/safe; zero graph leaks) plus devex and red-team
+  reports filed (`docs/qa/P-016.md`, `devex-P-016.md`, `redteam-P-016.md`).
+  Red-team **F-1 (High)**: stdio `_resolve` never checked `default_tenant_token` - the tenant id
+  alone authorized tokenless calls (incl. revoke/reinstate) and a wrong env token silently worked.
+  Fixed in `83d7b73` (env pair must resolve together) with red-at-parent regression
+  (`tests/security/test_p016_stdio_token.py`); `unauthorized` MCP errors now carry actionable
+  messages (were `null`); `pedigree_check_action` unauthorized/quota messages added.
+  F-2/F-3/F-5 -> P-015 scope, F-4 -> P-021 (recorded in the reports).
+- **Docs reality pass:** README MCP section (auth reality until P-015; full 13-tool list),
+  `make demo` wording matches the seed (path printed, token inside the file), dead stdio command in
+  `docs/09-TECH-CHEATSHEET.md` fixed, FEATURES F-06 `/mcp` routing note added, QA addenda written.
+- **Dogfood harness landed** (`0e36767`, `make dogfood` / `dogfood-strict`): 21 heavy-user
+  scenarios with a P-id expectation table; first runs found 3 harness bugs (fixed), then
+  PASS=12 FAIL=0 EXPECTED-FAIL=9 STALE=0 SKIP=1, exit 0; `--strict` exits 1 by design. S19:
+  1 500-node revoke 156 ms server-side, `check_invariants` clean.
+- **Phase B prep:** P-011/P-024/P-031 specs committed; P-012 mandatory consult trio filed
+  (`docs/consults/008-p012-reinstate/`): domain facts (blanket reset wipes root status before
+  `revoked_roots()` is read; stale `revoked_at`/`reason` left on un-revoked nodes; 20k cost
+  numbers), oracle review verdict **NOT YET** (pin corrected semantics into the oracle; lazy
+  corroboration; concrete invariant `revoked_at IS NOT NULL AND status<>'revoked'` == 0) and
+  architect recommendation (one `rederive(roots, seeds)` helper for revoke/reinstate/resume/
+  reconcile; delete `Q_REINSTATE_RESET` as the bug itself).
+- **Gate:** `make check` 406 passed, 1 skipped, 3 deselected, 1 xfailed; secret scan + numbers
+  PASS. **Next:** P-013 red tests -> fix, then P-025, then the Phase A push checkpoint.
 
 ### 2026-10-15 19:34-20:10 IST | Phase P0->P1 | F-04, F-05, F-06, security pass, F-07 | STATUS: done (F-07 QA gap)
 - Landed F-04 blame+impact (`44c2635`; 14 tests; `docs/qa/F-04.md` PASS), F-05 REST API + tenant
