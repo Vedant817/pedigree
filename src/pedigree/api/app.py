@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.staticfiles import StaticFiles
 
-from ..config import get_settings
+from ..config import admin_token_problem, get_settings
 from ..db.client import Db
 from ..errors import PedigreeError
 from . import routes
@@ -78,6 +78,9 @@ class RootDispatcher:
 
 def create_app(db: Db | None = None, settings=None) -> FastAPI:
     settings = settings or get_settings()
+    problem = admin_token_problem(settings)
+    if problem is not None:
+        raise RuntimeError(f"refusing to start: {problem}")
     db = db or Db(settings)
     registry = TenantRegistry(db, settings)
     # Function-local import keeps `import pedigree.api.app` free of mcp_server side
@@ -111,6 +114,3 @@ def create_app(db: Db | None = None, settings=None) -> FastAPI:
     ui = StaticFiles(directory=Path(__file__).resolve().parents[1] / "ui", html=True)
     app.mount("/", RootDispatcher(mcp_app, ui), name="workspace")
     return app
-
-
-app = create_app()

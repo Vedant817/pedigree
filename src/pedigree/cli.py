@@ -8,6 +8,7 @@ mandatory module args) and falls back to the Linux no-Docker path
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import subprocess
@@ -141,10 +142,34 @@ def db_status(settings: Settings) -> int:
     return 0 if ver == expected else 1
 
 
+def admin_create_tenant(settings: Settings, tenant_id: str, node_cap: int | None) -> int:
+    """First-run bootstrap without HTTP (P-013): create a tenant and print its token once."""
+    from .api.registry import TenantRegistry
+    from .config import admin_token_problem
+    from .db.client import Db
+    from .errors import PedigreeError
+
+    problem = admin_token_problem(settings)
+    if problem is not None:
+        print(f"[admin] refusing: {problem}. Provide a strong PEDIGREE_ADMIN_TOKEN "
+              "(or PEDIGREE_ENV=dev for local work).", file=sys.stderr)
+        return 2
+    db = Db(settings)
+    registry = TenantRegistry(db, settings)
+    try:
+        cred = registry.create_tenant(tenant_id, node_cap)
+    except PedigreeError as exc:
+        print(f"[admin] {exc.code}: {exc}", file=sys.stderr)
+        return 1
+    print(json.dumps({"tenant": cred.tenant_id, "token": cred.token}))
+    return 0
+
+
 def serve(settings: Settings, host: str, port: int) -> int:
     import uvicorn
 
-    uvicorn.run("pedigree.api.app:app", host=host, port=port, log_level="info")
+    uvicorn.run("pedigree.api.app:create_app", factory=True, host=host, port=port,
+                log_level="info")
     return 0
 
 
@@ -165,6 +190,13 @@ def main(argv: list[str] | None = None) -> int:
     p_mcp.add_argument("--host", default="127.0.0.1")
     p_mcp.add_argument("--port", type=int, default=8011)
 
+    p_admin = sub.add_parser("admin", help="admin tooling (first-run bootstrap, no HTTP)")
+    p_admin_sub = p_admin.add_subparsers(dest="admin_cmd", required=True)
+    p_create = p_admin_sub.add_parser("create-tenant",
+                                      help="create a tenant and print its token once")
+    p_create.add_argument("--id", required=True)
+    p_create.add_argument("--cap", type=int, default=None)
+
     sub.add_parser("seed", help="seed the demo tenant (synthetic scenarios)")
     sub.add_parser("version", help="print version")
 
@@ -183,6 +215,8 @@ def main(argv: list[str] | None = None) -> int:
             default_tenant_token=os.getenv("PEDIGREE_MCP_TOKEN"),
         )
         return srv.run(args.transport, args.host, args.port) or 0
+    if args.cmd == "admin":
+        return admin_create_tenant(settings, args.id, args.cap)
     if args.cmd == "seed":
         from . import __version__  # noqa: F401  (import check)
 

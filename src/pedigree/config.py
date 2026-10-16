@@ -79,6 +79,7 @@ class Settings(BaseSettings):
     falkor_password: str | None = None
 
     pedigree_admin_token: str = ""
+    pedigree_env: str = "dev"  # dev|test|local are lenient; anything else refuses empty/default admin tokens
     pedigree_secret: str = ""
     pedigree_node_cap: int = 200_000
     pedigree_store_text: bool = False
@@ -95,6 +96,27 @@ class Settings(BaseSettings):
     # read/write query timeouts (ms)
     read_timeout_ms: int = 5_000
     write_timeout_ms: int = 15_000
+
+
+DEV_ENVS = {"dev", "test", "local"}
+KNOWN_DEFAULT_ADMIN_TOKENS = {"change-me-admin", "change-me", "changeme"}
+
+
+def admin_token_problem(settings: Settings) -> str | None:
+    """Shared fail-closed guard (P-013): why the admin token is unusable, or None.
+
+    Non-dev environments refuse an empty or known-default token; dev/test/local accept
+    anything so a local checkout works without ceremony.
+    """
+    token = (settings.pedigree_admin_token or "").strip()
+    env = (settings.pedigree_env or "dev").strip().lower()
+    if env in DEV_ENVS:
+        return None
+    if not token:
+        return "PEDIGREE_ADMIN_TOKEN is empty"
+    if token.lower() in KNOWN_DEFAULT_ADMIN_TOKENS:
+        return "PEDIGREE_ADMIN_TOKEN is a known-default value; generate a strong token"
+    return None
 
 
 @lru_cache
