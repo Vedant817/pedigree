@@ -51,13 +51,14 @@ make start-db       # FalkorDB v4.22.1 - Docker image, or the pinned .so without
 make db-status      # reachable + module version check
 make test-quick     # the fast test suite against a REAL FalkorDB (no mocks of graph logic)
 make demo           # seeds synthetic scenarios S1+S8 into tenant `demo`; writes a private
-                    #   credential to an ignored path and prints it
+                    #   credential file and prints its path (the token lives inside)
 .venv/Scripts/python.exe -m pedigree.cli serve     # Windows
 .venv/bin/python -m pedigree.cli serve             # Linux/macOS
 ```
 
-Then open the printed local URL, paste the token `make demo` printed, and the workspace loads
-the seeded lineage. Previewing a revocation changes nothing until you confirm it.
+Then open the printed local URL, paste the token from the credential file `make demo` wrote
+(path printed, inside that file), and the workspace loads the seeded lineage. Previewing a
+revocation changes nothing until you confirm it.
 
 Docs: [full setup](#setup) · [data model](#graph-data-model) ·
 [Cypher inventory](#the-cypher-the-product-depends-on) ·
@@ -169,8 +170,10 @@ too_large 413 | rate_limited 429 (+ Retry-After) | quota_exceeded 429 | timeout 
 Streamable HTTP at `/mcp` and stdio. Tools: `pedigree_health`, `pedigree_record_source`,
 `pedigree_remember`, `pedigree_record_action`, `pedigree_corroborate` (agent-asserted support
 only), `pedigree_revoke`, `pedigree_reinstate`, `pedigree_blame`, `pedigree_impact`,
-`pedigree_check_action`, `pedigree_report`. The tenant comes from the token, never from a tool
-argument, and the LLM never writes Cypher.
+`pedigree_whatif`, `pedigree_check_action`, `pedigree_audit_sources`, `pedigree_report`.
+The tenant is determined by the token — the in-band `token` tool argument, or (stdio only) the
+`PEDIGREE_MCP_TENANT` + `PEDIGREE_MCP_TOKEN` environment pair, which must resolve together —
+never by the `tenant_id` argument alone; the LLM never writes Cypher.
 
 ```json
 // .opencode/opencode.json or Claude Code MCP config
@@ -178,6 +181,11 @@ argument, and the LLM never writes Cypher.
     "url": "http://127.0.0.1:8000/mcp",
     "headers": { "Authorization": "Bearer <tenant-token>" } } } }
 ```
+
+Interim note (until transport auth lands with P-015): the `Authorization` header above is
+advertised for MCP clients but is **not consumed yet** — every tool call must carry the
+`token` argument (or, on stdio, the environment pair), and the header is kept for forward
+compatibility.
 
 ### Claude Code hook
 

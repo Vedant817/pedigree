@@ -35,6 +35,8 @@ Repro: `python -m pedigree.cli mcp --transport stdio` with `PEDIGREE_MCP_TENANT=
   `default_tenant_id`, else `unauthorized`; or delete the tokenless branch entirely (tool-call `token`
   arg only). Landed in the P-016 follow-up batch.
 - **Test id:** `tests/security/test_p016_stdio_token.py` (wrong/missing env token + no arg → `unauthorized`).
+- **Status: FIXED in `83d7b73`** — the env pair must now resolve together; the regression test
+  captured the pre-fix behavior (`not_in_graph` = authorized) as its red run.
 
 ### F-4 · MEDIUM-LOW · 256 KB body cap bypassed by `Transfer-Encoding: chunked`
 
