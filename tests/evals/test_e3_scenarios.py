@@ -19,14 +19,10 @@ def boundary():
     settings = Settings(pedigree_admin_token="e3-test-operator")
     db = Db(settings)
     registry = TenantRegistry(db, settings)
-    client = TestClient(create_app(db, settings))
-    yield db, registry, client, settings
-    for record in registry.list_tenants():
-        try:
-            db.select(f"ped:{record.tenant_id}").delete()
-        except Exception:  # noqa: BLE001 - already gone
-            pass
-        db.query(registry.gname, "MATCH (t:Tenant {id:$id}) DELETE t", {"id": record.tenant_id})
+    # Individual scenarios and run() own their exact tenant cleanup. This fixture
+    # owns only the client; registry enumeration must never confer delete ownership.
+    with TestClient(create_app(db, settings)) as client:
+        yield db, registry, client, settings
 
 
 def _render(db, registry, settings, client):
@@ -44,7 +40,7 @@ def test_scenario_replay_matches_fixture_expectations(boundary, scenario_id):
     from pedigree.config import graph_name
 
     scenario = scenarios[0]
-    credential = registry.create_tenant("e3" + scenario_id.lower() + str(abs(hash(scenario_id)) % 10 ** 6))
+    credential = registry.create_tenant("e3" + scenario_id.lower() + uuid.uuid4().hex[:9])
     gname = graph_name(credential.tenant_id)
     headers = {"Authorization": "Bearer " + credential.token,
                "X-Admin-Token": settings.pedigree_admin_token}
@@ -101,7 +97,7 @@ def test_scenario_gate_expectations_hold(boundary):
 def test_gate_blocks_a_high_risk_push_on_the_revoked_branch(boundary):
     db, registry, client, settings = boundary
     scenario = next(s for s in load_scenarios() if s["id"] == "S1")
-    credential = registry.create_tenant("e3gate" + str(abs(hash("gate")) % 10 ** 6))
+    credential = registry.create_tenant("e3gate" + uuid.uuid4().hex[:9])
     from pedigree.config import graph_name
 
     gname = graph_name(credential.tenant_id)

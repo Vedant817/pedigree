@@ -111,9 +111,8 @@ def run(client: TestClient, db: Db, registry: TenantRegistry, settings: Settings
         tenant = "e3" + uuid.uuid4().hex[:9]
         credential = registry.create_tenant(tenant)
         gname = graph_name(tenant)
-        db.select(gname).delete() if False else None
-        headers = headers_for(credential)
         try:
+            headers = headers_for(credential)
             replay(scenario, client, headers)
             problems = assert_expected(scenario, db, gname)
             if problems:
