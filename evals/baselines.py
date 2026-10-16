@@ -131,7 +131,7 @@ def calibrate_b0_theta(dags, lo: float = 0.0, hi: float = 1.0, steps: int = 41) 
         for dag in dags:
             p = b0_similarity(dag, theta)
             truth_g = _truth_sets(dag)
-            f1s.append(_f1(p.pred, truth_g))
+            f1s.append(_f1(p.pred | p.actions, truth_g))
         mean_f1 = sum(f1s) / len(f1s) if f1s else 0.0
         sweep.append((round(theta, 4), round(mean_f1, 4)))
         if mean_f1 > best_f1:

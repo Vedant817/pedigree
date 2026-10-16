@@ -20,7 +20,7 @@ from pathlib import Path
 from evals import machineinfo
 from evals.gen import generate
 from evals.oracle import truth_for_dag
-from evals.stats import mean_ci, wilson
+from evals.stats import cluster_ratio_ci, mean_ci, metric_interval
 
 DROP_RATES = (0, 1, 2, 5, 10)      # percent
 WINDOWS = (5, 10, 25, 50, 100)     # K read targets
@@ -133,6 +133,7 @@ def main(argv=None) -> int:
 
     rows: list[dict] = []
     for seed in range(seeds):
+        row_start = len(rows)
         dag = generate(SEED_SPREAD + seed, **FIXED)
         truth = truth_for_dag(dag)
         # baseline: exact capture
@@ -151,21 +152,33 @@ def main(argv=None) -> int:
             parents = _window_parents(dag, k)
             pred, preserved, actions = _pred_for(dag, parents)
             rows.append(_score("window", k, dag, pred, actions, truth))
+        for row in rows[row_start:]:
+            row["seed"] = SEED_SPREAD + seed
     print(f"[e2] {len(rows)} rows over {seeds} seeds")
 
     metrics = ["recall", "leakage", "over_flag_ratio", "extra_actions"]
+    with (out / "e2_samples.csv").open("w", newline="", encoding="utf-8") as fh:
+        fh.writelines(line + "\n" for line in machineinfo.csv_header_lines(
+            info, {"seeds": seeds, "drop_rates": list(drops), "windows": list(windows)}))
+        writer = csv.DictWriter(fh, fieldnames=["seed", "kind", "param"] + metrics + ["n_g", "n_actions"])
+        writer.writeheader()
+        writer.writerows(rows)
     with (out / "e2_capture.csv").open("w", newline="", encoding="utf-8") as fh:
         fh.writelines(line + "\n" for line in machineinfo.csv_header_lines(
             info, {"seeds": seeds, "drop_rates": list(drops), "windows": list(windows)}))
-        writer = csv.DictWriter(fh, fieldnames=["kind", "param"] + metrics + ["n_g", "n_actions"])
+        writer = csv.DictWriter(fh, fieldnames=["kind", "param", "n_seeds", "ci_method"] +
+                                [name for metric in metrics for name in (metric, f"{metric}_lo", f"{metric}_hi", f"{metric}_n_seeds")] + ["n_g", "n_actions"])
         writer.writeheader()
         for kind in ("exact", "edge_drop", "window"):
             for param in sorted({r["param"] for r in rows if r["kind"] == kind}):
                 subset = [r for r in rows if r["kind"] == kind and r["param"] == param]
-                agg: dict = {"kind": kind, "param": param}
+                agg: dict = {"kind": kind, "param": param, "n_seeds": len(subset),
+                             "ci_method": "seed bootstrap percentile 95%; 10000 resamples"}
                 for metric in metrics:
                     values = [r[metric] for r in subset if r[metric] is not None]
+                    agg[f"{metric}_n_seeds"] = len(values)
                     if not values:
+                        agg[f"{metric}_lo"] = agg[f"{metric}_hi"] = None
                         agg[metric] = None
                         continue
                     mean, lo, hi = mean_ci(values, seed=19)
@@ -179,30 +192,30 @@ def main(argv=None) -> int:
 
     numbers = _numbers(rows)
     (out / "numbers_e2.json").write_text(json.dumps(numbers, indent=2), encoding="utf-8")
-    print("[e2] wrote e2_capture.csv and numbers_e2.json")
+    print("[e2] wrote e2_samples.csv, e2_capture.csv and numbers_e2.json")
     return 0
 
 
-#: metrics that are proper proportions of a fixed denominator (Wilson is valid); the other
-#: metrics are ratios that can exceed 1, so they get a bootstrap interval only.
+# Proper proportions use pooled counts; unbounded ratios retain the per-seed mean.
 PROPORTIONS = ("recall", "leakage")
 
 
 def _pooled(rows, kind, param, metric, count_key) -> dict:
-    subset = [r for r in rows if r["kind"] == kind and r["param"] == param
-              and r[metric] is not None]
-    if not subset:
-        return {"value": None, "ci95": None, "n": 0, "source": "evals/run_e2.py"}
-    values = [r[metric] for r in subset]
+    total = [r for r in rows if r["kind"] == kind and r["param"] == param]
+    subset = [r for r in total if r[metric] is not None]
     n = sum(r[count_key] for r in subset)
-    if metric not in PROPORTIONS:
-        mean, lo, hi = mean_ci(values, seed=19)
-        return {"value": round(mean, 4), "ci95": [round(lo, 4), round(hi, 4)],
-                "n": n, "source": "evals/run_e2.py (bootstrap CI)"}
-    k = sum(round(v * r[count_key]) for v, r in zip(values, subset, strict=True))
-    lo, hi = wilson(k, n)
-    return {"value": round(k / n, 4) if n else 0.0, "ci95": [round(lo, 4), round(hi, 4)],
-            "n": n, "source": "evals/run_e2.py"}
+    method = "seed-cluster bootstrap percentile 95%; 10000 resamples"
+    if not subset:
+        value = lo = hi = None
+    elif metric not in PROPORTIONS:
+        value, lo, hi = mean_ci([r[metric] for r in subset], seed=19)
+        method = "seed-mean bootstrap percentile 95%; 10000 resamples"
+    else:
+        pairs = [(round(r[metric] * r[count_key]), r[count_key])
+                 if r[metric] is not None else (0, 0) for r in total]
+        value, lo, hi = cluster_ratio_ci([pairs], seed=19)
+    return metric_interval(value, lo, hi, n_clusters=len(subset), n_items=n,
+                           n_total=len(total), method=method, source="evals/run_e2.py")
 
 
 def _numbers(rows) -> dict:

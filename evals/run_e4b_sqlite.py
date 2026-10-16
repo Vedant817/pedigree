@@ -3,8 +3,8 @@ and in SQLite3 (stdlib, recursive CTE) on the same generated DAG (docs/03 sectio
 
 Scope, stated plainly: this measures the **graph traversal primitives** Pedigree depends on
 (descendant closure, ancestor closure, edge read-back) - not the whole revoke pipeline. FalkorDB
-also gives us the per-tenant graph namespace, `GRAPH.COPY` and the ACL pattern, which SQLite does
-not; the blog/README say so.
+also gives this implementation a per-tenant graph namespace, `GRAPH.COPY` and database ACLs.
+SQLite can implement logical isolation too; this traversal benchmark does not compare isolation architectures.
 
     python evals/run_e4b_sqlite.py [--sizes 1000,5000] [--quick] [--out DIR]
 """
@@ -50,6 +50,13 @@ WITH RECURSIVE closure(id) AS (
 )
 SELECT id FROM closure WHERE id <> :root
 """
+
+
+def _assert_same_ids(sql_rows, graph_rows, label: str) -> int:
+    sql_ids = {row[0] for row in sql_rows}
+    graph_ids = {row[0] for row in graph_rows}
+    assert sql_ids == graph_ids, f"{label} ID-set mismatch: sqlite-only={sorted(sql_ids - graph_ids)}; falkor-only={sorted(graph_ids - sql_ids)}"
+    return len(sql_ids)
 
 
 def _median_ms(fn, rounds: int) -> float:
@@ -142,12 +149,20 @@ def main(argv=None) -> int:
                 MATCH (r:Node {id:$id}) CALL algo.BFS(r, $depth, 'DERIVED_FROM') YIELD nodes
                 UNWIND nodes AS n RETURN n.id
             """, {"id": r, "depth": 12}, op="e4b.falkor_anc").result_set, ROUNDS)
-        sql_n = len(conn.execute(SQL_DESCENDANTS, {"root": root}).fetchall())
-        graph_n = len(db.ro_query(gname, """
-            MATCH (r:Node {id:$id}) CALL algo.BFS(r, $depth, 'FEEDS') YIELD nodes
-            UNWIND nodes AS n RETURN n.id
-        """, {"id": root, "depth": 12}, op="e4b.falkor_desc").result_set)
-        assert sql_n == graph_n, f"closure mismatch: sqlite {sql_n} vs falkor {graph_n}"
+        sql_n = _assert_same_ids(
+            conn.execute(SQL_DESCENDANTS, {"root": root}).fetchall(),
+            db.ro_query(gname, """
+                MATCH (r:Node {id:$id}) CALL algo.BFS(r, $depth, 'FEEDS') YIELD nodes
+                UNWIND nodes AS n RETURN n.id
+            """, {"id": root, "depth": 12}, op="e4b.falkor_desc").result_set,
+            "descendants")
+        _assert_same_ids(
+            conn.execute(SQL_ANCESTORS, {"root": anchor}).fetchall(),
+            db.ro_query(gname, """
+                MATCH (r:Node {id:$id}) CALL algo.BFS(r, $depth, 'DERIVED_FROM') YIELD nodes
+                UNWIND nodes AS n RETURN n.id
+            """, {"id": anchor, "depth": 12}, op="e4b.falkor_anc").result_set,
+            "ancestors")
         rows.append({"nodes": len(dag.created), "edges": edges,
                      "closure_sqlite_ms": round(sql_desc, 2),
                      "closure_falkor_ms": round(graph_desc, 2),

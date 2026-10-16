@@ -25,7 +25,7 @@ from evals.baselines import (
 )
 from evals.gen import generate
 from evals.oracle import truth_for_dag
-from evals.stats import mean_ci, wilson
+from evals.stats import cluster_ratio_ci, mean_ci, metric_interval
 
 GRID = [(L, f, p) for L in (2, 4, 6) for f in (1, 3) for p in (0.0, 0.1, 0.3)]
 QUICK_GRID = [(2, 1, 0.1)]
@@ -52,6 +52,7 @@ def _items_universe(dag) -> set[str]:
 
 def _score(dag, system: str, pred: set[str], preserved: set[str], actions: set[str],
            irreversible: set[str], truth) -> dict:
+    assert (pred | actions).isdisjoint(preserved), "invalidated and preserved sets overlap"
     universe = _items_universe(dag)
     G = truth.G
     H = universe - G
@@ -144,7 +145,8 @@ def main(argv=None) -> int:
     with summary_path.open("w", newline="", encoding="utf-8") as fh:
         fh.writelines(line + "\n" for line in machineinfo.csv_header_lines(
             info, {"seeds_per_cell": seeds, "b0_theta": round(theta, 4)}))
-        writer = csv.DictWriter(fh, fieldnames=["cell", "system", "n_seeds"] + metrics +
+        writer = csv.DictWriter(fh, fieldnames=["cell", "system", "n_seeds", "ci_method"] +
+                                [name for metric in metrics for name in (metric, f"{metric}_lo", f"{metric}_hi", f"{metric}_n_seeds")] +
                                 ["n_g", "n_h", "n_actions", "n_irreversible", "n_should_preserve"])
         writer.writeheader()
         for cell_name in sorted({r["cell"] for r in all_rows}):
@@ -152,9 +154,10 @@ def main(argv=None) -> int:
                 cell_rows = [r for r in all_rows if r["cell"] == cell_name and r["system"] == system]
                 if not cell_rows:
                     continue
-                agg = {"cell": cell_name, "system": system}
+                agg = {"cell": cell_name, "system": system, "ci_method": "seed bootstrap percentile 95%; 10000 resamples"}
                 for metric in metrics:
                     values = [r[metric] for r in cell_rows if r[metric] is not None]
+                    agg[f"{metric}_n_seeds"] = len(values)
                     if not values:
                         agg[metric] = None
                         agg[f"{metric}_lo"] = None
@@ -189,20 +192,21 @@ def _numbers(rows, grid, seeds, theta, info) -> dict:
     systems = ["P", "B0", "B1", "B2", "B4", "B5"]
 
     def pooled(system, metric):
-        """Pool the per-seed counts over the whole grid (skipping seeds with an empty
-        denominator; the Wilson interval is computed on the pooled k/n)."""
+        """Preserve pooled counts; resample DAGs independently within each fixed cell."""
         key = {"recall": "n_g", "over_invalidation": "n_h", "action_recall": "n_actions",
                "irreversible_recall": "n_irreversible", "preserved_correct": "n_should_preserve"}
-        ks, ns = [], []
-        for r in rows:
-            if r["system"] != system or r[metric] is None:
-                continue
-            ns.append(r[key[metric]])
-            ks.append(round(r[metric] * ns[-1]))
-        k, n = sum(ks), sum(ns)
-        lo, hi = wilson(k, n)
-        return {"value": round(k / n, 4) if n else 0.0, "ci95": [round(lo, 4), round(hi, 4)],
-                "n": n, "source": "evals/run_e1.py"}
+        subset = [r for r in rows if r["system"] == system]
+        groups = {}
+        for r in subset:
+            n = r.get(key[metric], 0) if r[metric] is not None else 0
+            groups.setdefault(r["cell"], []).append((round(r[metric] * n) if n else 0, n))
+        value, lo, hi = cluster_ratio_ci(list(groups.values()), seed=17)
+        return metric_interval(value, lo, hi,
+                               n_clusters=sum(r[metric] is not None for r in subset),
+                               n_items=sum(n for group in groups.values() for _, n in group),
+                               n_total=len(subset),
+                               method="stratified seed-cluster bootstrap percentile 95%; 10000 resamples",
+                               source="evals/run_e1.py")
 
     out = {
         "e1_grid_cells": len(grid),
@@ -224,9 +228,13 @@ def _numbers(rows, grid, seeds, theta, info) -> dict:
         if cell_rows:
             values = [r[metric] for r in cell_rows]
             _mean, lo, hi = mean_ci(values, seed=23)
-            out[key] = {"value": round(sum(values) / len(values), 4),
-                        "ci95": [round(lo, 4), round(hi, 4)],
-                        "n": len(values), "source": "evals/run_e1.py (cell L6-f3-p0.3)"}
+            out[key] = metric_interval(
+                _mean, lo, hi, n_clusters=len(values),
+                n_items=sum(r["n_h" if metric == "over_invalidation" else "n_g"] for r in cell_rows),
+                n_total=sum(r["cell"] == "L6-f3-p0.3" and
+                            r["system"] == ("B4" if "b4" in key else "B2") for r in rows),
+                method="seed-mean bootstrap percentile 95%; 10000 resamples",
+                source="evals/run_e1.py (cell L6-f3-p0.3)")
     for metric, key in (("recall", "e1_recall"), ("over_invalidation", "e1_over_invalidation"),
                         ("action_recall", "e1_action_recall"),
                         ("irreversible_recall", "e1_irreversible_recall"),
