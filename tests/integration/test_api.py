@@ -29,7 +29,17 @@ def tenant(client):
     tid = "t" + uuid.uuid4().hex[:10]
     r = client.post("/admin/tenants", headers={"X-Admin-Token": ADMIN_TOKEN}, json={"id": tid})
     assert r.status_code == 200, r.text
-    return tid, r.json()["token"]
+    try:
+        yield tid, r.json()["token"]
+    finally:
+        db = client.app.state.db
+        registry = client.app.state.registry
+        graph = "ped:" + tid
+        try:
+            if graph in db.list_graphs():
+                db.select(graph).delete()
+        finally:
+            db.query(registry.gname, "MATCH(t:Tenant {id:$id}) DELETE t", {"id": tid})
 
 
 def _h(tok):
@@ -39,7 +49,8 @@ def _h(tok):
 def test_health_and_ready(client):
     assert client.get("/healthz").status_code == 200
     assert client.get("/readyz").status_code == 200
-    assert client.get("/metrics").status_code == 200
+    assert client.get("/metrics").status_code == 401
+    assert client.get("/metrics", headers={"X-Admin-Token": ADMIN_TOKEN}).status_code == 200
 
 
 def test_auth_without_token_is_rejected(client):
@@ -80,16 +91,32 @@ def test_source_lifecycle_and_revocation(client, tenant):
 def test_tenant_isolation(client):
     tid1 = "ta" + uuid.uuid4().hex[:8]
     tid2 = "tb" + uuid.uuid4().hex[:8]
-    r1 = client.post("/admin/tenants", headers={"X-Admin-Token": ADMIN_TOKEN}, json={"id": tid1})
-    r2 = client.post("/admin/tenants", headers={"X-Admin-Token": ADMIN_TOKEN}, json={"id": tid2})
-    tok1 = r1.json()["token"]
-    tok2 = r2.json()["token"]
-    h1 = {"Authorization": "Bearer " + tok1}
-    h2 = {"Authorization": "Bearer " + tok2}
-    src = client.post("/v1/sources", headers=h1, json={"kind": "web", "uri": "x"}).json()
-    res = client.get("/v1/blame/" + src["id"], headers=h2)
-    assert res.status_code == 404
-    assert client.get("/healthz").status_code == 200
+    owned = []
+    try:
+        r1 = client.post("/admin/tenants", headers={"X-Admin-Token": ADMIN_TOKEN}, json={"id": tid1})
+        if r1.status_code == 200:
+            owned.append(tid1)
+        r2 = client.post("/admin/tenants", headers={"X-Admin-Token": ADMIN_TOKEN}, json={"id": tid2})
+        if r2.status_code == 200:
+            owned.append(tid2)
+        tok1 = r1.json()["token"]
+        tok2 = r2.json()["token"]
+        h1 = {"Authorization": "Bearer " + tok1}
+        h2 = {"Authorization": "Bearer " + tok2}
+        src = client.post("/v1/sources", headers=h1, json={"kind": "web", "uri": "x"}).json()
+        res = client.get("/v1/blame/" + src["id"], headers=h2)
+        assert res.status_code == 404
+        assert client.get("/healthz").status_code == 200
+    finally:
+        db = client.app.state.db
+        registry = client.app.state.registry
+        for tid in owned:
+            graph = "ped:" + tid
+            try:
+                if graph in db.list_graphs():
+                    db.select(graph).delete()
+            finally:
+                db.query(registry.gname, "MATCH(t:Tenant {id:$id}) DELETE t", {"id": tid})
 
 
 def test_revoke_is_idempotent(client, tenant):
