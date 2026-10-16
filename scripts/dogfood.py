@@ -20,11 +20,10 @@ MUST flip to "pass" (and will be reported as STALE until they do) once the cited
 Notes on proven-by-probe realities this harness encodes (measured on the live FalkorDB v4.22.1,
 tree `561b7e2`; see docs/qa/P-010.md and the report this tool writes):
 
-- P-013 (S01): there is no way to run the admin-bootstrap path non-destructively. `TenantRegistry`
-  hardcodes `graph_name("registry")` -> `ped:registry`; `pedigree.config.REGISTRY_GRAPH`
-  ("pedigree:registry") is used only by the unused `ensure_registry_schema`, and
-  `Settings(extra="ignore")` ignores any `PEDIGREE_REGISTRY_GRAPH`. S01 therefore runs only when
-  the live registry is EMPTY, and reports which path it took (see S01's docstring).
+- P-013 (S01): FIXED - admin auth is fail-closed on any registry state; the `has_tenants()` gate is
+  gone. S01 proves it non-destructively: no-token calls 401 AND `api/routes/admin.py` contains no
+  `has_tenants` reference (bypass impossible by construction); the empty-registry proof lives in
+  `tests/security/test_admin_auth.py` (`test_fresh_registry_bootstrap_is_fail_closed`).
 - P-016 (S16/S17): fixed in tree at `6340a5c` + `561b7e2` (MCP stdio `initialize` + tool calls
   work; `GET /mcp` is served from the API process). The rows below therefore expect PASS with the
   P-016 citation and a "flip back if it regresses" note; if the fix regresses they FAIL and exit 1.
@@ -107,9 +106,9 @@ class Expectation:
 EXPECTATIONS: dict[str, Expectation] = {
     "S01": Expectation(
         "pass", "P-013",
-        "POST /admin/tenants with NO token -> 401. Conditional on an EMPTY registry: the registry "
-        "graph name is not configurable (TenantRegistry hardcodes ped:registry) so the bootstrap "
-        "path cannot be run non-destructively against a populated registry.",
+        "admin auth fail-closed on any registry state: no-token POST/GET -> 401 and the routes "
+        "source contains no has_tenants gate (bootstrap bypass impossible by construction; "
+        "empty-registry proof: tests/security/test_admin_auth.py).",
     ),
     "S02": Expectation("pass", "", "wrong admin token -> 401 (regression guard)."),
     "S03": Expectation("pass", "", "tenant create + list with the admin token."),
@@ -163,9 +162,9 @@ EXPECTATIONS: dict[str, Expectation] = {
         "python_info (no pedigree metric is registered). Row sends X-Admin-Token (target state).",
     ),
     "S15": Expectation(
-        "expected-fail", "P-025",
-        "FALKOR_PORT=1 python -c 'import pedigree.api.app, pedigree.mcp_server' -> want exit 0; "
-        "today nonzero (import connects and builds indexes).",
+        "pass", "P-025",
+        "FALKOR_PORT=1 python -c 'import pedigree.api.app, pedigree.mcp_server' -> exit 0 (fixed: no "
+        "import-time DB access; flip back to expected-fail only if it regresses).",
     ),
     "S16": Expectation(
         "pass", "P-016",
@@ -179,9 +178,9 @@ EXPECTATIONS: dict[str, Expectation] = {
         "pedigree_record_source -> pedigree_blame). Fixed at 6340a5c + 561b7e2.",
     ),
     "S18": Expectation(
-        "expected-fail", "P-013, P-011",
-        "CLI subcommands `admin create-tenant` and `resume` must exist (exit 0 on --help); today "
-        "argparse rejects both with exit 2.",
+        "expected-fail", "P-011",
+        "CLI: `admin --help` exits 0 (P-013 fixed); `resume --help` is still rejected until P-011 "
+        "lands.",
     ),
     "S19": Expectation(
         "pass", "",
@@ -430,26 +429,20 @@ class Ctx:
 # Scenarios
 # --------------------------------------------------------------------------------------
 def s01_admin_bootstrap(ctx: Ctx, res: ScenarioResult) -> None:
-    """P-013: fresh registry -> POST /admin/tenants with NO token must 401.
+    """P-013 (fixed): admin auth is fail-closed unconditionally; no bootstrap bypass exists.
 
-    Registry graph names are NOT configurable (TenantRegistry hardcodes `graph_name("registry")`
-    -> `ped:registry`; `pedigree.config.REGISTRY_GRAPH`/`PEDIGREE_REGISTRY_GRAPH` are dead for the
-    live registry), so this row runs only when the live registry is empty and SKIPs otherwise,
-    reporting the path taken.
+    The old `has_tenants()` gate made a fresh/empty registry skip auth entirely. Non-destructive
+    proof on the live (populated) registry: no-token calls 401 AND the routes source contains no
+    `has_tenants` reference, so the bypass is impossible by construction; the empty-registry case
+    itself is proven by `tests/security/test_admin_auth.py`
+    (`test_fresh_registry_bootstrap_is_fail_closed`, monkeypatched empty registry).
     """
-    count = ctx.registry_count()
-    res.note(f"registry graph `{REGISTRY_GRAPH}` holds {count} tenants")
-    if count > 0:
-        raise SkipScenario(
-            f"registry has {count} tenants; bootstrap path not reachable non-destructively and the "
-            "registry graph name is not configurable (TenantRegistry hardcodes ped:registry)"
-        )
     tid = "dogfood" + secrets.token_hex(4)
     resp = ctx.post("/admin/tenants", json_body={"id": tid}, headers={})
-    body = {}
-    with contextlib.suppress(Exception):
-        body = resp.json()
-    if resp.status_code == 200:
+    if resp.status_code == 200:  # safety: if this ever regresses, clean up after ourselves
+        body = {}
+        with contextlib.suppress(Exception):
+            body = resp.json()
         token = str(body.get("token", "")) if isinstance(body, dict) else ""
         ctx.created_tenants.add(tid)
         ctx.created_graphs.add(graph_name(tid))
@@ -457,6 +450,13 @@ def s01_admin_bootstrap(ctx: Ctx, res: ScenarioResult) -> None:
             ctx.secrets.append(token)
     res.check("POST /admin/tenants (no token) -> 401", resp.status_code == 401,
               ctx.evidence("POST", "/admin/tenants", resp))
+    gr = ctx.get("/admin/tenants")
+    res.check("GET /admin/tenants (no token) -> 401", gr.status_code == 401,
+              ctx.evidence("GET", "/admin/tenants", gr))
+    src = (ROOT / "src" / "pedigree" / "api" / "routes" / "admin.py").read_text(encoding="utf-8")
+    res.check("admin routes contain no has_tenants gate (bypass impossible by construction)",
+              "registry.has_tenants" not in src,
+              "src/pedigree/api/routes/admin.py: no registry.has_tenants call site")
 
 
 def s02_wrong_admin_token(ctx: Ctx, res: ScenarioResult) -> None:

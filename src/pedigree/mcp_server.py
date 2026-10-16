@@ -245,19 +245,3 @@ class PedigreeMCPServer:
 
 def build_mcp(db=None, settings=None, default_tenant_id=None, default_tenant_token=None):
     return PedigreeMCPServer(db, settings, default_tenant_id, default_tenant_token)
-
-mcp = None
-
-
-def _build_default():
-    global mcp
-    try:
-        settings = get_settings()
-        db = Db(settings)
-        if db.ping():
-            mcp = build_mcp(db, settings).server
-    except Exception:
-        mcp = None
-
-
-_build_default()

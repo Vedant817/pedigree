@@ -19,7 +19,7 @@ Status: qa | Tests: `tests/integration/test_api.py` | QA: in progress
   are middleware/dependency driven.
 - `PedigreeError` derivatives map to their documented HTTP statuses through a single handler;
   `not_in_graph` always returns 404.
-- `pedigree serve` runs `pedigree.api.app:app` via uvicorn.
+- `pedigree serve` runs `pedigree.api.app:create_app` via uvicorn (factory mode; P-025).
 
 ## Invariants
 - Engine is untouched; all paths use `graph_name(tenant)`.
