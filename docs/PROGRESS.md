@@ -1,6 +1,6 @@
 # CURRENT STATE (overwritten after every feature / checkpoint)
 
-- **Phase:** P2/P3 hardening and evaluation publication; updated Fri 2026-10-16 08:57 IST.
+- **Phase:** P2/P3 hardening and evaluation publication; updated Fri 2026-10-16 09:00 IST.
 - **Last implementation commits:** a677d9f (what-if/audit containment), d7f7409 (test fixture ownership),
   3941d85 (DAG-cluster evaluation intervals and quick artifact isolation).
 - **Environment:** Windows 11; Python 3.12.15; pinned FalkorDB module 42201 in Docker;
@@ -9,6 +9,8 @@
 - **Test state:** make check: 376 passed, 1 skipped (optional ACL deployment secret absent);
   Ruff, tracked secret scan, numbers check PASS. Independent what-if/audit QA: 45 passed;
   test-fixture ownership QA: 11 passed. Full serialized evaluation PASS; independent scoped F-14 statistical signoff PASS.
+  Fresh local clone of a020851, new venv and editable dev install: make check PASS, 376 passed,
+  1 skipped in 39.45s; Ruff, secrets and numbers PASS.
 - **Verified scope:** F-01..F-07, F-09..F-12, F-16 local container, F-17 what-if subset,
   F-18 PageRank/exact reach. Checkpoint/restore and WCC remain unbuilt.
   F-13/F-15 service ACL wiring remains open. E1/E2 synthetic semantics/capture model,
@@ -346,4 +348,7 @@
   Observation resolves the read-shape prerequisite only; adapter and real coverage/friction
   remain unbuilt/unmeasured. Documentation no longer claims the adapter ships.
 - Remaining gates: OpenCode adapter/runtime acceptance, service ACL wiring, E3b/E6, durable
-  hook spool/replay, human walkthrough/video/submission. Fresh-clone final check follows.
+  hook spool/replay, human walkthrough/video/submission. Fresh-clone verification of a020851 PASS: new Python 3.12.15 venv, 56 resolved packages,
+  make check 376 passed / 1 skipped in 39.45s, Ruff/secrets/numbers PASS. Synthetic demo
+  registry and 14 nodes remained after the clone suite. This is Windows/local DB evidence,
+  not a new hosted deployment or installed runtime acceptance.

@@ -29,6 +29,14 @@ limits and their analysis was completed by the orchestrator in a documented role
 quota also blocked installed-runtime capture, which is recorded in
 `docs/consults/opencode-spike.md` instead of being papered over.
 
+The subsequent Oct 16 hardening used **Codex through T3 Code**, **gpt-6.1-sol**,
+with independent QA and statistical-review subagents. It repaired what-if cleanup and
+snapshot comparison, isolated-source audit coverage, destructive test-fixture cleanup,
+and clustered evaluation publication. One bounded free OpenCode session completed a
+synthetic read and captured genuine before/after hook payloads; the final model response
+timed out. This is payload-contract evidence, not a completed Pedigree OpenCode adapter
+or real-session coverage/friction evaluation.
+
 ## What the human did (not the AI)
 
 - Chose the project, its scope and the time-boxed plan (the design pack this repository
