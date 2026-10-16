@@ -1,28 +1,31 @@
 # CURRENT STATE (overwritten after every feature / checkpoint)
 
-- **Phase:** P2/P3 hardening and evaluation publication; updated Fri 2026-10-16 09:09 IST.
-- **Last implementation commits:** a677d9f (what-if/audit containment), d7f7409 (test fixture ownership),
-  3941d85 (DAG-cluster evaluation intervals and quick artifact isolation).
+- **Phase:** P2/P3 hardening and evaluation publication; updated Fri 2026-10-16 09:42 IST.
+- **Last implementation commits:** f475979 (OpenCode ADR-009 record), a677d9f (what-if/audit containment),
+  d7f7409 (test fixture ownership), 3941d85 (DAG-cluster evaluation intervals and quick artifact isolation).
 - **Environment:** Windows 11; Python 3.12.15; pinned FalkorDB module 42201 in Docker;
   Node v24.13.1. Local core and synthetic demo require no model provider.
 - **Deadlines:** feature freeze Sun 2026-10-18 15:00 IST; target submit 21:00; hard stop 23:59.
-- **Test state:** make check: 391 passed, 1 skipped (optional ACL deployment secret absent);
-  Ruff, tracked secret scan, numbers check PASS. Independent what-if/audit QA: 45 passed;
-  test-fixture ownership QA: 11 passed. Full serialized evaluation PASS; independent scoped F-14 statistical signoff PASS.
-  Fresh local clone of 72c7650, new venv and editable dev install: make check PASS, 391 passed,
-  1 skipped in 38.86s; Ruff, secrets and numbers PASS. Post-clone demo registry retained, 14 nodes.
+- **Test state:** make check: 394 passed, 1 skipped (optional ACL deployment secret absent);
+  Ruff, tracked secret scan, numbers check PASS. F-08 slice: builtin Node suite 35 passed;
+  hook-replay integration against live API + real FalkorDB passed; independent QA/red-team NOT yet run.
+  Independent what-if/audit QA: 45 passed; test-fixture ownership QA: 11 passed. Full serialized
+  evaluation PASS; independent scoped F-14 statistical signoff PASS. Fresh local clone of 72c7650,
+  new venv and editable dev install: make check PASS, 391 passed, 1 skipped in 38.86s.
 - **Verified scope:** F-01..F-07, F-09..F-12, F-16 local container, F-17 what-if subset,
   F-18 PageRank/exact reach. Checkpoint/restore and WCC remain unbuilt.
   F-13/F-15 service ACL wiring remains open. E1/E2 synthetic semantics/capture model,
   E3 authored S1/S6/S8, E4/E4b local measurements are distinct from real-session evidence.
-- **Capture:** one genuine installed OpenCode read before/after payload recorded using a free
-  model; the Pedigree OpenCode adapter itself is unbuilt. E3b/E6 coverage and friction NOT MEASURED.
-  Claude hook has API/subprocess proof, not installed-runtime proof.
+- **Capture:** OpenCode adapter implemented as an explicitly enabled read-only slice (ADR-009,
+  `adapters/opencode/`): native reads gated and captured as observed read views, every other tool
+  denied, failed capture latches the session. Its tests replay the genuine 1.19.0 payload; installed
+  acceptance of the plugin file, write shapes and real coverage remain unmeasured. Claude hook has
+  API/subprocess proof, not installed-runtime proof.
 - **Data safety correction:** the old isolation fixture deleted all registry tenants. It now
   deletes only its own successful creates and reports cleanup failures. Independent real-DB
   sentinel survival passes. Earlier runs cannot establish that pre-existing data was preserved.
 - **Next 3 actions:**
-  1. Implement F-08 against the genuine read contract, then independently verify runtime capture.
+  1. Independent QA/red-team of the F-08 slice (fresh Node/API reruns, adversarial cases), then fix findings.
   2. Resolve service ACL wiring with independent tenant-boundary QA.
   3. Finish durable hook spool/replay and remaining release checks before feature freeze.
 - **Human pending:** video recording, walkthrough/architecture review, organizer track decision,
@@ -372,3 +375,30 @@
 - Automatic approval review rejected recursive removal of the two task-owned temporary QA
   clones as blocked by policy. They remain under the OS Temp directory (pedigree-final-9dab960007b84184888631fbaf435cbf
   and pedigree-verified-ca56abfe591f408ba95e5fc57b7c8d7e); no alternate deletion attempted.
+
+
+### 2026-10-16 09:42 IST | Phase P2/P3 | F-08 opt-in OpenCode read-only capture slice | STATUS: implemented; independent QA/red-team pending
+- `adapters/opencode/` (dependency-free Node ESM; entry `pedigree.js`, core `pedigree-core.js`,
+  install/config/limits in its README) implements ADR-009: disabled without
+  `PEDIGREE_OPENCODE_ENABLED=1`; only the observed native `read` tool is accepted and every other
+  tool is denied before execution; reads are path/credential/symlink-validated, gated through
+  `/v1/gate` (block/reverify/unknown/outage deny; an outage does not latch), and completed reads
+  capture session + observed read view (`readview:v1/<project-key>/<rel>#L<range>` + canonical
+  display-descriptor digest, no file bytes/outputs/commands/absolute paths/token on the wire) +
+  session_read edge via `/v1/events`. Failed/ambiguous capture latches the session incomplete and
+  denies further operations; per-session gate/capture serialization; bounded sessions/pending/
+  acked memories; no redirects, HTTPS except loopback, timeouts and response caps.
+- Evidence: builtin Node suite 35 tests (genuine-fixture wire mapping, gate/denial matrix,
+  containment and display-validation matrix, privacy canaries incl. a body-key allowlist,
+  bounds/clamps/eviction/URI overflow), run under pytest by
+  `tests/unit/test_opencode_adapter_suite.py`; `tests/integration/test_opencode_plugin.py`
+  replays the genuine 1.19.0 payload through a Node subprocess into a live API + real FalkorDB:
+  persisted Source with independently recomputed digest and forced `untrusted` integrity, Session
+  runtime + read window, revoke -> `reverify` denial with nothing captured, and identical captures
+  isolated per tenant. Labelled hook replay, not installed OpenCode execution.
+- Adjustments from reading the current runtime docs and the genuine recheck: install path is
+  `.opencode/plugins/` (plural) and the entry exports a single named plugin function (default
+  export dropped to avoid double registration).
+- Scope honesty: F-08 remains implementing; installed acceptance of this plugin file, write/edit/
+  shell shapes (provider-blocked) and real coverage remain unverified.
+- make check: 394 passed, 1 skipped in 42.37s; Ruff, tracked secret scan, numbers PASS.

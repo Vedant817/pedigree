@@ -28,3 +28,25 @@ gate denials and unsupported-tool execution spies. A Python integration test sta
 a real local API, invokes the Node plugin hooks using the genuine fixture and proves
 persisted Source/session window/tenant isolation in FalkorDB 42201. Label that hook
 replay, not installed OpenCode execution. QA and red-team independently rerun.
+
+## Implementation status (2026-10-16)
+
+Implemented in `adapters/opencode/` (`pedigree.js` entry, `pedigree-core.js` core,
+`README.md` install/config/limits; dependency-free ESM, no npm packages):
+
+- Builtin Node suite, 35 tests: `fixture-mapping.test.js` (exact allowlisted wire
+  contract from the genuine 1.19.0 payload), `hooks.test.js` (gate/denial/ordering/
+  latch matrix), `paths.test.js` (traversal, symlink/junction escape, credential
+  exclusions, display validation), `privacy.test.js` (canaries + body-key allowlist),
+  `bounds-config.test.js` (opt-in, fail-closed misconfiguration, clamps, memory/URI
+  bounds). Run under pytest by `tests/unit/test_opencode_adapter_suite.py`.
+- End-to-end hook replay: `tests/integration/test_opencode_plugin.py` drives the
+  genuine fixture through a Node subprocess into a live API + real FalkorDB 42201,
+  asserting the persisted Source identity with an independently recomputed digest,
+  forced `untrusted` integrity, Session runtime + read window, revoke → `reverify`
+  denial with no capture, and per-tenant isolation. Driver: `tests/driver.js`.
+- Install contract updated from the current runtime docs + genuine recheck: project
+  plugins load from `.opencode/plugins/`; the entry exports one named plugin function.
+
+Independent QA/red-team review must still rerun this before any shipped-subset claim
+(ADR-009), and installed-runtime acceptance of this plugin file remains unverified.
