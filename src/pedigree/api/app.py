@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import threading
 import uuid
 from collections import defaultdict
 from pathlib import Path
@@ -76,6 +77,29 @@ class RootDispatcher:
             await self._static_app(scope, receive, send)
 
 
+def _startup_resume(db: Db, registry: TenantRegistry) -> None:
+    """P-011: finish any crashed (`status='running'`) revocations, off the request path."""
+    import logging
+
+    from ..config import graph_name
+    from ..engine.revoke import resume_incomplete  # function-local keeps import side-effect free
+
+    log = logging.getLogger("pedigree.resume")
+    try:
+        for rec in registry.list_tenants():
+            gname = graph_name(rec.tenant_id)
+            try:
+                done = resume_incomplete(db, gname)
+                if done:
+                    log.info("startup-resume: finished %d revocation(s) for tenant %s",
+                             len(done), rec.tenant_id)
+            except Exception:  # noqa: BLE001
+                log.warning("startup-resume: failed for tenant %s", rec.tenant_id,
+                           exc_info=True)
+    except Exception:  # noqa: BLE001
+        log.warning("startup-resume: scan failed", exc_info=True)
+
+
 def create_app(db: Db | None = None, settings=None) -> FastAPI:
     settings = settings or get_settings()
     problem = admin_token_problem(settings)
@@ -92,8 +116,11 @@ def create_app(db: Db | None = None, settings=None) -> FastAPI:
 
     @contextlib.asynccontextmanager
     async def lifespan(_app: FastAPI):
-        # Required when the streamable-HTTP app is served outside its own server.
         async with mcp_srv.server.session_manager.run():
+            threading.Thread(
+                target=_startup_resume, args=(db, registry), daemon=True,
+                name="pedigree-startup-resume",
+            ).start()
             yield
 
     app = FastAPI(title="Pedigree API", version="0.1.0", lifespan=lifespan)

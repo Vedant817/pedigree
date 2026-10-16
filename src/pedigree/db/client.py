@@ -108,6 +108,18 @@ def chunks(xs: Sequence[Any] | Iterable[Any], n: int = CHUNK) -> Iterator[list[A
 
 
 # --- connection -------------------------------------------------------------
+@dataclass
+class _EmptyGraphResult:
+    """Stand-in returned when FalkorDB rejects MATCH on an empty graph ('empty key').
+
+    Semantically equivalent to zero rows; keeps read paths from raising on never-written graphs.
+    """
+
+    result_set: list[Any] = field(default_factory=list)
+    header: list[Any] = field(default_factory=list)
+    statistics: dict[str, Any] = field(default_factory=dict)
+
+
 class Db:
     """FalkorDB access with **one connection per thread**.
 
@@ -228,7 +240,12 @@ class Db:
                 res = g.query(cypher, params or {}, timeout=timeout_ms)
             else:
                 res = g.ro_query(cypher, params or {}, timeout=timeout_ms)
-        except DB_EXC as exc:  # noqa: PERF203 - single boundary
+        except DB_EXC as exc:
+            if (not write) and ("empty key" in str(exc).lower() or "empty graph" in str(exc).lower()):
+                # FalkorDB rejects MATCH on an empty graph with 'Invalid graph operation on
+                # empty key' (reported during startup scans and empty-graph routes). Treat as
+                # zero rows rather than an error.
+                return _EmptyGraphResult()
             raise map_db_error(exc) from exc
         ms = (time.perf_counter() - t0) * 1000.0
         rows = len(res.result_set) if res.result_set else 0

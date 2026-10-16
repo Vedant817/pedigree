@@ -165,6 +165,39 @@ def admin_create_tenant(settings: Settings, tenant_id: str, node_cap: int | None
     return 0
 
 
+def resume_revocations(settings: Settings, tenant: str | None) -> int:
+    """P-011 (A1): finish crashed revocations for every registered tenant or one tenant."""
+    from .api.registry import TenantRegistry
+    from .config import graph_name
+    from .db.client import Db
+    from .engine.revoke import resume_incomplete
+    from .errors import PedigreeError
+
+    db = Db(settings)
+    registry = TenantRegistry(db, settings)
+    if tenant is not None:
+        targets = [tenant]
+    else:
+        targets = [r.tenant_id for r in registry.list_tenants()]
+
+    finished_total = 0
+    for tid in targets:
+        gname = graph_name(tid)
+        try:
+            done = resume_incomplete(db, gname)
+        except PedigreeError as exc:
+            print(f"[resume] {tid}: failed ({exc.code}): {exc}", file=sys.stderr)
+            return 1
+        except Exception as exc:  # noqa: BLE001 - never abort the whole scan for one tenant
+            print(f"[resume] {tid}: failed: {exc}", file=sys.stderr)
+            return 1
+        finished_total += len(done)
+        if done:
+            print(f"[resume] {tid}: finished {len(done)} revocation(s)")
+    print(f"[resume] finished {finished_total} revocation(s) in total")
+    return 0
+
+
 def serve(settings: Settings, host: str, port: int) -> int:
     import uvicorn
 
@@ -197,6 +230,9 @@ def main(argv: list[str] | None = None) -> int:
     p_create.add_argument("--id", required=True)
     p_create.add_argument("--cap", type=int, default=None)
 
+    p_resume = sub.add_parser("resume", help="finish crashed (`running`) revocations and exit")
+    p_resume.add_argument("--tenant", default=None, help="limit to one tenant (default: all)")
+
     sub.add_parser("seed", help="seed the demo tenant (synthetic scenarios)")
     sub.add_parser("version", help="print version")
 
@@ -217,6 +253,8 @@ def main(argv: list[str] | None = None) -> int:
         return srv.run(args.transport, args.host, args.port) or 0
     if args.cmd == "admin":
         return admin_create_tenant(settings, args.id, args.cap)
+    if args.cmd == "resume":
+        return resume_revocations(settings, args.tenant)
     if args.cmd == "seed":
         from . import __version__  # noqa: F401  (import check)
 

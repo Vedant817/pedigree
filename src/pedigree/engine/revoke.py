@@ -132,6 +132,24 @@ def revoke(
         if not res.result_set:
             latest = db.ro_query(gname, Q.Q_REVOCATION_LATEST, {"id": root_id}, op="revoke.latest", trace=trace)
             row = latest.result_set[0] if latest.result_set else None
+            # P-011 (A1): a root that was revoked but whose Revocation is still `running`
+            # (process died mid-flight) is NOT a no-op. Finish it instead: resolve() is
+            # idempotent by construction (re-quarantine + recompute + write final), so
+            # re-running it matches a clean run.
+            if row is not None and row[1] == "running":
+                finished = resume_incomplete(db, gname, trace=trace)
+                resumed_row = next((r for r in finished if r.get("revocation_id") == row[0]), None)
+                if resumed_row is not None:
+                    resumed_row = dict(resumed_row)
+                    resumed_row.update({
+                        "idempotent": False,
+                        "resumed": True,
+                        "root_id": root_id,
+                        "kind": kind,
+                        "reason": reason,
+                        "ms": round((time.perf_counter() - t0) * 1000, 1),
+                    })
+                    return resumed_row
             return {
                 "idempotent": True,
                 "root_id": root_id,

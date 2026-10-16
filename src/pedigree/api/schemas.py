@@ -100,6 +100,10 @@ class TenantCreate(StrictModel):
     node_cap: int | None = None
 
 
+class ResumeRequest(StrictModel):
+    tenant: str
+
+
 class EventResponse(BaseModel):
     id: str
     status: str
