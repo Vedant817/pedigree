@@ -44,11 +44,12 @@ def public(db, monkeypatch):
     server = build_mcp(db=db, default_tenant_id=tenant, default_tenant_token=credential.token).server
 
     def mcp(name, **arguments):
-        result = asyncio.run(server.call_tool(name, arguments))
+        # Quota tests must reach admission after the role boundary.
+        result = asyncio.run(server.call_tool(name, {"token": credential.operator_token, **arguments}))
         return json.loads(result.content[0].text)
 
     try:
-        yield db, tenant, graph, client, MaskedHeaders({"Authorization": "Bearer " + credential.token}), mcp, app
+        yield db, tenant, graph, client, MaskedHeaders({"Authorization": "Bearer " + credential.operator_token}), mcp, app
     finally:
         client.close()
         # All calls synchronous, and process tests join their own writers first.

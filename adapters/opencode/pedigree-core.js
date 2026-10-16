@@ -80,7 +80,7 @@ export function isDeniedWin32Form(candidate) {
 /** Sanitized, fixed error texts. Never include content, absolute paths, tokens or exception details. */
 export const MESSAGES = Object.freeze({
   disabled: `${REPOINT}adapter is not enabled`,
-  misconfigured: `${REPOINT}adapter configuration is invalid; denying all tools (fail-closed)`,
+  misconfigured: `${REPOINT}adapter configuration is invalid; an agent token is required; denying all tools (fail-closed)`,
   unsupported: (tool) => `${REPOINT}tool "${tool}" is not supported by this read-only capture adapter and was denied`,
   malformed: `${REPOINT}tool hook payload is malformed; operation denied`,
   incomplete: `${REPOINT}session capture is incomplete; further operations are denied`,
@@ -120,6 +120,7 @@ export function loadConfig(env = {}) {
   if (enabled) {
     if (validateBaseUrl(baseUrl) !== null) problems.push("url");
     if (!token) problems.push("token");
+    if (token.trim().startsWith("ped_o_")) problems.push("agent_token");
   }
   return { enabled, baseUrl, token, timeoutMs, responseBytes, problems };
 }

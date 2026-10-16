@@ -27,7 +27,7 @@ def boundary():
 
 def _render(db, registry, settings, client):
     def headers_for(credential):
-        return {"Authorization": "Bearer " + credential.token,
+        return {"Authorization": "Bearer " + credential.operator_token,
                 "X-Admin-Token": settings.pedigree_admin_token}
     return run(client, db, registry, settings, headers_for)
 
@@ -42,7 +42,7 @@ def test_scenario_replay_matches_fixture_expectations(boundary, scenario_id):
     scenario = scenarios[0]
     credential = registry.create_tenant("e3" + scenario_id.lower() + uuid.uuid4().hex[:9])
     gname = graph_name(credential.tenant_id)
-    headers = {"Authorization": "Bearer " + credential.token,
+    headers = {"Authorization": "Bearer " + credential.operator_token,
                "X-Admin-Token": settings.pedigree_admin_token}
     try:
         replay(scenario, client, headers)
@@ -71,7 +71,7 @@ def test_scenario_gate_expectations_hold(boundary):
     for scenario in load_scenarios():
         credential = registry.create_tenant("e3g" + uuid.uuid4().hex[:9])
         gname = graph_name(credential.tenant_id)
-        headers = {**header, "Authorization": "Bearer " + credential.token}
+        headers = {**header, "Authorization": "Bearer " + credential.operator_token}
         try:
             replay(scenario, client, headers)
             for step in scenario.get("expected_gate", []):
@@ -101,7 +101,7 @@ def test_gate_blocks_a_high_risk_push_on_the_revoked_branch(boundary):
     from pedigree.config import graph_name
 
     gname = graph_name(credential.tenant_id)
-    headers = {"Authorization": "Bearer " + credential.token,
+    headers = {"Authorization": "Bearer " + credential.operator_token,
                "X-Admin-Token": settings.pedigree_admin_token}
     tainted = next((n["id"] for n in scenario["nodes"]
                     if n["type"] == "memory"

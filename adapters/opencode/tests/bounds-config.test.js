@@ -14,6 +14,23 @@ import { defaultServer, eventCalls, expectThrow, makeCore, makeProject, removePr
 
 const ARGS = { args: {} };
 
+test("operator credentials are rejected locally before networking", async (t) => {
+  const project = makeProject();
+  t.after(() => removeProject(project));
+  const config = loadConfig({ PEDIGREE_OPENCODE_ENABLED: "1", PEDIGREE_OPENCODE_TOKEN: "ped_o_synthetic_operator_only" });
+  assert.deepEqual(config.problems, ["agent_token"]);
+  const { core, calls } = makeCore({ project, config });
+  const error = await expectThrow(core.beforeHook(
+    { tool: "read", sessionID: "ses_role", callID: "call_role" },
+    { args: { filePath: path.join(project, "dummy.txt") } },
+  ));
+  assert.equal(error.code, "misconfigured");
+  assert.match(error.message, /agent token/);
+  assert.deepEqual(calls, []);
+  for (const token of ["ped_a_synthetic_agent", "ped_legacytenant_synthetic"])
+    assert.deepEqual(loadConfig({ PEDIGREE_OPENCODE_ENABLED: "1", PEDIGREE_OPENCODE_TOKEN: token }).problems, []);
+});
+
 function readPair(project, callID, sessionID = "ses_bounds") {
   const filePath = path.join(project, "dummy.txt");
   return [

@@ -7,11 +7,17 @@ import hashlib
 import hmac
 import secrets
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from ..config import get_settings, graph_name, validate_tenant
 from ..db.client import Db
-from ..db.queries import Q_REGISTRY_ALL, Q_REGISTRY_BY_ID, Q_REGISTRY_SET_STATUS, Q_REGISTRY_UPSERT
+from ..db.queries import (
+    Q_REGISTRY_ALL,
+    Q_REGISTRY_BY_ID,
+    Q_REGISTRY_ISSUE_OPERATOR,
+    Q_REGISTRY_SET_STATUS,
+    Q_REGISTRY_UPSERT,
+)
 from ..db.schema import ensure_schema
 from ..errors import Conflict, InvalidArgument, NotFoundInGraph
 
@@ -24,7 +30,13 @@ CACHE_TTL_S = 30.0
 @dataclass(frozen=True)
 class TenantCredential:
     tenant_id: str
-    token: str
+    agent_token: str = field(repr=False)
+    operator_token: str = field(repr=False)
+
+    @property
+    def token(self) -> str:
+        """Compatibility alias; never returns operator authority."""
+        return self.agent_token
 
 
 @dataclass(frozen=True)
@@ -35,13 +47,18 @@ class TenantRecord:
     created_at: int
 
 
+@dataclass(frozen=True)
+class ResolvedPrincipal(TenantRecord):
+    role: str
+
+
 class TenantRegistry:
     def __init__(self, db: Db, settings=None) -> None:
         self.db = db
         self.settings = settings or get_settings()
         self.gname = graph_name(REGISTRY_TENANT)
-        ensure_schema(db, self.gname)
-        self._cache: dict[str, tuple[str, float]] = {}
+        ensure_schema(db, self.gname, label="Tenant")
+        self._cache: dict[str, tuple[str, str, float]] = {}
 
     def has_tenants(self) -> bool:
         rows = self.db.ro_query(self.gname, Q_REGISTRY_ALL, {}, op="registry.list").result_set or []
@@ -55,8 +72,8 @@ class TenantRegistry:
             raise InvalidArgument("node_cap must be between 1 and 1000000",
                                   detail={"node_cap": node_cap})
         cap = node_cap if node_cap is not None else (self.settings.pedigree_node_cap)
-        token = f"ped_{tenant_id}_{secrets.token_urlsafe(32)}"
-        digest = _sha(token)
+        agent_token = f"ped_a_{tenant_id}_{secrets.token_urlsafe(32)}"
+        operator_token = f"ped_o_{tenant_id}_{secrets.token_urlsafe(32)}"
         # ensure unique
         try:
             existing = self.get_record(tenant_id)
@@ -68,11 +85,27 @@ class TenantRegistry:
         self.db.query(
             self.gname,
             Q_REGISTRY_UPSERT,
-            {"id": tenant_id, "cap": cap, "sha": digest, "now": now},
+            {"id": tenant_id, "cap": cap, "agent_sha": _sha(agent_token),
+             "operator_sha": _sha(operator_token), "now": now},
             op="registry.create",
         )
         self.invalidate_cache()
-        return TenantCredential(tenant_id, token)
+        return TenantCredential(tenant_id, agent_token, operator_token)
+
+    def issue_operator(self, tenant_id: str, *, rotate: bool = False) -> str:
+        """Explicit deployment-admin recovery/rotation; old hashes are unrecoverable."""
+        validate_tenant(tenant_id)
+        record = self.get_record(tenant_id)
+        if record.status != "active":
+            raise Conflict("tenant is not active")
+        token = f"ped_o_{tenant_id}_{secrets.token_urlsafe(32)}"
+        rows = self.db.query(self.gname, Q_REGISTRY_ISSUE_OPERATOR,
+                             {"id": tenant_id, "sha": _sha(token), "rotate": rotate},
+                             op="registry.issue_operator").result_set or []
+        if not rows:
+            raise Conflict("operator credential already exists; explicit rotation required")
+        self.invalidate_cache()
+        return token
 
     def get_record(self, tenant_id: str) -> TenantRecord:
         res = self.db.ro_query(self.gname, Q_REGISTRY_BY_ID, {"id": tenant_id}, op="registry.get").result_set or []
@@ -94,16 +127,22 @@ class TenantRegistry:
                           op="registry.revoke")
         self.invalidate_cache()
 
-    def resolve(self, token: str) -> TenantRecord | None:
+    def resolve(self, token: str) -> ResolvedPrincipal | None:
+        if not isinstance(token, str) or not token or token.strip() != token:
+            return None
         digest = _sha(token)
         now = time.monotonic()
-        cached = self._cache.get(token)
-        if cached is not None and cached[1] > now:
-            tid = cached[0]
-            try:
-                return self.get_record(tid)
-            except NotFoundInGraph:
-                self.invalidate_cache()
+        cached = self._cache.get(digest)
+        # Every cache hit rechecks stored active status AND the matching digest. This
+        # prevents stale role authority after rotation by another server process.
+        if cached is not None and cached[2] > now:
+            rows = self.db.ro_query(self.gname, Q_REGISTRY_BY_ID, {"id": cached[0]},
+                                    op="registry.resolve").result_set or []
+            if rows:
+                principal = self._principal(rows[0], token, digest)
+                if principal is not None:
+                    return principal
+            self._cache.pop(digest, None)
         for rec in self.list_tenants():
             if rec.status != "active":
                 continue
@@ -111,10 +150,30 @@ class TenantRegistry:
                                      op="registry.resolve").result_set or []
             if not rows:
                 continue
-            stored = rows[0][4]
-            if hmac.compare_digest(stored, digest):
-                self._cache[token] = (rec.tenant_id, now + CACHE_TTL_S)
-                return rec
+            principal = self._principal(rows[0], token, digest)
+            if principal is not None:
+                self._cache[digest] = (rec.tenant_id, principal.role, now + CACHE_TTL_S)
+                return principal
+        return None
+
+    @staticmethod
+    def _principal(row, token: str, digest: str) -> ResolvedPrincipal | None:
+        if row[1] != "active":
+            return None
+        # Legacy slot is agent-only. A role prefix alone never grants authority.
+        slots = ((row[5], "agent", "ped_a_"), (row[6], "operator", "ped_o_"),
+                 (row[4], "agent", "ped_"))
+        for stored, role, prefix in slots:
+            if not isinstance(stored, str) or not hmac.compare_digest(stored, digest):
+                continue
+            if prefix == "ped_":
+                # A genuine old tenant may itself begin a_/o_; compare its complete
+                # expected prefix rather than interpreting those bytes as a role.
+                valid_prefix = token.startswith(f"ped_{row[0]}_")
+            else:
+                valid_prefix = token.startswith(f"{prefix}{row[0]}_")
+            if valid_prefix:
+                return ResolvedPrincipal(row[0], row[1], int(row[2]), int(row[3]), role)
         return None
 
     def invalidate_cache(self) -> None:

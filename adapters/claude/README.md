@@ -1,6 +1,9 @@
 # Claude Code command hook
 
-Set `PEDIGREE_URL` and the tenant `PEDIGREE_TOKEN` in the hook environment.
+Set `PEDIGREE_URL` and the tenant **agent** `PEDIGREE_TOKEN` (`ped_a_…`) in the hook
+environment. Legacy tenant tokens remain agent credentials. Never configure an
+operator bearer (`ped_o_…`): the hook rejects it locally before reading input or
+sending requests, exits 2, and emits a deny decision for `pre`.
 Merge `settings.example.json` into Claude settings and use the Python executable
 available to your shell (`python3` in the example; often `python` on Windows).
 The script requires Python 3.11+ and only the standard library.
@@ -16,7 +19,8 @@ files up to 8 MiB for Read/Write/Edit/MultiEdit; Read looks up the exact absolut
 File bodies, edit text, tool responses and raw prompts are never transmitted.
 Bash command summaries (up to 300 characters) are transmitted for classification.
 
-Failures produce a generic stderr warning and exit 0; there is no durable spool.
+Network and malformed-input failures produce a generic stderr warning and exit 0;
+operator-token configuration is rejected as described above. There is no durable spool.
 Each HTTP request has a one second timeout and redirects are refused. This is
 fail-open capture and gating. A successful protocol unit test does not establish
 that Claude installed or executed this configuration.

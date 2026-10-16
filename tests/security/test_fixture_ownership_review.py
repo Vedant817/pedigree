@@ -87,7 +87,7 @@ def spy_fixture(monkeypatch, *, status=200, graph_error=False, row_error=False, 
         def response():
             if malformed:
                 raise ValueError("review malformed create response")
-            return {"token":"synthetic-review-only"}
+            return {"token":"synthetic-review-only", "operator_token":"synthetic-review-operator"}
         return SimpleNamespace(status_code=status, text="synthetic response", json=response)
 
     import pedigree.db.client

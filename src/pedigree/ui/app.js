@@ -11,7 +11,7 @@
   };
   function notice(message, error = false) { $('notice').textContent = message; $('notice').className = error ? 'error' : ''; }
   async function api(path, body) {
-    if (!token) throw new Error('Connect with your tenant token first.');
+    if (!token) throw new Error('Connect with your operator token first.');
     const started = epoch;
     const response = await fetch(path, {method: body === undefined ? 'GET' : 'POST',
       headers: {'Authorization': 'Bearer ' + token, 'Content-Type':'application/json'},

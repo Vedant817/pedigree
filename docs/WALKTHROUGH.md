@@ -5,13 +5,13 @@ freshly seeded demo tenant. Start one in two terminals:
 
 ```bash
 # terminal 1
-make start-db && make demo                      # seeds tenant `demo` (S1 + S8), prints a token
+make start-db && make demo                      # seeds tenant `demo`, prints private credential-file path
 .venv/Scripts/python.exe -m pedigree.cli serve  # Windows; .venv/bin/python on Linux
 ```
 
 ```bash
-# terminal 2 - reuse the token `make demo` printed (never paste it into a commit)
-TOKEN=$(python -c "import json;print(json.load(open('scratch/demo-demo.json'))['token'])")
+# terminal 2 - operator actions use the private operator credential (never commit it)
+TOKEN=$(python -c "import json;print(json.load(open('scratch/demo-demo.json'))['operator_token'])")
 H="Authorization: Bearer $TOKEN"
 BASE=http://127.0.0.1:8000
 curl -s "$BASE/v1/graph" -H "$H"      # what the graph holds right now

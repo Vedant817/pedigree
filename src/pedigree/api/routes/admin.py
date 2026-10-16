@@ -21,7 +21,8 @@ def register(app: FastAPI, registry, settings) -> None:
     def create_tenant(payload: TenantCreate, request: Request):
         _require_admin(request, settings)
         cred = registry.create_tenant(payload.id, payload.node_cap)
-        return {"tenant": cred.tenant_id, "token": cred.token}
+        return {"tenant": cred.tenant_id, "token": cred.token,
+                "agent_token": cred.agent_token, "operator_token": cred.operator_token}
 
     @app.post("/v1/admin/resume")
     def resume(payload: ResumeRequest, request: Request):

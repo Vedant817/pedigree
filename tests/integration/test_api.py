@@ -30,7 +30,8 @@ def tenant(client):
     r = client.post("/admin/tenants", headers={"X-Admin-Token": ADMIN_TOKEN}, json={"id": tid})
     assert r.status_code == 200, r.text
     try:
-        yield tid, r.json()["token"]
+        # This fixture exercises operator lifecycle actions; agent denials live in P-015.
+        yield tid, r.json()["operator_token"]
     finally:
         db = client.app.state.db
         registry = client.app.state.registry

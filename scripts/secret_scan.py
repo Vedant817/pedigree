@@ -17,6 +17,7 @@ import subprocess
 from pathlib import Path
 
 PATTERNS: list[tuple[str, re.Pattern[str]]] = [
+    ("pedigree_bearer", re.compile(r"\bped_[ao]_[a-z0-9]{3,24}_[A-Za-z0-9_\-]{43}(?![A-Za-z0-9_\-])")),
     ("aws_access_key", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
     ("github_token", re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36,}\b")),
     ("github_pat", re.compile(r"\bgithub_pat_[A-Za-z0-9_]{50,}\b")),

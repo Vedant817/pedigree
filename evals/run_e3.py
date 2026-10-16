@@ -19,7 +19,7 @@ ADMIN = "e3-operator"
 
 
 def _fixture_headers(credential, client: TestClient, operator: str | None):
-    headers = {"Authorization": "Bearer " + credential.token}
+    headers = {"Authorization": "Bearer " + credential.operator_token}
     if operator:
         headers["X-Admin-Token"] = operator
     return headers

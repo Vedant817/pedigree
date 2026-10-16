@@ -68,7 +68,8 @@ def _mk_tenant(registry, client):
     r = client.post("/admin/tenants", headers={"X-Admin-Token": ADMIN}, json={"id": tid})
     assert r.status_code == 200, r.text
     registry._qa_owned_tenants.add(tid)
-    return tid, r.json()["token"]
+    # Exercise graph isolation even with the tenant's operator capability.
+    return tid, r.json()["operator_token"]
 
 
 def test_api_isolation_matrix(app_client):

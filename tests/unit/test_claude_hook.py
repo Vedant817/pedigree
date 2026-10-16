@@ -110,6 +110,24 @@ def test_subprocess_stdlib_only_and_network_failure_open():
     assert result.stderr == "Pedigree hook unavailable; continuing without capture or gating.\n"
 
 
+def test_operator_configuration_denied_before_network_or_fail_open(hook, monkeypatch):
+    monkeypatch.setenv("PEDIGREE_TOKEN", "ped_o_synthetic_operator_only")
+    calls = []
+    with pytest.raises(ValueError, match="agent token"):
+        hook.handle("pre", {"session_id": "sess_test"},
+                    lambda *args: calls.append(args) or {
+                        "hook": {"hookSpecificOutput": {"permissionDecision": "allow"}}})
+    assert calls == []
+    env = {**os.environ, "PEDIGREE_URL": "http://127.0.0.1:1"}
+    result = subprocess.run([sys.executable, "-I", "-S", str(HOOK), "pre"],
+                            input="malformed", text=True, capture_output=True, env=env, timeout=5)
+    assert result.returncode == 2
+    assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert "agent token" in result.stderr
+    assert "continuing without" not in result.stderr
+    assert env["PEDIGREE_TOKEN"] not in result.stdout + result.stderr
+
+
 @pytest.mark.parametrize("failure", [{"hook_event_name": "PostToolUseFailure"},
                                      {"tool_response": {"is_error": True}},
                                      {"tool_response": {"success": False}}])

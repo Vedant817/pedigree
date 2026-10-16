@@ -17,6 +17,12 @@ from pathlib import Path
 WARNING = "Pedigree hook unavailable; continuing without capture or gating."
 TIMEOUT = 1.0
 MAX_BYTES = 8 * 1024 * 1024
+ROLE_ERROR = "Pedigree hook requires an agent token; operator configuration denied."
+
+
+def validate_agent_config():
+    if os.environ.get("PEDIGREE_TOKEN", "").strip().startswith("ped_o_"):
+        raise ValueError(ROLE_ERROR)
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -26,6 +32,7 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def request(path, payload=None):
+    validate_agent_config()
     base = os.environ.get("PEDIGREE_URL", "http://127.0.0.1:8000").rstrip("/")
     parsed = urllib.parse.urlsplit(base)
     token = os.environ.get("PEDIGREE_TOKEN", "")
@@ -64,6 +71,7 @@ def summary(tool, args):
 
 
 def handle(mode, payload, send=request):
+    validate_agent_config()
     sid = payload["session_id"]
     tool = payload.get("tool_name", "unknown")
     args = payload.get("tool_input") or {}
@@ -117,6 +125,15 @@ def handle(mode, payload, send=request):
 
 
 def main():
+    # Configuration errors must not enter the network/malformed-input fail-open path.
+    try:
+        validate_agent_config()
+    except ValueError:
+        print(ROLE_ERROR, file=sys.stderr)
+        if len(sys.argv) > 1 and sys.argv[1] == "pre":
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse",
+                "permissionDecision": "deny", "permissionDecisionReason": ROLE_ERROR}}))
+        return 2
     try:
         raw = sys.stdin.buffer.read(262145)
         if len(raw) > 262144:

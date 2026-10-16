@@ -26,7 +26,8 @@ def test_isolation_fixture_never_deletes_preexisting_tenant(monkeypatch):
     def post(url, headers, json):
         tid = json["id"]
         records[tid] = SimpleNamespace(tenant_id=tid)
-        return SimpleNamespace(status_code=200, text="", json=lambda: {"token": "synthetic"})
+        return SimpleNamespace(status_code=200, text="", json=lambda: {
+            "token": "synthetic", "operator_token": "synthetic-operator"})
 
     import pedigree.db.client
     monkeypatch.setattr(pedigree.db.client, "Db", lambda settings: FakeDb())

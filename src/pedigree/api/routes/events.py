@@ -34,6 +34,16 @@ def register(app: FastAPI, db, registry, settings) -> None:
                 detail={"limit": LIMITS["events_per_request"], "got": len(payload.events)},
             )
         spec_list = normalize_events(payload.runtime, {"session_id": payload.session_id, "events": payload.events})
+        operator = operator_authorized(request, settings)
+        # Authorize every trust-bearing assertion before the first admission/write.
+        for raw in payload.events:
+            if isinstance(raw, dict):
+                if raw.get("by") in ("human", "scanner") and not operator:
+                    auth.require_operator(request)
+                auth.authorize_source(request.state.principal, raw.get("source_kind") or raw.get("kind"), raw.get("integrity"))
+        for spec in spec_list:
+            if spec.get("op") == "source":
+                auth.authorize_source(request.state.principal, spec.get("kind"), spec.get("integrity"))
         created: list[str] = []
         # In-batch alias map: a capture id names a node, but identity is derived from the
         # artifact (ADR-008), so later events in the same batch that reference the id are
@@ -53,10 +63,8 @@ def register(app: FastAPI, db, registry, settings) -> None:
                 elif op == "session_read":
                     session_read(locked_db, gname, sid, resolve(spec.get("node_id")))
                 elif op == "source":
-                    # The capture channel never asserts trust for an agent token: integrity is
-                    # forced to untrusted unless the operator credential is presented. A claimed
-                    # `runtime`/`kind`/`integrity` in the payload is not a credential (ADR-008).
-                    operator = operator_authorized(request, settings)
+                    # Agent context captures cannot create trust; rejected claims were
+                    # checked for the entire batch before admission.
                     res = record_source(
                         locked_db,
                         gname,

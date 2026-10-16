@@ -64,8 +64,20 @@ def authenticate(request: Request):
     ensure_schema(db, gname)
     request.state.tenant_id = tenant
     request.state.graph_name = gname
+    request.state.principal = rec
     _gate_rate(request, tenant, request.app.state.settings)
     return tenant
+
+
+def require_operator(request: Request) -> None:
+    if getattr(getattr(request.state, "principal", None), "role", None) != "operator":
+        raise PedigreeError("operator credential required", code="forbidden")
+
+
+def authorize_source(principal, kind, integrity) -> None:
+    """Shared REST/MCP trust policy; ordinary captures remain untrusted for agents."""
+    if principal.role != "operator" and (kind in ("human", "scanner") or integrity == "trusted"):
+        raise PedigreeError("trusted source requires operator credential", code="forbidden")
 
 
 def set_tenant(request, tenant):

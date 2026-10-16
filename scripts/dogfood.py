@@ -114,7 +114,7 @@ EXPECTATIONS: dict[str, Expectation] = {
     "S03": Expectation("pass", "", "tenant create + list with the admin token."),
     "S04": Expectation(
         "pass", "",
-        "full journey: operator source (non-agent-safe kind, X-Admin-Token), memory with "
+        "full journey: operator bearer trusted source, memory with "
         "derived_from, action, /v1/gate allow + block, /v1/blame, /v1/impact.",
     ),
     "S05": Expectation(
@@ -199,6 +199,7 @@ EXPECTATIONS: dict[str, Expectation] = {
         "UI: GET / -> 200 with an HTML marker; after the S16-S17 MCP checks, / and /mcp coexist "
         "(bare GET /mcp is answered by the MCP app, not 404).",
     ),
+    "S22": Expectation("pass", "P-015", "agent bearer cannot revoke, reinstate or assert trusted provenance; even with global admin header."),
     "CLEAN": Expectation(
         "pass", "", "cleanup verification: every graph and registry row this run created is gone "
         "and the graph set returned to its baseline.",
@@ -248,6 +249,7 @@ class ScenarioResult:
 class Tenant:
     id: str
     token: str
+    operator_token: str
 
 
 @dataclass
@@ -366,12 +368,19 @@ class Ctx:
         if node_cap is not None:
             body["node_cap"] = node_cap
         token: str | None = None
+        operator_token = ""
         path = ""
         if self.admin_token:
             resp = self.client.post("/admin/tenants", json=body, headers=self.admin_headers())
             if resp.status_code == 200:
                 payload = resp.json()
-                token = str(payload.get("token", ""))
+                token = str(payload.get("agent_token", payload.get("token", "")))
+                operator_token = str(payload.get("operator_token", ""))
+                self.secrets.extend([token, operator_token])
+                # Register ownership before checking credential shape, so a bad issuance
+                # response cannot leak this harness's successfully created registry row.
+                self.created_tenants.add(tid)
+                self.created_graphs.add(graph_name(tid))
                 path = "HTTP /admin/tenants"
             else:
                 raise HarnessError(
@@ -379,14 +388,19 @@ class Ctx:
                 )
         elif self.registry is not None:
             cred = self.registry.create_tenant(tid, node_cap)
+            self.created_tenants.add(tid)
+            self.created_graphs.add(graph_name(tid))
             token = cred.token
+            operator_token = cred.operator_token
             path = "direct TenantRegistry (no admin token available)"
         if not token:
             raise SkipScenario("cannot create tenants: no admin token and no DB access")
+        if not operator_token:
+            raise HarnessError("tenant issuance omitted the operator credential")
         self.created_tenants.add(tid)
         self.created_graphs.add(graph_name(tid))
-        self.secrets.append(token)
-        tenant = Tenant(tid, token)
+        self.secrets.extend([token, operator_token])
+        tenant = Tenant(tid, token, operator_token)
         self.tenants[alias] = tenant
         self.state.setdefault("tenant_paths", {})[tid] = path
         return tenant
@@ -401,7 +415,7 @@ class Ctx:
         return {"Authorization": f"Bearer {tenant.token}"}
 
     def tenant_headers(self, tenant: Tenant) -> dict[str, str]:
-        return {**self.bearer(tenant), **self.admin_headers()}
+        return {"Authorization": f"Bearer {tenant.operator_token}"}
 
     def post(self, path: str, json_body: Any, headers: dict[str, str] | None = None,
              timeout: float | None = None) -> httpx.Response:
@@ -445,11 +459,10 @@ def s01_admin_bootstrap(ctx: Ctx, res: ScenarioResult) -> None:
         body = {}
         with contextlib.suppress(Exception):
             body = resp.json()
-        token = str(body.get("token", "")) if isinstance(body, dict) else ""
+        tokens = [str(body.get(key, "")) for key in ("token", "agent_token", "operator_token")] if isinstance(body, dict) else []
         ctx.created_tenants.add(tid)
         ctx.created_graphs.add(graph_name(tid))
-        if token:
-            ctx.secrets.append(token)
+        ctx.secrets.extend(token for token in tokens if token)
     res.check("POST /admin/tenants (no token) -> 401", resp.status_code == 401,
               ctx.evidence("POST", "/admin/tenants", resp))
     gr = ctx.get("/admin/tenants")
@@ -490,9 +503,8 @@ def s04_full_journey(ctx: Ctx, res: ScenarioResult) -> None:
     tenant = ctx.ensure_tenant("T_A")
     tag = secrets.token_hex(3)
     src_id, mem_id, act_id = f"dsrc_{tag}", f"dmem_{tag}", f"dact_{tag}"
-    operator = bool(ctx.admin_token)
     events = [
-        # kind "file" is NOT agent-safe: it needs the operator credential (routes/engine.py).
+        # Explicit integrity=trusted needs operator; ordinary agent file captures are untrusted.
         {"type": "source", "kind": "file", "id": src_id, "uri": f"file:///dogfood/{tag}.md",
          "title": "dogfood design doc", "integrity": "trusted"},
         {"type": "memory", "id": mem_id, "text": "dogfood memory", "mkind": "fact",
@@ -508,21 +520,17 @@ def s04_full_journey(ctx: Ctx, res: ScenarioResult) -> None:
     res.check("POST /v1/events (source+memory+action) -> 200",
               resp.status_code == 200 and set(created) == {src_id, mem_id, act_id},
               ctx.evidence("POST", "/v1/events", resp))
-    if operator:
-        res.note("operator path exercised: X-Admin-Token present, source kind 'file', integrity trusted")
-    else:
-        res.note("operator path NOT exercised (no admin token in attach mode): source recorded untrusted")
+    res.note("operator bearer exercised: source kind 'file', integrity trusted")
 
     blame = ctx.get(f"/v1/blame/{mem_id}", headers=ctx.bearer(tenant))
     bnode = _json(blame).get("node", {}) if isinstance(_json(blame), dict) else {}
     res.check("GET /v1/blame -> 200, memory ok",
               blame.status_code == 200 and bnode.get("status") == "ok" and bnode.get("id") == mem_id,
               ctx.evidence("GET", f"/v1/blame/{mem_id}", blame))
-    if operator:
-        graph_nodes = _json(blame).get("graph", {}).get("nodes", []) if isinstance(_json(blame), dict) else []
-        src_flags = [n.get("low_integrity") for n in graph_nodes if n.get("id") == src_id]
-        res.check("operator source recorded as trusted (low_integrity false)",
-                  src_flags == [False], f"blame graph low_integrity for {src_id}: {src_flags}")
+    graph_nodes = _json(blame).get("graph", {}).get("nodes", []) if isinstance(_json(blame), dict) else []
+    src_flags = [n.get("low_integrity") for n in graph_nodes if n.get("id") == src_id]
+    res.check("operator source recorded as trusted (low_integrity false)",
+              src_flags == [False], f"blame graph low_integrity for {src_id}: {src_flags}")
 
     allow = ctx.post("/v1/gate",
                      {"action": {"tool": "Read", "summary": "read the design doc",
@@ -543,7 +551,7 @@ def s04_full_journey(ctx: Ctx, res: ScenarioResult) -> None:
               ctx.evidence("GET", f"/v1/impact/{src_id}", impact))
 
     revoke = ctx.post("/v1/revoke", {"root_id": src_id, "reason": "dogfood journey"},
-                      headers=ctx.bearer(tenant))
+                      headers=ctx.tenant_headers(tenant))
     rbody = _json(revoke)
     tainted = rbody.get("counts", {}).get("tainted") if isinstance(rbody, dict) else None
     res.check("POST /v1/revoke(source) -> 200 with tainted descendants",
@@ -589,8 +597,13 @@ def s05_revoke_reinstate(ctx: Ctx, res: ScenarioResult) -> None:
     res.check("POST /v1/events (4 nodes, one corroborated) -> 200",
               resp.status_code == 200, ctx.evidence("POST", "/v1/events", resp))
 
+    attestation = ctx.post("/v1/corroborate", {"memory_id": mem2, "source_id": src2, "by": "human"},
+                           headers=ctx.tenant_headers(tenant))
+    res.check("operator attests the preserved branch", attestation.status_code == 200,
+              ctx.evidence("POST", "/v1/corroborate", attestation))
+
     revoke = ctx.post("/v1/revoke", {"root_id": src1, "reason": "dogfood"},
-                      headers=ctx.bearer(tenant))
+                      headers=ctx.tenant_headers(tenant))
     stats = ctx.get("/v1/stats", headers=ctx.bearer(tenant))
     by_status = _json(stats).get("by_status", {}) if isinstance(_json(stats), dict) else {}
     want = {"ok": 1, "revoked": 1, "tainted": 1, "preserved": 1}
@@ -598,7 +611,7 @@ def s05_revoke_reinstate(ctx: Ctx, res: ScenarioResult) -> None:
               revoke.status_code == 200 and all(by_status.get(k, 0) == v for k, v in want.items()),
               f"POST /v1/revoke -> {revoke.status_code}; GET /v1/stats -> {frag(by_status)}")
 
-    reinstate = ctx.post("/v1/reinstate", {"root_id": src1}, headers=ctx.bearer(tenant))
+    reinstate = ctx.post("/v1/reinstate", {"root_id": src1}, headers=ctx.tenant_headers(tenant))
     stats2 = ctx.get("/v1/stats", headers=ctx.bearer(tenant))
     by2 = _json(stats2).get("by_status", {}) if isinstance(_json(stats2), dict) else {}
     res.check("after reinstate: all 4 nodes ok again",
@@ -619,10 +632,10 @@ def s06_reinstate_independent_root(ctx: Ctx, res: ScenarioResult) -> None:
     created = ctx.post("/v1/events", {"runtime": "generic", "events": events},
                        headers=ctx.bearer(tenant))
     rev_a = ctx.post("/v1/revoke", {"root_id": a, "reason": "dogfood A"},
-                     headers=ctx.bearer(tenant))
+                     headers=ctx.tenant_headers(tenant))
     rev_b = ctx.post("/v1/revoke", {"root_id": b, "reason": "dogfood B"},
-                     headers=ctx.bearer(tenant))
-    rein_a = ctx.post("/v1/reinstate", {"root_id": a}, headers=ctx.bearer(tenant))
+                     headers=ctx.tenant_headers(tenant))
+    rein_a = ctx.post("/v1/reinstate", {"root_id": a}, headers=ctx.tenant_headers(tenant))
     stats = ctx.get("/v1/stats", headers=ctx.bearer(tenant))
     by_status = _json(stats).get("by_status", {}) if isinstance(_json(stats), dict) else {}
     rbody = _json(rein_a)
@@ -763,7 +776,7 @@ def s12_double_space_bearer(ctx: Ctx, res: ScenarioResult) -> None:
 
 
 def s13_metrics_docs_protection(ctx: Ctx, res: ScenarioResult) -> None:
-    """P-029: /metrics behind the operator token, /docs off unless PEDIGREE_ENV=dev."""
+    """P-029: /metrics behind deployment admin auth, docs visibility follows settings."""
     metrics = ctx.get("/metrics")
     docs = ctx.get("/docs")
     openapi = ctx.get("/openapi.json")
@@ -783,8 +796,7 @@ def s14_metrics_content(ctx: Ctx, res: ScenarioResult) -> None:
     res.check("GET /metrics -> 200 with a 'pedigree' series",
               resp.status_code == 200 and has_pedigree,
               f"GET /metrics -> {resp.status_code}; pedigree={has_pedigree}; sample={frag(sample, 90)}")
-    res.note("row sends X-Admin-Token (the P-029 target state); today the header is ignored and "
-             "only python_gc_*/python_info series exist (no pedigree metric is registered)")
+    res.note("row uses deployment-admin authentication; metric instrumentation is tracked by P-022")
 
 
 def s15_import_without_db(ctx: Ctx, res: ScenarioResult) -> None:
@@ -965,7 +977,7 @@ def s19_heavy(ctx: Ctx, res: ScenarioResult) -> None:
 
     t0 = time.perf_counter()
     revoke = ctx.post("/v1/revoke", {"root_id": root, "reason": "dogfood heavy"},
-                      headers=ctx.bearer(tenant), timeout=120.0)
+                      headers=ctx.tenant_headers(tenant), timeout=120.0)
     wall_ms = round((time.perf_counter() - t0) * 1000.0, 1)
     rbody = _json(revoke)
     tainted = rbody.get("counts", {}).get("tainted") if isinstance(rbody, dict) else None
@@ -983,7 +995,7 @@ def s19_heavy(ctx: Ctx, res: ScenarioResult) -> None:
               ctx.evidence("GET", "/v1/invariants", inv1, 90))
 
     reinstate = ctx.post("/v1/reinstate", {"root_id": root},
-                         headers=ctx.bearer(tenant), timeout=120.0)
+                         headers=ctx.tenant_headers(tenant), timeout=120.0)
     inv2 = ctx.get("/v1/invariants", headers=ctx.bearer(tenant))
     v2 = _json(inv2).get("violations", []) if isinstance(_json(inv2), dict) else ["unparseable"]
     res.check("reinstate -> 200 and invariants clean again",
@@ -1024,6 +1036,38 @@ def s21_ui_and_mcp_coexist(ctx: Ctx, res: ScenarioResult) -> None:
               ctx.evidence("GET", "/mcp", mcp, 110))
 
 
+def s22_agent_role_denials(ctx: Ctx, res: ScenarioResult) -> None:
+    tenant = ctx.ensure_tenant("T_ROLE")
+    tag = secrets.token_hex(3)
+    sid, mid = f"rolesrc_{tag}", f"rolemem_{tag}"
+    setup = ctx.post("/v1/events", {"runtime": "generic", "events": [
+        {"type": "source", "kind": "web", "id": sid},
+        {"type": "memory", "id": mid, "text": "role guard", "derived_from": [sid]},
+    ]}, headers=ctx.bearer(tenant))
+    res.check("agent can ingest baseline graph", setup.status_code == 200,
+              ctx.evidence("POST", "/v1/events", setup))
+    before = ctx.node_count(tenant)
+    attempts = [
+        ("/v1/revoke", {"root_id": sid, "reason": "agent escalation"}),
+        ("/v1/reinstate", {"root_id": sid}),
+        ("/v1/corroborate", {"memory_id": mid, "source_id": sid, "by": "human"}),
+        ("/v1/sources", {"kind": "web", "integrity": "trusted"}),
+        ("/v1/events", {"runtime": "generic", "session_id": f"rolesess_{tag}", "events": [
+            {"type": "session"}, {"type": "source", "kind": "web", "integrity": "trusted"}]}),
+    ]
+    # A valid deployment-admin header must not upgrade an agent bearer.
+    headers = {**ctx.bearer(tenant), **ctx.admin_headers()}
+    for path, payload in attempts:
+        response = ctx.post(path, payload, headers=headers)
+        res.check(f"agent denied {path}", response.status_code == 403
+                  and err_code(_json(response)) == "forbidden", ctx.evidence("POST", path, response))
+    after = ctx.node_count(tenant)
+    blame = ctx.get(f"/v1/blame/{mid}", headers=ctx.bearer(tenant))
+    res.check("denials leave graph size and memory status unchanged",
+              before == after == 2 and _json(blame).get("node", {}).get("status") == "ok",
+              f"node counts before={before} after={after}; memory={_json(blame).get('node', {}).get('status')}")
+
+
 def clean_verify(ctx: Ctx, res: ScenarioResult) -> None:
     """Pseudo-scenario: cleanup verification, filled by the runner."""
     outcome = ctx.state.get("cleanup", {})
@@ -1057,13 +1101,14 @@ SCENARIO_FUNCS: dict[str, Callable[[Ctx, ScenarioResult], None]] = {
     "S19": s19_heavy,
     "S20": s20_burst_gate,
     "S21": s21_ui_and_mcp_coexist,
+    "S22": s22_agent_role_denials,
     "CLEAN": clean_verify,
 }
 
 #: Run order: S16/S17 before S21 (S21 re-checks coexistence), S18-S20 (process/load/scale) last.
 RUN_ORDER: list[str] = [
     "S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10", "S11",
-    "S12", "S13", "S14", "S15", "S16", "S17", "S21", "S18", "S19", "S20",
+    "S12", "S13", "S14", "S15", "S16", "S17", "S21", "S22", "S18", "S19", "S20",
 ]
 
 SCENARIO_TITLES: dict[str, str] = {
@@ -1088,6 +1133,7 @@ SCENARIO_TITLES: dict[str, str] = {
     "S19": "heavy graph + revoke latency",
     "S20": "burst 150 gate calls",
     "S21": "UI + /mcp coexistence",
+    "S22": "agent role escalation denied",
     "CLEAN": "cleanup verification",
 }
 
@@ -1361,7 +1407,7 @@ def build_report(
     add("- S01: the registry graph name is not configurable (TenantRegistry hardcodes "
         "`graph_name('registry')` -> `ped:registry`; `pedigree.config.REGISTRY_GRAPH` is only used "
         "by the unused `ensure_registry_schema`). The row reports whether it ran or skipped.")
-    add("- S14 sends `X-Admin-Token` (the P-029 target state); today the header is ignored.")
+    add("- S14 sends `X-Admin-Token`; metrics authentication is required, and P-022 tracks instrumentation.")
     add("- S08 accepts FastAPI's native `{'detail': [...]}` 422 as well as the product envelope, "
         "because the P-021 fix may land as Pydantic validation.")
     add("- S11's forged Content-Length is rejected by h11 at the protocol level "

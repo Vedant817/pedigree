@@ -42,7 +42,9 @@ def ensure_demo_tenant(registry, tenant: str, credentials_dir: Path) -> Path | N
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as stream:
             credential = registry.create_tenant(tenant)
-            json.dump({"tenant": tenant, "token": credential.token}, stream)
+            json.dump({"tenant": tenant, "token": credential.token,
+                       "agent_token": credential.agent_token,
+                       "operator_token": credential.operator_token}, stream)
             stream.write("\n")
     except Exception:
         file.unlink(missing_ok=True)
@@ -62,7 +64,9 @@ def main() -> int:
         if credential_file:
             print(f"[seed] local credential file: {credential_file} (keep private; never commit)")
         else:
-            print("[seed] existing tenant credential retained; use the previously issued token in the UI")
+            print("[seed] existing tenant credentials retained; use the previously issued operator "
+                  "token in the UI. For a legacy tenant, explicitly run pedigree admin "
+                  "issue-operator --id <tenant>.")
         return 0
     except Exception as exc:  # noqa: BLE001 - a CLI reports the reason, never a credential
         print(f"[seed] failed: {type(exc).__name__}: {exc}", file=sys.stderr)

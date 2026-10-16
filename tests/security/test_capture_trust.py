@@ -18,8 +18,10 @@ def capture_boundary(fresh_graph):
     settings = Settings(pedigree_admin_token="capture-test-operator")
     registry = TenantRegistry(db, settings)
     credential = registry.create_tenant(tenant)
+    client_operator_token = credential.operator_token
     headers = {"Authorization": "Bearer " + credential.token}
     with TestClient(create_app(db, settings)) as client:
+        client.p015_operator_token = client_operator_token
         try:
             yield db, tenant, graph, settings, credential.token, client, headers
         finally:
@@ -33,7 +35,7 @@ def seed_support(boundary):
 
 
 @pytest.mark.parametrize("author", ["human", "scanner"])
-@pytest.mark.parametrize("admin", [None, "incorrect-operator"])
+@pytest.mark.parametrize("admin", [None, "incorrect-operator", "capture-test-operator"])
 def test_tenant_cannot_assert_trusted_corroboration(capture_boundary, author, admin):
     seed_support(capture_boundary)
     db, _, graph, _, _, client, headers = capture_boundary
@@ -48,9 +50,9 @@ def test_tenant_cannot_assert_trusted_corroboration(capture_boundary, author, ad
 @pytest.mark.parametrize("author", ["human", "scanner"])
 def test_operator_credential_can_attest_with_tenant_scope(capture_boundary, author):
     seed_support(capture_boundary)
-    db, _, graph, settings, _, client, headers = capture_boundary
+    db, _, graph, _, _, client, _ = capture_boundary
     response = client.post("/v1/corroborate",
-                           headers={**headers, "X-Admin-Token": settings.pedigree_admin_token},
+                           headers={"Authorization": "Bearer " + client.p015_operator_token},
                            json={"memory_id": "belief", "source_id": "support", "by": author})
     assert response.status_code == 200, response.text
     assert db.ro_query(graph, "MATCH ()-[c:CORROBORATED_BY]->() RETURN c.by").result_set == [[author]]
@@ -61,10 +63,7 @@ def test_rest_kind_and_integrity_claims_are_not_credentials(capture_boundary, ki
     _, _, _, _, _, client, headers = capture_boundary
     response = client.post("/v1/sources", headers=headers,
                            json={"kind": kind, "integrity": "trusted", "uri": "file:///unverified"})
-    # rejected outright (422), or accepted but never trusted
-    assert response.status_code in (200, 401, 403, 422), response.text
-    if response.status_code == 200:
-        assert response.json()["low_integrity"] is True
+    assert response.status_code == 403, response.text
 
 
 @pytest.mark.parametrize("kind", ["human", "file"])
@@ -103,12 +102,13 @@ def test_mcp_payload_cannot_mint_authority(capture_boundary, operation):
                     "uri": "file:///mcp-claim", "integrity": "trusted"}
             response = await server.call_tool("pedigree_record_source", args)
             result = json.loads(response.content[0].text)
-            if result.get("ok"):
-                assert result["result"]["low_integrity"] is True
+            assert result.get("ok") is False, result
+            assert result["error"]["code"] == "forbidden"
         else:
             response = await server.call_tool("pedigree_corroborate", {
                 "token": token, "memory_id": "belief", "source_id": "support", "by": operation})
             result = json.loads(response.content[0].text)
             assert result.get("ok") is False, result
+            assert result["error"]["code"] == "forbidden"
             assert db.ro_query(graph, "MATCH ()-[c:CORROBORATED_BY]->() RETURN c.by").result_set == []
     asyncio.run(run())

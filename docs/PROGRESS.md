@@ -1,9 +1,12 @@
 # CURRENT STATE (overwritten after every feature / checkpoint)
 
-- **Phase:** Phase C security hardening, Fri 2026-10-16 21:00 IST. P-029 hygiene and
+- **Phase:** Phase C security hardening, Fri 2026-10-16 21:17 IST. P-029 hygiene and
   P-014 request-wide quota admission have independent QA/red-team PASS. Current full
-  `make check`: 519 passed, 1 skipped, 3 deselected, 1 xfailed; Ruff, tracked secrets
-  and numbers PASS. P-015 mandatory three-role consult is in progress; roles remain open.
+  `make check`: 582 passed, 1 skipped, 3 deselected, 1 xfailed; Ruff, tracked secrets
+  and numbers PASS. P-014 committed in 303016a, P-029 test follow-up f940b23.
+  P-015 consult 010 / ADR-011, implementation, independent QA/red-team and full gate
+  PASS. Dogfood now 20 PASS, 3 expected failures, zero leftovers. P-021 consult 011
+  complete; decision/implementation next. No Phase-C checkpoint or push yet.
 - **Last implementation commits:** 1243744/031f86a/83d7b73 (P-016 QA follow-up: stdio default-tenant
   token bypass fixed - red-team F-1 with red-at-parent regression; MCP errors actionable; README
   auth reality + 13-tool list; QA addenda), ef9033f (P-012 consult trio filed: domain + oracle
@@ -51,8 +54,8 @@
   deletes only its own successful creates and reports cleanup failures. Independent real-DB
   sentinel survival passes. Earlier runs cannot establish that pre-existing data was preserved.
 - **Next 3 actions:**
-  1. Close P-015 consult 010 with decision/ADR, then agent/operator credentials and attack tests.
-  2. Independent P-015 QA/red-team, full checks and role-aware dogfood.
+  1. Fresh-clone role verification, P-021 consult decision/ADR and test-first implementation.
+  2. Independent P-021 validation/body-limit/error QA and red-team; flip S08/S09 only on proof.
   3. P-021 validation/error containment and P-020 auth/rate limits; Phase-C checkpoint only
      after independent security reports and clean-clone verification.
 - **Human pending:** video recording, walkthrough/architecture review, organizer track decision,
@@ -614,3 +617,28 @@
   Crashes/ambiguous writes strand admission until quiescent manual recovery. Full cap may
   reject new revoke/reinstate ledger nodes. Non-quota errors can retain earlier batch writes.
 - No evaluation numbers produced; no push or Phase-C completion claim. Next: P-015.
+
+### 2026-10-16 21:17 IST | Phase C | P-015 tenant roles | STATUS: done
+- Consult 010 / ADR-011: separate stored agent/operator digests, legacy agent-only,
+  explicit operator issuance/rotation. Tenant role checks replace global-header trust
+  upgrades. Whole batches authorize before writes; HTTP MCP consumes per-message bearer
+  headers without conflicting/invalid credential fallback. Defaults/hooks agent-only;
+  explicit operator MCP invocation allowed, with domain dissent documented.
+- Builder actual red: 14 failed in 9.20s. Core/HTTP/query lint green 26 passed plus
+  same-session header-change test 1 passed. Registry create/issuance attacked concurrently;
+  unique Tenant constraint/CREATE and write-first issuance prevent credential overwrite.
+- Independent QA 10 passed in18.81s; combined focused91 passed in94.29s. Independent
+  red-team16 passed in37.71s. Reports docs/qa/P-015.md and redteam-P-015.md; sentinel intact.
+- Final `make check`: 582 passed,1 skipped,3 deselected,1 xfailed in274.01s; Ruff,
+  tracked secret scan and numbers PASS. `secret_scan --history` PASS after staging newfiles.
+  Earlier fullrun:1failed563passed; sole stale fake credential response fixed, ownership
+  assertions retained. Root focused fixture cleanup12passed1.55s, sentinel unchanged.
+- `make dogfood`:20PASS,0FAIL,3EXPECTED-FAIL,0STALE,0SKIP; exactownedcleanupPASS/zero
+  leftovers. S22 agent+globaladmin escalation denialPASS. Remaining S08/S09=P-021,
+  S14=applicationmetrics. Report scratch/dogfood/20261016T153741Z.md.
+- Consumers: newtenantfiles save both roles, UI requests operator, CLI explicit issue/rotate;
+  existingfiles preserved. Adapter local guards verified in Python/Node, notinstalledruntime.
+  Scannerrole-shape tests actual2red then7green; no productioncredential output/commit.
+- Material caveat: agent corroboration can produce descriptive preserved status; tested
+  high-risk gate still blocks. README/KNOWN_ISSUES disclose status is not operator verification.
+- No evalnumbers, provider/deployment claim or push. Next P-021, then P-020/P-036 and C gate.

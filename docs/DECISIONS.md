@@ -315,3 +315,35 @@ the coordination namespace. No cap or graph schema migration is introduced.
 **Evidence.** docs/consults/009-p014-quota/decision.md; tests/unit/test_quota.py;
 tests/integration/test_p014_quota.py; independent docs/qa/P-014.md and
 docs/qa/redteam-P-014.md, including separate-process races and exact snapshots.
+
+## ADR-011 | 2026-10-16 | Tenant agent and operator credentials
+
+**Context.** Shared tenant bearer authority permits an agent to revoke/reinstate;
+the interim global-admin trust header is not a tenant role. FIX_PROMPT C1 requires
+separate hashed role credentials and forbidden responses for agent trust claims.
+
+**Decision.** Consult 010: resolve explicit stored roles by digest, legacy tokens
+agent-only, additive agent/operator issuance with explicit administrative rotation.
+Shared REST/MCP capability checks precede writes; global admin headers cannot elevate
+an agent. Full event batches reject prohibited assertions before mutation. Normal
+captured files remain untrusted agent evidence. Deployment administration remains
+separate from tenant operations. HTTP MCP consumes bearer headers and rejects
+conflicting tool credentials, with no invalid-credential fallback.
+
+**Alternatives/dissent.** Domain recommended agent-only MCP. Architect and red-team
+recommend explicit operator MCP requests to satisfy C1's operator-can acceptance;
+choose this interpretation while requiring agent-only shipped defaults and hooks.
+Prefixes alone cannot grant roles. Silent startup operator issuance cannot recover
+the original secret and risks accidental privilege.
+
+**Consequences.** UI and operator-positive tests need operator credentials; legacy
+users need explicit operator issuance. Anyone who supplies an operator credential
+to an agent grants it that authority. No host-compromise defense is claimed.
+Indexed authentication and rate limiting remain P-020. Authorization and migration
+need independent real REST/MCP QA before closure.
+
+**Evidence.** docs/consults/010-p015-roles/{domain,architect,specialist,decision}.md;
+domain's owned real-DB 42201 property/migration probe. Implementation uses the
+existing Tenant(id) index/unique-constraint helper with CREATE, and a write-first
+credential_epoch update before conditional operator issuance. Builder separate-client
+races admitted one valid creation/issuance; independent tests/reports pending.

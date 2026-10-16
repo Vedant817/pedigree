@@ -80,3 +80,12 @@ def test_cli_history_mode_exits_nonzero_on_planted_key(tiny_repo: Path):
     _git(tiny_repo, "commit", "-q", "-m", "oops")
 
     assert secret_scan.main(["--root", str(tiny_repo), "--history"]) == 1
+
+
+@pytest.mark.parametrize("role", ["a", "o"])
+def test_role_bearer_detected_outside_assignment(role):
+    import secrets
+
+    value = "ped_" + role + "_tenant_" + secrets.token_urlsafe(32)
+    findings = secret_scan.scan_text("Authorization: Bearer " + value)
+    assert any(name == "pedigree_bearer" for _, name, _ in findings)

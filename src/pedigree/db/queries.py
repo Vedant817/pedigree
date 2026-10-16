@@ -335,10 +335,11 @@ Q_STATUS_COUNTS = "MATCH (n:Node) RETURN n.status AS status, count(*) AS n"
 Q_REVOCATION_COUNTS = "MATCH (v:Revocation) RETURN v.state AS state, count(*) AS n"
 
 # --- registry (F-05) ---------------------------------------------------------
-Q_REGISTRY_UPSERT = "MERGE (t:Tenant {id:$id}) SET t.status = 'active', t.node_cap = $cap, t.token_sha256 = $sha, t.created_at = $now"
-Q_REGISTRY_BY_ID = "MATCH (t:Tenant {id:$id}) RETURN t.id, t.status, t.node_cap, t.created_at, t.token_sha256"
+Q_REGISTRY_UPSERT = "CREATE (t:Tenant {id:$id, status:'active', node_cap:$cap, agent_token_sha256:$agent_sha, operator_token_sha256:$operator_sha, created_at:$now})"
+Q_REGISTRY_BY_ID = "MATCH (t:Tenant {id:$id}) RETURN t.id, t.status, t.node_cap, t.created_at, t.token_sha256, t.agent_token_sha256, t.operator_token_sha256"
 Q_REGISTRY_ALL = "MATCH (t:Tenant) RETURN t.id, t.status, t.node_cap, t.created_at"
 Q_REGISTRY_SET_STATUS = "MATCH (t:Tenant {id:$id}) SET t.status = $status"
+Q_REGISTRY_ISSUE_OPERATOR = "MATCH (t:Tenant {id:$id}) SET t.credential_epoch = coalesce(t.credential_epoch,0) + 1 WITH t WHERE t.status = 'active' AND ($rotate OR t.operator_token_sha256 IS NULL) SET t.operator_token_sha256 = $sha RETURN t.id"
 
 # --- gate (F-11) -------------------------------------------------------------
 Q_GATE_NODES = """

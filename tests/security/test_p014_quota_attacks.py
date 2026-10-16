@@ -19,8 +19,9 @@ from pedigree.mcp_server import build_mcp
 
 
 class MaskedCredential:
-    def __init__(self, token):
+    def __init__(self, token, operator_token):
         self.token = token
+        self.operator_token = operator_token
 
     def __repr__(self):
         return "<temporary masked credential>"
@@ -37,7 +38,8 @@ def target(db, monkeypatch):
     get_settings.cache_clear()
     registry = TenantRegistry(db)
     tenant = "qr" + uuid.uuid4().hex[:12]
-    credential = MaskedCredential(registry.create_tenant(tenant, node_cap=2).token)
+    issued = registry.create_tenant(tenant, node_cap=2)
+    credential = MaskedCredential(issued.token, issued.operator_token)
     graph = graph_name(tenant)
     ensure_schema(db, graph)
     app = create_app(db=db)
@@ -54,7 +56,8 @@ def target(db, monkeypatch):
 
 
 def post(target, path, body):
-    return target[5].post(path, json=body, headers={"Authorization": "Bearer " + target[3].token})
+    token = target[3].operator_token if path in {"/v1/revoke", "/v1/reinstate"} else target[3].token
+    return target[5].post(path, json=body, headers={"Authorization": "Bearer " + token})
 
 
 def invoke(server, name, **args):
@@ -100,14 +103,14 @@ def test_all_public_creators_at_cap_and_edges_remain_available(target):
     for name, args in [("record_source", {}), ("remember", {"text": "x"}),
                        ("record_action", {"tool": "cat"}), ("revoke", {"root_id": "src"}),
                        ("check_action", {"tool": "cat", "record": True})]:
-        result = invoke(server, "pedigree_" + name, **args)
+        result = invoke(server, "pedigree_" + name, token=credential.operator_token, **args)
         assert result["error"]["code"] == "quota_exceeded", (name, result)
         assert snapshot(db, graph) == before
 
 
 def test_policy_lookup_failure_cannot_fall_back_uncapped(target, monkeypatch):
     db, tenant, graph, credential, app, _ = target
-    record = app.state.registry.get_record(tenant)
+    record = app.state.registry.resolve(credential.token)
     monkeypatch.setattr(app.state.registry, "resolve", lambda token: record)
     def missing(*args):
         raise NotFoundInGraph("synthetic missing policy")

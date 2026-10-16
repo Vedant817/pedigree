@@ -56,7 +56,7 @@ make demo           # seeds synthetic scenarios S1+S8 into tenant `demo`; writes
 .venv/bin/python -m pedigree.cli serve             # Linux/macOS
 ```
 
-Then open the printed local URL, paste the token from the credential file `make demo` wrote
+Then open the printed local URL, paste the operator token from the credential file `make demo` wrote
 (path printed, inside that file), and the workspace loads the seeded lineage. Previewing a
 revocation changes nothing until you confirm it.
 
@@ -96,7 +96,8 @@ verified against an installed OpenCode session and may write nothing in real wor
 
 One graph per tenant, `ped:<tenant>` (ids are `^[a-z0-9]{3,24}$`, so the ACL pattern
 `~ped:abc` can never match tenant `abcd`). The registry graph `ped:registry` holds
-`Tenant{id, status, node_cap, created_at, token_sha256}` - only a sha256, never the token.
+`Tenant{id, status, node_cap, created_at, agent_token_sha256, operator_token_sha256}` stores credential
+digests. Legacy `token_sha256` remains agent-only; bearer values are never stored in the graph.
 
 Nodes (`all :Node` + a type label): `Source` (a prompt, a file, a web page, a tool output, an MCP
 tool description), `Memory` (a belief), `Action` (a tool call with `effect`/`risk`/`artifacts`),
@@ -155,9 +156,10 @@ command against a seeded tenant.
 `/v1/corroborate` · `/v1/sessions` · `/v1/sessions/read` · `/v1/revoke` (dry-run first) ·
 `/v1/reinstate` · `GET /v1/blame/{id}` · `/v1/impact/{id}` · `/v1/gate` · `/v1/graph` ·
 `/v1/stats` · `/v1/artifacts/lookup` · `/v1/invariants` · `/` (static workspace) ·
-`/healthz` `/readyz` `/metrics` `/docs` · `POST /admin/tenants` (operator token).
+`/healthz` `/readyz` `/metrics` `/docs` · `POST /admin/tenants` (deployment admin credential).
 
-Errors are typed and never leak a stack trace; every response carries a correlation id. The
+Typed errors use the mapping below. Generic exception-message containment remains tracked
+under P-021; correlation IDs support diagnosis. The
 mapping (also in `docs/01-IDEA.md`, the interface section):
 
 ```
@@ -168,10 +170,11 @@ too_large 413 | rate_limited 429 (+ Retry-After) | quota_exceeded 429 | timeout 
 ### MCP (server name `pedigree`)
 
 Streamable HTTP at `/mcp` and stdio. Tools: `pedigree_health`, `pedigree_record_source`,
-`pedigree_remember`, `pedigree_record_action`, `pedigree_corroborate` (agent-asserted support
-only), `pedigree_revoke`, `pedigree_reinstate`, `pedigree_blame`, `pedigree_impact`,
+`pedigree_remember`, `pedigree_record_action`, `pedigree_corroborate`,
+`pedigree_revoke`, `pedigree_reinstate`, `pedigree_blame`, `pedigree_impact`,
 `pedigree_whatif`, `pedigree_check_action`, `pedigree_audit_sources`, `pedigree_report`.
-The tenant is determined by the token — the in-band `token` tool argument, or (stdio only) the
+The tenant and role are determined by the bearer header on HTTP, the in-band `token`
+tool argument, or (stdio only) the
 `PEDIGREE_MCP_TENANT` + `PEDIGREE_MCP_TOKEN` environment pair, which must resolve together —
 never by the `tenant_id` argument alone; the LLM never writes Cypher.
 
@@ -179,13 +182,20 @@ never by the `tenant_id` argument alone; the LLM never writes Cypher.
 // .opencode/opencode.json or Claude Code MCP config
 { "mcpServers": { "pedigree": { "type": "http",
     "url": "http://127.0.0.1:8000/mcp",
-    "headers": { "Authorization": "Bearer <tenant-token>" } } } }
+    "headers": { "Authorization": "Bearer <agent-token>" } } } }
 ```
 
-Interim note (until transport auth lands with P-015): the `Authorization` header above is
-advertised for MCP clients but is **not consumed yet** — every tool call must carry the
-`token` argument (or, on stdio, the environment pair), and the header is kept for forward
-compatibility.
+MCP defaults and hooks use agent credentials. Operators may explicitly invoke MCP tools
+with their own operator credential; never put that credential in an agent configuration.
+An invalid HTTP bearer cannot fall back to another credential, and conflicting header/tool
+credentials are rejected. Revoke/reinstate and human/scanner attestations require operator.
+
+Tenant creation returns `agent_token` and `operator_token` once; `token` is the agent
+compatibility alias. Keep both private and supply only the agent value to adapters.
+For an existing tenant, use `pedigree admin issue-operator --id <tenant>` in a local
+deployment-admin environment. It refuses to replace an existing operator credential
+unless `--rotate` is explicit. Hashes cannot recover a lost bearer. `make demo` preserves
+existing credential files; older files need explicit operator issuance for UI actions.
 
 ### Claude Code hook
 
@@ -210,16 +220,18 @@ OpenCode session, and write/edit/shell coverage plus real-session gate friction 
 
 ## Security model
 
-- **Identity:** a tenant token (`ped_<tenant>_<32 urlsafe>`) resolves to exactly one graph; the
+- **Identity:** independent agent (`ped_a_…`) and operator (`ped_o_…`) credentials resolve
+  to one tenant graph and a stored role. Legacy `ped_<tenant>_…` credentials remain agent-only; the
   tenant never comes from a body field, a query parameter or a tool argument.
 - **Isolation:** one graph per tenant; every query is scoped to `graph_name(tenant)`. Cross-tenant
   ids return `not_in_graph` (or `reverify` from the gate - unknown lineage is never "safe").
   Per-tenant DB ACL users are **verified** (a test provisions real ACL users scoped to
   `~ped:<tenant>` and proves cross-namespace denial on v4.22.1) but the shipped service still
   connects with the shared credentials - documented as an open item, not claimed.
-- **Authority:** the agent channel can only *downgrade*. Sources captured over HTTP are always
-  untrusted whatever the payload claims, trusted-by-default kinds need the operator credential,
-  and `CORROBORATED_BY` never lets an agent overwrite a human/scanner attestation (ADR-008). The
+- **Authority:** agent bearers ingest untrusted evidence, read and gate. Explicit trusted
+  claims, human/scanner attestations and revoke/reinstate require the tenant operator bearer.
+  The deployment admin header does not elevate an agent. Captured files remain untrusted;
+  `CORROBORATED_BY` never lets an agent overwrite a human/scanner attestation (ADR-011). The
   gate's "independent support" trust therefore rests on a human or scanner signal, not on anything
   the agent can write.
 - **Input surface:** static parameterised Cypher with a lint gate, id/URI/artifact validation,
@@ -300,6 +312,8 @@ Aligned manually with `docs/03-EVAL-AND-DEMO.md` section 7; that document is the
 - Session read-window capture over-approximates influence on purpose (the ratio is measured in E2).
 - `preserved` is only as good as the corroboration signal, and after ADR-008 only a human or
   scanner can produce the trusted kind of that signal.
+  The lifecycle label alone is descriptive: agent support can also yield `preserved`;
+  the gate separately requires trusted attestation before treating it as containment.
 - Hooks see only what the runtime exposes; paraphrase through an unhooked channel is invisible.
 - Bash risk classification is a documented regex heuristic, not a sandbox. External effects
   (pushes already pulled, emails sent) are listed, not undone.

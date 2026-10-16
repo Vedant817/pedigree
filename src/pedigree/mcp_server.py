@@ -2,10 +2,13 @@
 """Model Context Protocol server (F-06): wraps the same engine as HTTP."""
 from __future__ import annotations
 
+import hmac
+from contextvars import ContextVar
+
 from mcp.server.mcpserver import MCPServer
 
+from .api.auth import authorize_source
 from .api.registry import TenantRegistry
-from .api.routes.engine import AGENT_SAFE_KINDS
 from .config import get_settings, graph_name
 from .db.client import Db
 from .db.schema import ensure_schema
@@ -30,6 +33,21 @@ def _call(fn, *a, **kw):
 
 
 _UNAUTHORIZED_MSG = "invalid or missing tenant token"
+_http_headers: ContextVar[object | None] = ContextVar("pedigree_mcp_http_headers", default=None)
+
+
+async def _transport_auth_context(ctx, call_next):
+    # Installed SDK ServerMiddleware receives the actual per-message HTTP request.
+    # ContextVar lifetime includes its async handler/threadpool, never a server field.
+    marker = _http_headers.set(getattr(ctx.request, "headers", None))
+    try:
+        return await call_next(ctx)
+    finally:
+        _http_headers.reset(marker)
+
+
+def _forbidden():
+    return {"ok": False, "error": {"code": "forbidden", "message": "operator credential required"}}
 
 
 class PedigreeMCPServer:
@@ -38,36 +56,46 @@ class PedigreeMCPServer:
         self.db = db if db is not None else Db(self.settings)
         self.default_tenant_id = default_tenant_id
         self.default_tenant_token = default_tenant_token
-        self.server = MCPServer("pedigree")
+        self.server = MCPServer("pedigree", middleware=[_transport_auth_context])
         self.registry = TenantRegistry(self.db, self.settings)
         self._register_tools()
 
     def _resolve(self, tenant_id=None, token=None):
-        if token:
+        headers = _http_headers.get()
+        if headers is not None:
+            # A supplied header is authoritative. Even an empty/malformed header
+            # must never fall back to tool arguments or configured credentials.
+            presented = headers.get("authorization")
+            if presented is not None:
+                values = headers.getlist("authorization") if hasattr(headers, "getlist") else [presented]
+                if len(values) != 1 or not presented.startswith("Bearer "):
+                    return None, None, None
+                raw = presented[7:]
+                if not raw or raw.strip() != raw or any(c.isspace() for c in raw):
+                    return None, None, None
+                if token is not None and not hmac.compare_digest(raw.encode(), token.encode()):
+                    return None, None, None
+                token = raw
+            elif token is None:
+                return None, None, None
+        if token is not None:
             rec = self.registry.resolve(token)
-            if rec is None:
-                return None, None
-            if tenant_id is not None and tenant_id != rec.tenant_id:
-                return None, None
-            tid = rec.tenant_id
+            if rec is None or (tenant_id is not None and tenant_id != rec.tenant_id):
+                return None, None, None
         else:
             if tenant_id is None:
                 tenant_id = self.default_tenant_id
-            # F-1 (red-team P-016): the tokenless convenience path must present the
-            # CONFIGURED default token, and it must resolve to the configured default
-            # tenant. The tenant id alone must never authorize, and a wrong
-            # PEDIGREE_MCP_TOKEN must not silently "work".
             if not self.default_tenant_id or not self.default_tenant_token:
-                return None, None
+                return None, None, None
             if tenant_id != self.default_tenant_id:
-                return None, None
+                return None, None, None
             rec = self.registry.resolve(self.default_tenant_token)
-            if rec is None or rec.tenant_id != self.default_tenant_id:
-                return None, None
-            tid = rec.tenant_id
+            if rec is None or rec.tenant_id != self.default_tenant_id or rec.role != "agent":
+                return None, None, None
+        tid = rec.tenant_id
         gname = graph_name(tid)
         ensure_schema(self.db, gname)
-        return tid, gname
+        return tid, gname, rec
 
     def _register_tools(self):
         srv = self.server
@@ -81,19 +109,15 @@ class PedigreeMCPServer:
         def pedigree_record_source(tenant_id: str | None = None, token: str | None = None,
                                   kind: str = "web", uri: str | None = None, title: str | None = None,
                                   id: str | None = None,
-                                  conf: list[str] | None = None) -> dict:
-            if kind not in AGENT_SAFE_KINDS:
-                return {"ok": False, "error": {"code": "invalid_argument",
-                                               "message": "this source kind needs the capture channel",
-                                               "detail": {"kind": kind, "channel": "POST /v1/events"}}}
-            tid, gname = self._resolve(tenant_id, token)
+                                  conf: list[str] | None = None,
+                                  integrity: str | None = None) -> dict:
+            tid, gname, principal = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             def go():
-                # MCP has no operator credential (tools must not accept one), so every source
-                # an agent records is untrusted regardless of kind (ADR-008).
+                authorize_source(principal, kind, integrity)
                 r = record_source(self.db, gname, tid, quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap), kind=kind, uri=uri, title=title,
-                                  integrity="untrusted", conf=conf, id=id)
+                                  integrity=integrity if principal.role == "operator" else "untrusted", conf=conf, id=id)
                 return {"id": r.id, "status": r.status, "low_integrity": r.low_integrity,
                         "warnings": r.warnings}
             return _call(go)
@@ -103,7 +127,7 @@ class PedigreeMCPServer:
                               mkind: str = "fact", derived_from: list[str] | None = None,
                               corroborated_by: list[str] | None = None, artifact: str | None = None,
                               artifact_key: str | None = None, id: str | None = None) -> dict:
-            tid, gname = self._resolve(tenant_id, token)
+            tid, gname, principal = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             def go():
@@ -120,7 +144,7 @@ class PedigreeMCPServer:
                                   decision: str | None = None, effect: str | None = None,
                                   risk: str | None = None, artifacts: list[str] | None = None,
                                   id: str | None = None) -> dict:
-            tid, gname = self._resolve(tenant_id, token)
+            tid, gname, principal = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             def go():
@@ -135,16 +159,12 @@ class PedigreeMCPServer:
         def pedigree_corroborate(tenant_id: str | None = None, token: str | None = None,
                                  memory_id: str = "", source_id: str = "",
                                  by: str = "agent") -> dict:
-            if by != "agent":
-                # MCP has no operator credential, so it can only assert agent support;
-                # human/scanner authority needs the operator header on the REST route (ADR-008).
-                return {"ok": False, "error": {"code": "forbidden",
-                                               "message": "trusted attestation needs the operator credential",
-                                               "detail": {"by": str(by)[:16]}}}
-            tid, gname = self._resolve(tenant_id, token)
+            tid, gname, principal = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
-            return _call(lambda: (corroborate(self.db, gname, memory_id, source_id, by="agent", quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap)), {"ok": True})[1])
+            if by in ("human", "scanner") and principal.role != "operator":
+                return _forbidden()
+            return _call(lambda: (corroborate(self.db, gname, memory_id, source_id, by=by, quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap)), {"ok": True})[1])
 
         @srv.tool()
         def pedigree_check_action(token: str | None = None, tool: str = "", summary: str = "",
@@ -156,7 +176,7 @@ class PedigreeMCPServer:
 
             Read-only by default. Policy is configured by the service operator.
             """
-            tid, gname = self._resolve(token=token)
+            tid, gname, principal = self._resolve(token=token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             return _call(lambda: check_action(
@@ -169,24 +189,28 @@ class PedigreeMCPServer:
         def pedigree_revoke(tenant_id: str | None = None, token: str | None = None,
                             root_id: str = "", reason: str = "", dry_run: bool = False,
                             kind: str = "revoke") -> dict:
-            tid, gname = self._resolve(tenant_id, token)
+            tid, gname, principal = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
+            if principal.role != "operator":
+                return _forbidden()
             return _call(lambda: revoke(self.db, gname, tid, root_id=root_id, reason=reason,
                                        dry_run=dry_run, kind=kind, quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap)))
 
         @srv.tool()
         def pedigree_reinstate(tenant_id: str | None = None, token: str | None = None,
                                root_id: str = "", dry_run: bool = False) -> dict:
-            tid, gname = self._resolve(tenant_id, token)
+            tid, gname, principal = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
+            if principal.role != "operator":
+                return _forbidden()
             return _call(lambda: reinstate(self.db, gname, tid, root_id=root_id, dry_run=dry_run, quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap)))
 
         @srv.tool()
         def pedigree_blame(tenant_id: str | None = None, token: str | None = None,
                            node_id: str = "", max_depth: int = 12) -> dict:
-            tid, gname = self._resolve(tenant_id, token)
+            tid, gname, principal = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             return _call(lambda: run_blame(self.db, gname, node_id, max_depth=max_depth))
@@ -194,7 +218,7 @@ class PedigreeMCPServer:
         @srv.tool()
         def pedigree_impact(tenant_id: str | None = None, token: str | None = None,
                             node_id: str = "", max_depth: int = 12) -> dict:
-            tid, gname = self._resolve(tenant_id, token)
+            tid, gname, principal = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             return _call(lambda: run_impact(self.db, gname, node_id, max_depth=max_depth))
@@ -202,7 +226,7 @@ class PedigreeMCPServer:
         @srv.tool()
         def pedigree_whatif(tenant_id: str | None = None, token: str | None = None,
                             roots: list[str] | None = None) -> dict:
-            tid, gname = self._resolve(tenant_id, token)
+            tid, gname, principal = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             return _call(lambda: whatif(self.db, gname, tid, roots or [], reason="what-if"))
@@ -210,14 +234,14 @@ class PedigreeMCPServer:
         @srv.tool()
         def pedigree_audit_sources(tenant_id: str | None = None, token: str | None = None,
                                    limit: int = 50) -> dict:
-            tid, gname = self._resolve(tenant_id, token)
+            tid, gname, principal = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             return _call(lambda: audit_sources(self.db, gname, limit=limit))
 
         @srv.tool()
         def pedigree_report(tenant_id: str | None = None, token: str | None = None) -> dict:
-            tid, gname = self._resolve(tenant_id, token)
+            tid, gname, principal = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             return _call(lambda: report(self.db, gname))

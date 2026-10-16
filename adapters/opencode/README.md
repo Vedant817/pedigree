@@ -35,7 +35,7 @@ are not installed-runtime proof. F-08 remains *implementing*.
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `PEDIGREE_OPENCODE_ENABLED` | unset | Must be exactly `1` to enable. Anything else disables the plugin (no hooks, no network). |
-| `PEDIGREE_OPENCODE_TOKEN` | required | Agent tenant token (`ped_*`). The plugin never accepts the operator `X-Admin-Token`. |
+| `PEDIGREE_OPENCODE_TOKEN` | required | Agent tenant bearer (`ped_a_…`), or a legacy tenant token with agent privileges. An operator bearer (`ped_o_…`) makes the configuration invalid and denies tools before networking. Never supply the deployment admin secret. |
 | `PEDIGREE_OPENCODE_URL` | `http://127.0.0.1:8000` | Pedigree API base. HTTPS anywhere; plaintext HTTP only on loopback. No credentials in the URL, no query or fragment. |
 | `PEDIGREE_OPENCODE_TIMEOUT_MS` | `3000` | Per-request timeout, clamped to `100`..`30000`. |
 | `PEDIGREE_OPENCODE_MAX_RESPONSE_BYTES` | `1048576` | Response-size cap, clamped to `4096`..`8388608`. Responses that exceed it (even with an untrue `content-length`) are treated as a failed request. |

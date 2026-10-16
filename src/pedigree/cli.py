@@ -143,7 +143,7 @@ def db_status(settings: Settings) -> int:
 
 
 def admin_create_tenant(settings: Settings, tenant_id: str, node_cap: int | None) -> int:
-    """First-run bootstrap without HTTP (P-013): create a tenant and print its token once."""
+    """First-run bootstrap: deliver both tenant role credentials once."""
     from .api.registry import TenantRegistry
     from .config import admin_token_problem
     from .db.client import Db
@@ -161,7 +161,30 @@ def admin_create_tenant(settings: Settings, tenant_id: str, node_cap: int | None
     except PedigreeError as exc:
         print(f"[admin] {exc.code}: {exc}", file=sys.stderr)
         return 1
-    print(json.dumps({"tenant": cred.tenant_id, "token": cred.token}))
+    print(json.dumps({"tenant": cred.tenant_id, "token": cred.token,
+                      "agent_token": cred.agent_token, "operator_token": cred.operator_token}))
+    return 0
+
+
+def admin_issue_operator(settings: Settings, tenant_id: str, rotate: bool = False) -> int:
+    """Explicitly issue or rotate only the operator credential of an existing tenant."""
+    from .api.registry import TenantRegistry
+    from .config import admin_token_problem
+    from .db.client import Db
+    from .errors import PedigreeError
+
+    problem = admin_token_problem(settings)
+    if problem is not None:
+        print(f"[admin] refusing: {problem}. Provide a strong PEDIGREE_ADMIN_TOKEN "
+              "(or PEDIGREE_ENV=dev for local work).", file=sys.stderr)
+        return 2
+    registry = TenantRegistry(Db(settings), settings)
+    try:
+        token = registry.issue_operator(tenant_id, rotate=rotate)
+    except PedigreeError as exc:
+        print(f"[admin] {exc.code}: {exc}", file=sys.stderr)
+        return 1
+    print(json.dumps({"tenant": tenant_id, "operator_token": token}))
     return 0
 
 
@@ -251,9 +274,14 @@ def main(argv: list[str] | None = None) -> int:
     p_admin = sub.add_parser("admin", help="admin tooling (first-run bootstrap, no HTTP)")
     p_admin_sub = p_admin.add_subparsers(dest="admin_cmd", required=True)
     p_create = p_admin_sub.add_parser("create-tenant",
-                                      help="create a tenant and print its token once")
+                                      help="create a tenant and print its agent/operator credentials once")
     p_create.add_argument("--id", required=True)
     p_create.add_argument("--cap", type=int, default=None)
+    p_operator = p_admin_sub.add_parser("issue-operator",
+                                      help="issue an existing tenant's operator credential once")
+    p_operator.add_argument("--id", required=True)
+    p_operator.add_argument("--rotate", action="store_true",
+                            help="replace an already issued operator credential (invalidates the old one)")
 
     p_resume = sub.add_parser("resume", help="finish crashed (`running`) revocations and exit")
     p_resume.add_argument("--tenant", default=None, help="limit to one tenant (default: all)")
@@ -280,6 +308,8 @@ def main(argv: list[str] | None = None) -> int:
         )
         return srv.run(args.transport, args.host, args.port) or 0
     if args.cmd == "admin":
+        if args.admin_cmd == "issue-operator":
+            return admin_issue_operator(settings, args.id, args.rotate)
         return admin_create_tenant(settings, args.id, args.cap)
     if args.cmd == "resume":
         return resume_revocations(settings, args.tenant)
