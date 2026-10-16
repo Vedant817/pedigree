@@ -34,13 +34,14 @@ replay, not installed OpenCode execution. QA and red-team independently rerun.
 Implemented in `adapters/opencode/` (`pedigree.js` entry, `pedigree-core.js` core,
 `README.md` install/config/limits; dependency-free ESM, no npm packages):
 
-- Builtin Node suite, 37 tests: `fixture-mapping.test.js` (exact allowlisted wire
+- Builtin Node suite, 38 tests: `fixture-mapping.test.js` (exact allowlisted wire
   contract from the genuine 1.19.0 payload), `hooks.test.js` (gate/denial/ordering/
   latch matrix), `paths.test.js` (traversal, symlink/junction escape, credential
   exclusions, display validation, win32 stream/drive-relative denial, case
-  canonicalization), `privacy.test.js` (canaries + body-key allowlist),
-  `bounds-config.test.js` (opt-in, fail-closed misconfiguration, clamps, memory/URI
-  bounds). Run under pytest by `tests/unit/test_opencode_adapter_suite.py`.
+  canonicalization, dot-dot literal names vs `..`-segment escapes), `privacy.test.js`
+  (canaries + body-key allowlist), `bounds-config.test.js` (opt-in, fail-closed
+  misconfiguration, clamps, memory/URI bounds). Run under pytest by
+  `tests/unit/test_opencode_adapter_suite.py`.
 - End-to-end hook replay: `tests/integration/test_opencode_plugin.py` drives the
   genuine fixture through a Node subprocess into a live API + real FalkorDB 42201,
   asserting the persisted Source identity with an independently recomputed digest,
@@ -70,6 +71,10 @@ scanner; plus stale-doc and claim-wording findings) and the red-team evidence in
   between validation and the runtime read. P-014 (`/v1/events` bypassing node_cap)
   is pre-existing and out of this slice's scope (`AUDIT.md`).
 
-Builder fix-verification evidence is in the QA addendum (`docs/qa/F-08.md`);
-an independent QA rerun must still pass before any shipped-subset claim, and
+Builder fix-verification evidence is in the QA addendum (`docs/qa/F-08.md`): independent
+round 1 found a secret-scan canary and stale docs; independent round 2 found that the
+review-evidence commit itself had reintroduced the canary literal (plus one fail-closed
+path over-denial) — both closed by redaction + the segment-aware escape fix and the
+commit amended in place (`bb9511a`, unpushed); round 3 re-confirmed PASS with fresh runs
+of every gate and of the reviewer's own probe harness. F-08 stays implementing;
 installed-runtime acceptance of this plugin file remains unverified.

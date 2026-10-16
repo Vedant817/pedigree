@@ -128,7 +128,7 @@ node --test adapters/opencode/tests/fixture-mapping.test.js adapters/opencode/te
   adapters/opencode/tests/bounds-config.test.js
 ```
 
-- `tests/unit/test_opencode_adapter_suite.py` runs the same suite (37 tests)
+- `tests/unit/test_opencode_adapter_suite.py` runs the same suite (38 tests)
   under pytest.
 - `tests/integration/test_opencode_plugin.py` starts a real local API and
   FalkorDB, then drives the genuine fixture through `tests/driver.js` with a

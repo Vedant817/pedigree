@@ -1,7 +1,8 @@
 # CURRENT STATE (overwritten after every feature / checkpoint)
 
-- **Phase:** P2/P3 hardening and evaluation publication; updated Fri 2026-10-16 10:31 IST.
-- **Last implementation commits:** 8dd6509 (F-08 OpenCode read-only slice incl. review hardening),
+- **Phase:** P2/P3 hardening and evaluation publication; updated Fri 2026-10-16 11:00 IST.
+- **Last implementation commits:** bb9511a (F-08 review fixes incl. round-2 closure, amended
+  in place), 8dd6509 (F-08 OpenCode read-only slice incl. review hardening),
   f475979 (OpenCode ADR-009 record), a677d9f (what-if/audit containment), d7f7409 (test fixture
   ownership).
 - **Environment:** Windows 11; Python 3.12.15; pinned FalkorDB module 42201 in Docker;
@@ -9,10 +10,12 @@
 - **Deadlines:** feature freeze Sun 2026-10-18 15:00 IST; target submit 21:00; hard stop 23:59.
 - **Test state:** make check: 396 passed, 1 skipped (optional ACL deployment secret absent),
   1 xfailed (strict read-window watchdog), Ruff, tracked secret scan and numbers check PASS;
-  `scripts/check_secrets.sh` PASS including git history. F-08 slice: builtin Node suite 37 passed;
+  `scripts/check_secrets.sh` PASS including git history. F-08 slice: builtin Node suite 38 passed;
   hook-replay integration (live API + real FalkorDB) 3 passed; security regressions 1 passed
   + 1 strict xfail. QA round 1 FAIL (secret-scan canary + stale docs) fixed pre-push; red-team
-  F-08 findings fixed/disclosed; independent round-2 re-verification in flight.
+  F-08 findings fixed/disclosed; round-2 re-verification FAIL (the review-evidence commit itself
+  reintroduced the canary literal) fixed by redaction + amend (`a2b7fc4` -> `bb9511a`) plus one
+  fail-closed over-denial fixed; round-3 independent re-confirmation PASS.
   Independent what-if/audit QA: 45 passed; test-fixture ownership QA: 11 passed. Full serialized
   evaluation PASS; independent scoped F-14 statistical signoff PASS. Fresh local clone of 72c7650,
   new venv and editable dev install: make check PASS, 391 passed, 1 skipped in 38.86s.
@@ -31,7 +34,7 @@
   deletes only its own successful creates and reports cleanup failures. Independent real-DB
   sentinel survival passes. Earlier runs cannot establish that pre-existing data was preserved.
 - **Next 3 actions:**
-  1. Land the independent round-2 re-verification verdict for the F-08 fix round (round-1 QA/red-team findings are fixed or disclosed).
+  1. F-08 review cycle closed (round-3 PASS in `docs/qa/F-08.md`); F-08 stays implementing — installed-runtime acceptance still unclaimed.
   2. Resolve service ACL wiring with independent tenant-boundary QA.
   3. Finish durable hook spool/replay and remaining release checks before feature freeze.
 - **Human pending:** video recording, walkthrough/architecture review, organizer track decision,
@@ -433,3 +436,24 @@
   (pre-fix: two).
 - Honesty: F-08 remains implementing; hook-replay only; the three disclosures are limits, not
   guarantees changed.
+
+
+### 2026-10-16 11:00 IST | Phase P2/P3 | F-08 review cycle closed: round-2 FAIL fixed, round-3 PASS | STATUS: independent re-confirmation PASS at `bb9511a`; F-08 remains implementing
+- Round-2 verdict (independent QA, `docs/qa/F-08.md`): FAIL on one artifact - the review-evidence
+  commit itself (`a2b7fc4`) reintroduced the canary literal in its own report (F08R2-QA-1, High:
+  `make check` exit 2, `check_secrets.sh` exit 1 including history), plus a Low fail-closed
+  over-denial for in-project names starting `..` (F08R2-QA-2) and an Info `\\?\` over-denial
+  accepted as fail-closed (F08R2-QA-3). All code/test suites were green in round 2.
+- Fixes at the amended commit `bb9511a` (was `a2b7fc4`; unpushed before and after): the canary
+  assignment is paraphrased and two verbatim command arguments in the report are redacted;
+  `resolveWithinRoot` uses a segment-aware escape test (`escapesRoot`) in both branches with a
+  `..x`/`..foo/y.txt` allowed-vs-traversal-denied regression (Node suite 37 -> 38). Re-running the
+  reviewer's own probe: exactly rows 21/22 changed to allow+captured.
+- Evidence: `make check` 396 passed / 1 skipped / 1 xfailed; Ruff/secret/numbers PASS;
+  `scripts/check_secrets.sh` PASS including git history; `git log -S` and `git grep` clean for the
+  canary literal and its prefix; Node 38/38; security 1 passed + 1 strict xfail; integration
+  3 passed; round-3 independent re-confirmation PASS (fresh gate reruns + full 58-row probe diff:
+  only the two over-deny rows changed, every denial row byte-identical with fetches 0).
+- Honesty: F-08 remains implementing; hook-replay only, installed-runtime acceptance unclaimed;
+  F08R2-QA-3 stays accepted fail-closed; the amended-away commits remain as dangling local,
+  unreachable objects until a future `git gc` (not scanned by the history scan, not pushable).
