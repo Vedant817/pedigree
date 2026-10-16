@@ -163,6 +163,7 @@ def revoke(
             }
         roots = revoked_roots(db, gname, trace=trace)
         statuses, final = resolve(db, gname, roots, trace=trace, hook=hook)
+        reconcile(db, gname, trace=trace, allow_running=True)  # P-024: repair stragglers before finishing
         out = _finish(db, gname, rid, statuses, final, trace)
         out.update({"idempotent": False, "root_id": root_id, "kind": kind, "reason": reason})
         out["ms"] = round((time.perf_counter() - t0) * 1000, 1)
@@ -351,6 +352,33 @@ def resume_incomplete(db: Db, gname: str, *, trace: Trace | None = None) -> list
             statuses, final = resolve(db, gname, roots, trace=trace)
             out.append(_finish(db, gname, rid, statuses, final, trace))
     return out
+
+
+def reconcile(db: Db, gname: str, *, allow_running: bool = False, trace: Trace | None = None, hook=None) -> dict:
+    """P-024: repair nodes left `quarantined` with no `running` Revocation.
+
+    Only acts when no Revocation is running (running rows are handled by resume_incomplete),
+    unless invoked from within an in-flight `revoke()`, in which case allow_running=True.
+    Returns a summary; does not create a Revocation row (statuses are derived from remaining
+    revoked roots).
+    """
+    running = db.ro_query(gname, Q.Q_RUNNING_REVOCATIONS, {}, op="reconcile.running", trace=trace)
+    if (not allow_running) and running.result_set:
+        return {"reconciled": 0, "skipped": "running_revocation_present",
+                "running": len(running.result_set)}
+    quarantined_rows = db.ro_query(
+        gname, Q.Q_QUARANTINED_NODES, {}, op="reconcile.quarantined", trace=trace).result_set or []
+    qids = [r[0] for r in quarantined_rows]
+    if not qids:
+        return {"reconciled": 0, "running": 0}
+    # Materialise the stragglers as 'ok' so the normal recompute can re-classify them.
+    for ch in chunks(qids):
+        db.query(gname, "UNWIND $ids AS i MATCH (n:Node {id:i}) SET n.status='ok' RETURN count(n)",
+                 {"ids": ch}, op="reconcile.seed", trace=trace)
+    roots = revoked_roots(db, gname, trace=trace)
+    seeds = set(qids) | roots
+    resolve(db, gname, roots, seeds=seeds, trace=trace, hook=hook)
+    return {"reconciled": len(qids), "running": 0}
 
 
 def report(db: Db, gname: str, *, trace: Trace | None = None) -> dict:

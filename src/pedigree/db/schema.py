@@ -180,4 +180,20 @@ def check_invariants(
             topological_order(nodes, parents)
         except CycleError:
             violations.append("derivation graph contains a cycle")
+
+    # P-024: quarantined nodes without a running Revocation are stragglers
+    try:
+        running = db.ro_query(gname, Q.Q_RUNNING_REVOCATIONS, {}, op="inv").result_set or []
+    except Exception:  # noqa: BLE001
+        running = []
+    if not running:
+        try:
+            quarantined_count = db.ro_query(
+                gname, "MATCH (n:Node {status:'quarantined'}) RETURN count(n) AS n", {},
+                op="inv.q", ).result_set or []
+            quarantined_count = int(quarantined_count[0][0]) if quarantined_count else 0
+        except Exception:  # noqa: BLE001
+            quarantined_count = 0
+        if quarantined_count:
+            violations.append(f"quarantined node without a running Revocation: {quarantined_count}")
     return violations

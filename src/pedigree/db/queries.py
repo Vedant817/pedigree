@@ -231,6 +231,7 @@ RETURN v.id
 Q_RUNNING_REVOCATIONS = """
 MATCH (v:Revocation {state:'running'}) RETURN v.id, v.root_id, v.tenant ORDER BY v.started_at
 """
+Q_QUARANTINED_NODES = "MATCH (n:Node {status:'quarantined'}) RETURN n.id, coalesce(n.tenant, '') AS tenant"
 Q_REINSTATE_ROOT = """
 MATCH (r:Node) WHERE r.id = $id AND r.status = 'revoked'
   AND ('Source' IN labels(r) OR 'Memory' IN labels(r))

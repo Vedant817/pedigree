@@ -82,7 +82,7 @@ def _startup_resume(db: Db, registry: TenantRegistry) -> None:
     import logging
 
     from ..config import graph_name
-    from ..engine.revoke import resume_incomplete  # function-local keeps import side-effect free
+    from ..engine.revoke import reconcile, resume_incomplete  # function-local: side-effect free
 
     log = logging.getLogger("pedigree.resume")
     try:
@@ -93,6 +93,10 @@ def _startup_resume(db: Db, registry: TenantRegistry) -> None:
                 if done:
                     log.info("startup-resume: finished %d revocation(s) for tenant %s",
                              len(done), rec.tenant_id)
+                rec_res = reconcile(db, gname)
+                if rec_res.get("reconciled"):
+                    log.info("startup-reconcile: repaired %s quarantined nodes for tenant %s",
+                             rec_res.get("reconciled"), rec.tenant_id)
             except Exception:  # noqa: BLE001
                 log.warning("startup-resume: failed for tenant %s", rec.tenant_id,
                            exc_info=True)

@@ -198,6 +198,31 @@ def resume_revocations(settings: Settings, tenant: str | None) -> int:
     return 0
 
 
+def reconcile_stragglers(settings: Settings, tenant: str | None) -> int:
+    """P-024 (B3): repair nodes stranded `quarantined` with no running Revocation."""
+    from .api.registry import TenantRegistry
+    from .config import graph_name
+    from .db.client import Db
+    from .engine.revoke import reconcile
+
+    db = Db(settings)
+    registry = TenantRegistry(db, settings)
+    targets = [tenant] if tenant is not None else [r.tenant_id for r in registry.list_tenants()]
+    total = 0
+    for tid in targets:
+        gname = graph_name(tid)
+        try:
+            out = reconcile(db, gname)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[reconcile] {tid}: failed: {exc}", file=sys.stderr)
+            return 1
+        total += out.get("reconciled", 0)
+        if out.get("reconciled"):
+            print(f"[reconcile] {tid}: repaired {out.get('reconciled')} node(s)")
+    print(f"[reconcile] repaired {total} node(s) in total")
+    return 0
+
+
 def serve(settings: Settings, host: str, port: int) -> int:
     import uvicorn
 
@@ -233,6 +258,9 @@ def main(argv: list[str] | None = None) -> int:
     p_resume = sub.add_parser("resume", help="finish crashed (`running`) revocations and exit")
     p_resume.add_argument("--tenant", default=None, help="limit to one tenant (default: all)")
 
+    p_reconcile = sub.add_parser("reconcile", help="repair stragglers (quarantined without running)")
+    p_reconcile.add_argument("--tenant", default=None, help="limit to one tenant (default: all)")
+
     sub.add_parser("seed", help="seed the demo tenant (synthetic scenarios)")
     sub.add_parser("version", help="print version")
 
@@ -255,6 +283,8 @@ def main(argv: list[str] | None = None) -> int:
         return admin_create_tenant(settings, args.id, args.cap)
     if args.cmd == "resume":
         return resume_revocations(settings, args.tenant)
+    if args.cmd == "reconcile":
+        return reconcile_stragglers(settings, args.tenant)
     if args.cmd == "seed":
         from . import __version__  # noqa: F401  (import check)
 

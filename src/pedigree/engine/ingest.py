@@ -263,6 +263,17 @@ def remember(
     if not keep_text and text:
         warnings.append("text_not_stored")
 
+    # P-031 (B4): derived_from parents may only be existing Source/Memory/Action nodes.
+    for _p in parents:
+        _exists, _labels = node_exists(db, gname, _p, trace)
+        if not _exists:
+            continue  # `require_nodes` below raises NotFoundInGraph
+        if not (set(_labels) & {"Source", "Memory", "Action"}):
+            raise InvalidArgument(
+                "parent must be a Source, Memory, or Action node",
+                detail={"parent": _p, "labels": sorted(_labels or [])},
+            )
+
     require_nodes(db, gname, parents, trace)
     with_trace = trace
     if parents:
