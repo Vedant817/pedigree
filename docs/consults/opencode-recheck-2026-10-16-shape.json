@@ -1,0 +1,59 @@
+{
+  "status": "real_read_tool_executed_session_final_response_timed_out",
+  "runtime": "opencode 1.19.0",
+  "date": "2026-10-16",
+  "model": "opencode/deepseek-v4.1-flash-free",
+  "model_catalog_cost": {
+    "input": 0,
+    "output": 0,
+    "cache_read": 0,
+    "cache_write": 0
+  },
+  "completed_read_tools": 1,
+  "step_finish_cost": 0,
+  "wall_timeout_seconds": 60,
+  "tool_events": [
+    {
+      "hook": "tool.execute.before",
+      "input": {
+        "tool": "read",
+        "sessionID": "$SESSION_ID",
+        "callID": "$CALL_ID"
+      },
+      "output": {
+        "args": {
+          "filePath": "$PROJECT\\dummy.txt"
+        }
+      }
+    },
+    {
+      "hook": "tool.execute.after",
+      "input": {
+        "tool": "read",
+        "sessionID": "$SESSION_ID",
+        "callID": "$CALL_ID",
+        "args": {
+          "filePath": "$PROJECT\\dummy.txt"
+        }
+      },
+      "output": {
+        "title": "$PROJECT/dummy.txt",
+        "output": "<path>$PROJECT\\dummy.txt</path>\n<type>file</type>\n<content>\n1: Synthetic public Pedigree capture recheck. Marker: F08_RECHECK_DUMMY_READ_OK.\n\n(End of file - total 1 lines)\n</content>",
+        "metadata": {
+          "preview": "Synthetic public Pedigree capture recheck. Marker: F08_RECHECK_DUMMY_READ_OK.",
+          "truncated": false,
+          "loaded": [],
+          "display": {
+            "type": "file",
+            "path": "$PROJECT\\dummy.txt",
+            "text": "Synthetic public Pedigree capture recheck. Marker: F08_RECHECK_DUMMY_READ_OK.",
+            "lineStart": 1,
+            "lineEnd": 1,
+            "totalLines": 1,
+            "truncated": false
+          }
+        }
+      }
+    }
+  ]
+}
