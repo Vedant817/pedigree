@@ -123,9 +123,10 @@ EXPECTATIONS: dict[str, Expectation] = {
         "corroborating source -> preserved, then reinstate -> ok).",
     ),
     "S06": Expectation(
-        "expected-fail", "P-012",
-        "reinstate(A) must not un-revoke the independent root B: A(src)->B(mem)->Cc(mem), "
-        "revoke A, revoke B, reinstate A => want A=ok, B=revoked, Cc=tainted; today all ok.",
+        "pass", "P-012",
+        "reinstate(A) does not un-revoke independent root B: A(src)->B(mem)->Cc(mem); "
+        "revoke A, revoke B, reinstate A => A=ok, B=revoked, Cc=tainted (FIXED; flip back only "
+        "if it regresses).",
     ),
     "S07": Expectation(
         "expected-fail", "P-014",
@@ -178,9 +179,9 @@ EXPECTATIONS: dict[str, Expectation] = {
         "pedigree_record_source -> pedigree_blame). Fixed at 6340a5c + 561b7e2.",
     ),
     "S18": Expectation(
-        "expected-fail", "P-011",
-        "CLI: `admin --help` exits 0 (P-013 fixed); `resume --help` is still rejected until P-011 "
-        "lands.",
+        "pass", "",
+        "CLI subcommands `admin create-tenant` and `resume` exist (exit 0 on --help); P-011/P-013 "
+        "fixed.",
     ),
     "S19": Expectation(
         "pass", "",
