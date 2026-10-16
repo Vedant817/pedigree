@@ -7,7 +7,15 @@ from ...config import LIMITS
 from ...db.schema import check_invariants
 from ...engine.gate import classify_action, load_policy
 from ...engine.ingest import artifact_lookup as lookup_fn
-from ...engine.ingest import ensure_session, read_window, record_action, record_source, remember, session_read
+from ...engine.ingest import (
+    ensure_session,
+    read_window,
+    record_action,
+    record_source,
+    remember,
+    session_read,
+)
+from ...engine.quota import QuotaPolicy, admission, preflight
 from ...errors import TooLarge
 from .. import auth
 from ..routes.engine import operator_authorized
@@ -35,73 +43,75 @@ def register(app: FastAPI, db, registry, settings) -> None:
         def resolve(value):
             return aliases.get(value, value) if isinstance(value, str) else value
 
-        for spec in spec_list:
-            op = spec.get("op")
-            sid = spec.get("session_id")
-            if op == "session":
-                ensure_session(db, gname, tenant, sid, runtime=payload.runtime or spec.get("runtime", "other"))
-            elif op == "session_read":
-                session_read(db, gname, sid, resolve(spec.get("node_id")))
-            elif op == "source":
-                # The capture channel never asserts trust for an agent token: integrity is
-                # forced to untrusted unless the operator credential is presented. A claimed
-                # `runtime`/`kind`/`integrity` in the payload is not a credential (ADR-008).
-                operator = operator_authorized(request, settings)
-                res = record_source(
-                    db,
-                    gname,
-                    tenant,
-                    kind=spec.get("kind", "web"),
-                    uri=spec.get("uri"),
-                    title=spec.get("title"),
-                    integrity=spec.get("integrity") if operator else "untrusted",
-                    content_hash=spec.get("content_hash"),
-                    conf=spec.get("conf"),
-                    id=spec.get("id"),
-                )
-                if spec.get("id"):
-                    aliases[spec["id"]] = res.id
-                created.append(res.id)
-            elif op == "memory":
-                res = remember(
-                    db,
-                    gname,
-                    tenant,
-                    text=spec.get("text", ""),
-                    derived_from=[resolve(x) for x in (spec.get("derived_from") or [])],
-                    corroborated_by=[resolve(x) for x in (spec.get("corroborated_by") or [])],
-                    artifact=spec.get("artifact"),
-                    artifact_key=spec.get("artifact_key"),
-                    id=spec.get("id"),
-                    session_id=sid,
-                    via="hook" if payload.runtime in {"claude-code", "opencode"} else "agent_reported",
-                )
-                created.append(res.id)
-            elif op == "action":
-                parents = [resolve(x) for x in (spec.get("relied_on") or [])] or (
-                    read_window(db, gname, sid, settings.pedigree_read_window) if sid else [])
-                effect, risk = classify_action(load_policy(settings.pedigree_policy_file),
-                                                spec.get("tool", "unknown"), spec.get("summary", ""),
-                                                effect=spec.get("effect"), risk=spec.get("risk"))
-                res = record_action(
-                    db,
-                    gname,
-                    tenant,
-                    tool=spec.get("tool", "unknown"),
-                    summary=spec.get("summary", ""),
-                    relied_on=parents,
-                    decision=spec.get("decision"),
-                    effect=effect,
-                    risk=risk,
-                    artifacts=spec.get("artifacts") or [],
-                    artifact_key=spec.get("artifact_key"),
-                    session_id=sid,
-                    id=spec.get("id"),
-                    via="hook" if payload.runtime in {"claude-code", "opencode"} else "agent_reported",
-                )
-                created.append(res.id)
-            else:
-                continue
+        with admission(db, gname, QuotaPolicy(tenant, registry.get_record(tenant).node_cap)) as locked_db:
+            preflight(locked_db, gname, tenant, spec_list)
+            for spec in spec_list:
+                op = spec.get("op")
+                sid = spec.get("session_id")
+                if op == "session":
+                    ensure_session(locked_db, gname, tenant, sid, runtime=payload.runtime or spec.get("runtime", "other"))
+                elif op == "session_read":
+                    session_read(locked_db, gname, sid, resolve(spec.get("node_id")))
+                elif op == "source":
+                    # The capture channel never asserts trust for an agent token: integrity is
+                    # forced to untrusted unless the operator credential is presented. A claimed
+                    # `runtime`/`kind`/`integrity` in the payload is not a credential (ADR-008).
+                    operator = operator_authorized(request, settings)
+                    res = record_source(
+                        locked_db,
+                        gname,
+                        tenant,
+                        kind=spec.get("kind", "web"),
+                        uri=spec.get("uri"),
+                        title=spec.get("title"),
+                        integrity=spec.get("integrity") if operator else "untrusted",
+                        content_hash=spec.get("content_hash"),
+                        conf=spec.get("conf"),
+                        id=spec.get("id"),
+                    )
+                    if spec.get("id"):
+                        aliases[spec["id"]] = res.id
+                    created.append(res.id)
+                elif op == "memory":
+                    res = remember(
+                        locked_db,
+                        gname,
+                        tenant,
+                        text=spec.get("text", ""),
+                        derived_from=[resolve(x) for x in (spec.get("derived_from") or [])],
+                        corroborated_by=[resolve(x) for x in (spec.get("corroborated_by") or [])],
+                        artifact=spec.get("artifact"),
+                        artifact_key=spec.get("artifact_key"),
+                        id=spec.get("id"),
+                        session_id=sid,
+                        via="hook" if payload.runtime in {"claude-code", "opencode"} else "agent_reported",
+                    )
+                    created.append(res.id)
+                elif op == "action":
+                    parents = [resolve(x) for x in (spec.get("relied_on") or [])] or (
+                        read_window(locked_db, gname, sid, settings.pedigree_read_window) if sid else [])
+                    effect, risk = classify_action(load_policy(settings.pedigree_policy_file),
+                                                    spec.get("tool", "unknown"), spec.get("summary", ""),
+                                                    effect=spec.get("effect"), risk=spec.get("risk"))
+                    res = record_action(
+                        locked_db,
+                        gname,
+                        tenant,
+                        tool=spec.get("tool", "unknown"),
+                        summary=spec.get("summary", ""),
+                        relied_on=parents,
+                        decision=spec.get("decision"),
+                        effect=effect,
+                        risk=risk,
+                        artifacts=spec.get("artifacts") or [],
+                        artifact_key=spec.get("artifact_key"),
+                        session_id=sid,
+                        id=spec.get("id"),
+                        via="hook" if payload.runtime in {"claude-code", "opencode"} else "agent_reported",
+                    )
+                    created.append(res.id)
+                else:
+                    continue
         return {"created": created}
 
     @app.get("/v1/artifacts/lookup")

@@ -28,6 +28,12 @@ that cannot be finished goes here rather than being silently dropped.
 | 21 | 2026-10-16 | Isolation and E3 scenario fixture teardown previously enumerated and deleted all registered tenants. It now tracks only successful creates owned by that fixture, preserves a real pre-existing sentinel, and reports retained/unknown cleanup failures. Earlier runs cannot establish preservation of pre-existing data. The dedicated synthetic demo was re-seeded after repair; no recovery of arbitrary deleted data is claimed. | high | repaired; docs/qa/test-fixture-ownership.md and e3-fixture-ownership.md PASS; lazy suite sentinel added |
 
 What-if F-17 and source audit F-18 have independent QA/red-team PASS for their local subsets.
+P-014 quota admission requires one stable Redis/Falkor primary and coordination keys
+protected from eviction or loss. A crash or uncertain mutation can strand a nonexpiring
+tenant mutex. Recovery requires stopping writers and confirming DB work is quiescent
+before deleting the exact key; failover with live writers is outside this guarantee.
+A full graph can reject revoke/reinstate when a new ledger node is needed. See
+[the quota contract](fixes/P-014.md) and ADR-010 for this availability tradeoff.
 F-17 concurrency admission is process-local; checkpoint/restore remains unbuilt.
 F-18 WCC analysis remains unbuilt. These subset passes do not close the ACL service-wiring
 item or establish multi-process what-if coordination.

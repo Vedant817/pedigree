@@ -18,6 +18,7 @@ from ..db.client import Db, Trace, chunks
 from ..errors import InvalidArgument, NotFoundInGraph, PedigreeError, TooLarge
 from .compute import compute_final
 from .ingest import new_id, node_exists, now_ms
+from .quota import quota_write
 
 MAX_FIXPOINT_ITERS = 10
 MAX_VERIFY_ITERS = 5
@@ -75,6 +76,7 @@ def plan(db: Db, gname: str, roots, *, seeds=None, trace: Trace | None = None):
 
 
 # --- public API -------------------------------------------------------------
+@quota_write("revoke")
 def revoke(
     db: Db,
     gname: str,
@@ -267,6 +269,7 @@ def _finish(db: Db, gname: str, rid: str, statuses: dict[str, str], final, trace
     }
 
 
+@quota_write("reinstate")
 def reinstate(
     db: Db,
     gname: str,

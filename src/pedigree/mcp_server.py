@@ -8,12 +8,13 @@ from .api.registry import TenantRegistry
 from .api.routes.engine import AGENT_SAFE_KINDS
 from .config import get_settings, graph_name
 from .db.client import Db
-from .db.schema import ensure_schema, node_count
+from .db.schema import ensure_schema
 from .engine.audit import audit_sources
 from .engine.blame import blame as run_blame
 from .engine.blame import impact as run_impact
 from .engine.gate import check_action
 from .engine.ingest import corroborate, record_action, record_source, remember
+from .engine.quota import QuotaPolicy
 from .engine.revoke import reinstate, report, revoke
 from .engine.whatif import whatif
 from .errors import PedigreeError
@@ -88,13 +89,10 @@ class PedigreeMCPServer:
             tid, gname = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
-            cap = self.registry.get_record(tid).node_cap
-            if node_count(self.db, gname) >= cap:
-                return {"ok": False, "error": {"code": "quota_exceeded", "message": "node cap exceeded"}}
             def go():
                 # MCP has no operator credential (tools must not accept one), so every source
                 # an agent records is untrusted regardless of kind (ADR-008).
-                r = record_source(self.db, gname, tid, kind=kind, uri=uri, title=title,
+                r = record_source(self.db, gname, tid, quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap), kind=kind, uri=uri, title=title,
                                   integrity="untrusted", conf=conf, id=id)
                 return {"id": r.id, "status": r.status, "low_integrity": r.low_integrity,
                         "warnings": r.warnings}
@@ -108,11 +106,8 @@ class PedigreeMCPServer:
             tid, gname = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
-            cap = self.registry.get_record(tid).node_cap
-            if node_count(self.db, gname) >= cap:
-                return {"ok": False, "error": {"code": "quota_exceeded", "message": "node cap exceeded"}}
             def go():
-                r = remember(self.db, gname, tid, text=text, mkind=mkind, derived_from=derived_from or [],
+                r = remember(self.db, gname, tid, quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap), text=text, mkind=mkind, derived_from=derived_from or [],
                             corroborated_by=corroborated_by or [], artifact=artifact,
                             artifact_key=artifact_key, id=id)
                 return {"id": r.id, "status": r.status, "low_integrity": r.low_integrity,
@@ -128,11 +123,8 @@ class PedigreeMCPServer:
             tid, gname = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
-            cap = self.registry.get_record(tid).node_cap
-            if node_count(self.db, gname) >= cap:
-                return {"ok": False, "error": {"code": "quota_exceeded", "message": "node cap exceeded"}}
             def go():
-                r = record_action(self.db, gname, tid, tool=tool, summary=summary,
+                r = record_action(self.db, gname, tid, quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap), tool=tool, summary=summary,
                                   relied_on=relied_on or [], decision=decision, effect=effect,
                                   risk=risk, artifacts=artifacts or [], id=id)
                 return {"id": r.id, "status": r.status, "low_integrity": r.low_integrity,
@@ -152,7 +144,7 @@ class PedigreeMCPServer:
             tid, gname = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
-            return _call(lambda: (corroborate(self.db, gname, memory_id, source_id, by="agent"), {"ok": True})[1])
+            return _call(lambda: (corroborate(self.db, gname, memory_id, source_id, by="agent", quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap)), {"ok": True})[1])
 
         @srv.tool()
         def pedigree_check_action(token: str | None = None, tool: str = "", summary: str = "",
@@ -167,13 +159,11 @@ class PedigreeMCPServer:
             tid, gname = self._resolve(token=token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
-            if record and node_count(self.db, gname) >= self.registry.get_record(tid).node_cap:
-                return {"ok": False, "error": {"code": "quota_exceeded", "message": "node cap exceeded"}}
             return _call(lambda: check_action(
                 self.db, gname, {"tool": tool, "summary": summary, "effect": effect,
                                  "risk": risk, "audience": audience},
                 relied_on=relied_on, session_id=session_id, max_depth=max_depth,
-                policy_path=self.settings.pedigree_policy_file, record=record, tenant=tid))
+                policy_path=self.settings.pedigree_policy_file, record=record, tenant=tid, quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap)))
 
         @srv.tool()
         def pedigree_revoke(tenant_id: str | None = None, token: str | None = None,
@@ -183,7 +173,7 @@ class PedigreeMCPServer:
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             return _call(lambda: revoke(self.db, gname, tid, root_id=root_id, reason=reason,
-                                       dry_run=dry_run, kind=kind))
+                                       dry_run=dry_run, kind=kind, quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap)))
 
         @srv.tool()
         def pedigree_reinstate(tenant_id: str | None = None, token: str | None = None,
@@ -191,7 +181,7 @@ class PedigreeMCPServer:
             tid, gname = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
-            return _call(lambda: reinstate(self.db, gname, tid, root_id=root_id, dry_run=dry_run))
+            return _call(lambda: reinstate(self.db, gname, tid, root_id=root_id, dry_run=dry_run, quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap)))
 
         @srv.tool()
         def pedigree_blame(tenant_id: str | None = None, token: str | None = None,

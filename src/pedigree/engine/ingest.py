@@ -31,6 +31,7 @@ from ..config import (
 from ..db import queries as Q
 from ..db.client import Db, Trace, chunks
 from ..errors import Conflict, InvalidArgument, NotFoundInGraph, TooLarge
+from .quota import quota_write
 
 VIA_VALUES = ("cite", "session_read", "agent_reported", "hook")
 
@@ -120,6 +121,7 @@ def require_nodes(db: Db, gname: str, ids: list[str], trace: Trace | None, *, op
         raise NotFoundInGraph("unknown ids", detail={"missing": missing[:16], "n_missing": len(missing)})
 
 
+@quota_write("source")
 def record_source(
     db: Db,
     gname: str,
@@ -205,6 +207,7 @@ def record_source(
     return IngestResult(row[0], row[1], bool(row[2]), list(row[3] or []), 0, warnings)
 
 
+@quota_write("memory")
 def remember(
     db: Db,
     gname: str,
@@ -311,6 +314,7 @@ def remember(
     return result
 
 
+@quota_write("action")
 def record_action(
     db: Db,
     gname: str,
@@ -395,6 +399,7 @@ def record_action(
     return result
 
 
+@quota_write("edge")
 def corroborate(db: Db, gname: str, memory_id: str, source_id: str, *, by: str = "agent", trace: Trace | None = None) -> None:
     if by not in ("agent", "human", "scanner"):
         raise InvalidArgument("invalid corroboration author", detail={"by": str(by)[:16]})
@@ -407,6 +412,7 @@ def corroborate(db: Db, gname: str, memory_id: str, source_id: str, *, by: str =
 
 
 # --- sessions ---------------------------------------------------------------
+@quota_write("session")
 def ensure_session(
     db: Db, gname: str, tenant: str, session_id: str, *, runtime: str = "other",
     agent_id: str | None = None, now: int | None = None, trace: Trace | None = None,
@@ -423,6 +429,7 @@ def ensure_session(
     return session_id
 
 
+@quota_write("edge")
 def session_read(db: Db, gname: str, session_id: str, node_id: str, *, now: int | None = None, trace: Trace | None = None) -> None:
     res = db.query(
         gname, Q.Q_SESSION_READ, {"sess": session_id, "n": node_id, "now": now or now_ms()},

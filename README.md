@@ -225,6 +225,12 @@ OpenCode session, and write/edit/shell coverage plus real-session gate friction 
 - **Input surface:** static parameterised Cypher with a lint gate, id/URI/artifact validation,
   body-size and array caps, per-tenant rate limits and node quotas, bounded query timeouts, and
   the registry tenant id reserved.
+- **Quota admission:** public creators share a request-wide owner-token mutex and count
+  new identities before writing. Quota overflow leaves an events batch unchanged; other
+  errors can leave earlier events committed. This requires a stable Redis primary with
+  coordination keys protected from eviction. A crash or uncertain write can strand the
+  mutex and block later writes; recovery requires stopping writers and confirming DB
+  work is quiescent. See [P-014](docs/fixes/P-014.md) for the exact recovery boundary.
 - **Secret checks:** `.env` is ignored and `.env.example` is committed. `make check` scans
   tracked files; `python scripts/secret_scan.py --history` also scans Git history and is
   run explicitly at release checkpoints. Pattern scanning is not a proof of absence.

@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from fastapi import FastAPI, Request
 
-from ...db.schema import node_count
 from ...engine.gate import check_action
-from ...errors import QuotaExceeded
+from ...engine.quota import QuotaPolicy
 from .. import auth
 from ..schemas import GateRequest
 
@@ -15,13 +14,12 @@ def register(app: FastAPI, db, registry, settings) -> None:
         auth.authenticate(request)
         tenant = request.state.tenant_id
         gname = request.state.graph_name
-        if payload.record and node_count(db, gname) >= registry.get_record(tenant).node_cap:
-            raise QuotaExceeded("node cap exceeded")
         result = check_action(
             db,
             gname,
             action=payload.action.model_dump(),
             tenant=tenant,
+            quota=QuotaPolicy(tenant, registry.get_record(tenant).node_cap),
             relied_on=payload.relied_on,
             session_id=payload.session_id,
             policy_path=settings.pedigree_policy_file,

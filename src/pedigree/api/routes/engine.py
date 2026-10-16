@@ -6,14 +6,15 @@ import time
 from fastapi import FastAPI, Request
 
 from ...config import graph_name
-from ...db.schema import ensure_schema, node_count
+from ...db.schema import ensure_schema
 from ...engine.audit import audit_sources
 from ...engine.blame import blame as run_blame
 from ...engine.blame import impact as run_impact
 from ...engine.ingest import corroborate, ensure_session, record_action, record_source, remember, session_read
+from ...engine.quota import QuotaPolicy, admission
 from ...engine.revoke import reinstate, report, revoke
 from ...engine.whatif import whatif
-from ...errors import InvalidArgument, PedigreeError, QuotaExceeded
+from ...errors import InvalidArgument, PedigreeError
 from .. import auth
 from ..schemas import (
     ActionCreate,
@@ -60,17 +61,10 @@ def register(app: FastAPI, db, registry, settings) -> None:
         ensure_schema(db, gname)
         return tenant, gname
 
-    def quota(db, gname, tenant):
-        cap = registry.get_record(tenant).node_cap
-        n = node_count(db, gname)
-        if n >= cap:
-            raise QuotaExceeded("node cap exceeded", detail={"nodes": n, "cap": cap})
-
     @app.post("/v1/sources")
     def create_source(payload: SourceCreate, request: Request):
         tenant, gname = tenant_and_db(request)
         gate(request, tenant)
-        quota(db, gname, tenant)
         operator = operator_authorized(request, settings)
         if payload.kind not in AGENT_SAFE_KINDS and not operator:
             raise InvalidArgument(
@@ -82,7 +76,7 @@ def register(app: FastAPI, db, registry, settings) -> None:
         integrity = payload.integrity if (operator and payload.integrity) else (
             None if operator else "untrusted")
         res = record_source(
-            db, gname, tenant,
+            db, gname, tenant, quota=QuotaPolicy(tenant, registry.get_record(tenant).node_cap),
             kind=payload.kind,
             uri=payload.uri,
             title=payload.title,
@@ -98,9 +92,8 @@ def register(app: FastAPI, db, registry, settings) -> None:
     def create_memory(payload: MemoryCreate, request: Request):
         tenant, gname = tenant_and_db(request)
         gate(request, tenant)
-        quota(db, gname, tenant)
         res = remember(
-            db, gname, tenant,
+            db, gname, tenant, quota=QuotaPolicy(tenant, registry.get_record(tenant).node_cap),
             text=payload.text,
             mkind=payload.mkind,
             derived_from=payload.derived_from,
@@ -121,9 +114,8 @@ def register(app: FastAPI, db, registry, settings) -> None:
     def create_action(payload: ActionCreate, request: Request):
         tenant, gname = tenant_and_db(request)
         gate(request, tenant)
-        quota(db, gname, tenant)
         res = record_action(
-            db, gname, tenant,
+            db, gname, tenant, quota=QuotaPolicy(tenant, registry.get_record(tenant).node_cap),
             tool=payload.tool,
             summary=payload.summary,
             relied_on=payload.relied_on,
@@ -147,21 +139,22 @@ def register(app: FastAPI, db, registry, settings) -> None:
         if payload.by in ("human", "scanner") and not operator_authorized(request, settings):
             raise PedigreeError("trusted attestation needs the operator credential",
                                 code="forbidden", detail={"header": "X-Admin-Token"})
-        corroborate(db, gname, payload.memory_id, payload.source_id, by=payload.by)
+        corroborate(db, gname, payload.memory_id, payload.source_id, by=payload.by, quota=QuotaPolicy(tenant, registry.get_record(tenant).node_cap))
         return {"ok": True, "by": payload.by}
 
     @app.post("/v1/sessions")
     def ensure(payload: EnsureSessionRequest, request: Request):
         tenant, gname = tenant_and_db(request)
-        sid = ensure_session(db, gname, tenant, payload.session_id, runtime=payload.runtime, agent_id=payload.agent_id)
+        sid = ensure_session(db, gname, tenant, payload.session_id, runtime=payload.runtime, agent_id=payload.agent_id, quota=QuotaPolicy(tenant, registry.get_record(tenant).node_cap))
         return {"session_id": sid}
 
     @app.post("/v1/sessions/read")
     def sread(payload: SessionReadRequest, request: Request):
         tenant, gname = tenant_and_db(request)
-        if payload.ensure == "yes":
-            ensure_session(db, gname, tenant, payload.session_id, runtime=payload.runtime)
-        session_read(db, gname, payload.session_id, payload.node_id)
+        with admission(db, gname, QuotaPolicy(tenant, registry.get_record(tenant).node_cap)) as locked_db:
+            if payload.ensure == "yes":
+                ensure_session(locked_db, gname, tenant, payload.session_id, runtime=payload.runtime)
+            session_read(locked_db, gname, payload.session_id, payload.node_id)
         return {"ok": True}
 
     @app.post("/v1/revoke")
@@ -170,7 +163,7 @@ def register(app: FastAPI, db, registry, settings) -> None:
         gate(request, tenant, "revoke")
         gate(request, tenant)  # establish sane consistent state
         out = revoke(db, gname, tenant, root_id=payload.root_id, reason=payload.reason,
-                    dry_run=payload.dry_run, kind=payload.kind)
+                    dry_run=payload.dry_run, kind=payload.kind, quota=QuotaPolicy(tenant, registry.get_record(tenant).node_cap))
         return out
 
     @app.post("/v1/whatif")
@@ -183,7 +176,7 @@ def register(app: FastAPI, db, registry, settings) -> None:
     def do_reinstate(payload: ReinstateRequest, request: Request):
         tenant, gname = tenant_and_db(request)
         gate(request, tenant)
-        out = reinstate(db, gname, tenant, root_id=payload.root_id, dry_run=payload.dry_run)
+        out = reinstate(db, gname, tenant, root_id=payload.root_id, dry_run=payload.dry_run, quota=QuotaPolicy(tenant, registry.get_record(tenant).node_cap))
         return out
 
     @app.get("/v1/blame/{node_id}")

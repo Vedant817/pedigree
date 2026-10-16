@@ -1,9 +1,9 @@
 # CURRENT STATE (overwritten after every feature / checkpoint)
 
-- **Phase:** **Phase B complete** (FIX_PROMPT Phase B: P-011, P-012, P-024, P-031 all committed +
-  green; `make check` PASS; `make dogfood` PASS=16 / EXPECTED-FAIL=6). Enter **Phase C**
-  (security hardening); P-015 is consult-required before implementation. Updated
-  Fri 2026-10-16 18:00 IST.
+- **Phase:** Phase C security hardening, Fri 2026-10-16 21:00 IST. P-029 hygiene and
+  P-014 request-wide quota admission have independent QA/red-team PASS. Current full
+  `make check`: 519 passed, 1 skipped, 3 deselected, 1 xfailed; Ruff, tracked secrets
+  and numbers PASS. P-015 mandatory three-role consult is in progress; roles remain open.
 - **Last implementation commits:** 1243744/031f86a/83d7b73 (P-016 QA follow-up: stdio default-tenant
   token bypass fixed - red-team F-1 with red-at-parent regression; MCP errors actionable; README
   auth reality + 13-tool list; QA addenda), ef9033f (P-012 consult trio filed: domain + oracle
@@ -18,7 +18,7 @@
 - **Environment:** Windows 11; Python 3.12.15; pinned FalkorDB module 42201 in Docker;
   Node v24.13.1. Local core and synthetic demo require no model provider.
 - **Deadlines:** feature freeze Sun 2026-10-18 15:00 IST; target submit 21:00; hard stop 23:59.
-- **Test state:** make check: 406 passed, 1 skipped (optional ACL deployment secret absent),
+- **Previous checkpoint test state (not a current full-suite rerun):** make check: 406 passed, 1 skipped (optional ACL deployment secret absent),
   3 deselected (perf; `make check-perf` 3 passed - EXPLAIN index plans, 20 000-node revoke
   1 376 ms, 60 020-node gate 4.0 ms; P-010 QA re-measured 1 371.9 ms / 2.1-4.3 ms on its own
   harness), 1 xfailed (strict read-window watchdog), Ruff, tracked secret scan and numbers
@@ -51,16 +51,10 @@
   deletes only its own successful creates and reports cleanup failures. Independent real-DB
   sentinel survival passes. Earlier runs cannot establish that pre-existing data was preserved.
 - **Next 3 actions:**
-  1. Audit-fix program (FIX_PROMPT Phase A closing): P-010 and P-016 QA-closed; next **P-013**
-     admin-token fail-closed (spec `docs/fixes/P-013.md`, red tests planned), then **P-025**
-     import side effects (spec `docs/fixes/P-025.md`), then the Phase A checkpoint + push
-     decision.
-  2. Phase B revoke correctness: P-011 spec ready (`docs/fixes/P-011.md`); P-012 consult trio
-     filed (`docs/consults/008-p012-reinstate/`: domain facts + oracle review verdict "NOT YET"
-     with corrections + architect `rederive(roots, seeds)` recommendation); P-024/P-031 specs
-     ready. B1 executes after Phase A review.
-  3. F-08 review cycle closed (round-3 PASS in `docs/qa/F-08.md`); F-08 stays implementing —
-     installed-runtime acceptance still unclaimed; service ACL wiring (F-13/F-15) remains open.
+  1. Close P-015 consult 010 with decision/ADR, then agent/operator credentials and attack tests.
+  2. Independent P-015 QA/red-team, full checks and role-aware dogfood.
+  3. P-021 validation/error containment and P-020 auth/rate limits; Phase-C checkpoint only
+     after independent security reports and clean-clone verification.
 - **Human pending:** video recording, walkthrough/architecture review, organizer track decision,
   hosted account/submission. Git origin is configured; this continuation has not pushed.
 
@@ -579,3 +573,44 @@
 - New finding P010-QA-2 (Info, pre-existing, out of P-010 scope): `tests/integration/test_mcp.py`
   and `tests/security/test_security_F06.py` leak `ped:mcp*` graphs (34 in the local DB). Queued
   with test hygiene; no code or latency impact.
+
+
+### 2026-10-16 18:08 IST | Phase C | P-029 independent hygiene follow-up | STATUS: done
+- 5bed8a4: removed duplicate Pydantic timeout validator; production /docs, /redoc and
+  /openapi.json now follow one visibility setting; non-ASCII metrics-token bytes reject
+  with 401 rather than raising a comparison exception/500. No role-separation claim.
+- Independent red: 3 failed / 20 passed; metrics malformed bytes500, ReDoc200 and
+  OpenAPI200 reproduced. Parent configuration warning reproduced with warnings-as-errors.
+- Independent final command: .venv/Scripts/python.exe -m pytest
+  tests/security/test_p029_hygiene.py tests/unit/test_timeout_settings.py -q -s --tb=short
+  -> 35 passed in6.04s; session ownership sentinel PASS. Ruff PASS; secret_scan --history
+  PASS. Reports docs/qa/P-029.md and redteam-P-029.md include actual red/green evidence.
+- P-014 consult found unlocked count/create unsafe even inside one Falkor query: cap1
+  admitted4 under independent connections. Write-first barrier fixed that narrow probe,
+  not a multi-query batch. Decision009 uses explicit public admission and a nonexpiring
+  owner-token mutex, bounded wait, identity-aware preflight and fail-closed stranded locks;
+  stable primary/no-eviction assumptions and manual quiescent recovery remain explicit.
+  Implementation/independent quota review pending; no current full-suite green claimed.
+
+### 2026-10-16 21:00 IST | Phase C | P-014 quota admission | STATUS: done
+- Consult 009 / ADR-010: explicit public quota policy; identity-aware whole-request
+  planning and nonexpiring owner-token mutex. Standalone engine remains registry-independent.
+  Real separate-process races, exact overflow snapshots, Source/Session dedupe,
+  gate/MCP and revocation-ledger growth covered. Independent reviewers reproduced an
+  inherited-policy tenant-binding bug; all five regressions pass after correction.
+- Independent QA: 37 passed in 23.05s; red-team: 13 passed in 8.93s. Reports:
+  docs/qa/P-014.md and redteam-P-014.md. Owned cleanup/sentinel preservation PASS.
+- Final `make check`: 519 passed, 1 skipped, 3 deselected, 1 xfailed in 138.99s;
+  Ruff, tracked secret scan and check_numbers PASS. Initial full run found one obsolete
+  metrics-public assertion; P-029 test follow-up now checks 401/no token and 200/admin.
+  API fixtures clean only their own successful tenant creates; independent 31 passed.
+- `make dogfood`: PASS=19 FAIL=0 EXPECTED-FAIL=3 STALE=0 SKIP=0, exit 0.
+  S07 events overflow now PASS (429, no writes). Remaining expected failures are S08/S09
+  input/error containment and S14 absent application metrics. Not strict all-scenarios PASS.
+  Exact owned cleanup PASS, no leftovers; report scratch/dogfood/20261016T152457Z.md.
+- Docker Desktop and the existing pinned DB container were restarted after downtime;
+  unavailable-DB setup errors were not classified as product failures or passing tests.
+- Limits: stable primary/protected keys/cooperating writers required; no failover fencing.
+  Crashes/ambiguous writes strand admission until quiescent manual recovery. Full cap may
+  reject new revoke/reinstate ledger nodes. Non-quota errors can retain earlier batch writes.
+- No evaluation numbers produced; no push or Phase-C completion claim. Next: P-015.

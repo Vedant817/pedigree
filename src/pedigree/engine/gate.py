@@ -14,6 +14,7 @@ from ..db.client import chunks
 from ..errors import InvalidArgument
 from .blame import _norm_depth, bfs_paths
 from .ingest import _validate_conf, _validate_ids, read_window, record_action
+from .quota import quota_write
 
 SEVERITY = {"allow": 0, "warn": 1, "reverify": 2, "block": 3}
 HOOK_MAP = {"allow": "allow", "warn": "allow", "reverify": "ask", "block": "deny"}
@@ -75,6 +76,7 @@ def hook_output(decision, reason):
                                    "permissionDecisionReason": reason}}
 
 
+@quota_write("gate")
 def check_action(db, gname, action, *, relied_on=None, session_id=None, policy_path=None,
                  max_depth=12, record=False, tenant=None, trace=None):
     if tenant is not None:

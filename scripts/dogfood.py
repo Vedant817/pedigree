@@ -129,9 +129,9 @@ EXPECTATIONS: dict[str, Expectation] = {
         "if it regresses).",
     ),
     "S07": Expectation(
-        "expected-fail", "P-014",
+        "pass", "P-014",
         "quota: node_cap 5 tenant, one /v1/events creating 55 nodes => want 429 quota_exceeded and "
-        "NO partial write; today 200.",
+        "NO partial write; request-wide admission rejects before mutation.",
     ),
     "S08": Expectation(
         "expected-fail", "P-021",
@@ -639,7 +639,7 @@ def s06_reinstate_independent_root(ctx: Ctx, res: ScenarioResult) -> None:
 
 
 def s07_quota(ctx: Ctx, res: ScenarioResult) -> None:
-    """P-014: a tenant with node_cap 5 must reject a 55-node batch atomically."""
+    """P-014: quota overflow must reject the whole batch before any mutation."""
     if not ctx.admin_token:
         raise SkipScenario("node_cap 5 needs POST /admin/tenants with the admin token")
     tenant = ctx.ensure_tenant("T_Q", node_cap=5)

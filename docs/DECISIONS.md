@@ -285,3 +285,33 @@ genuine read fixture and separate opencode-write-recheck-2026-10-16.md. Implemen
 `docs/qa/redteam-F-08.md` (Windows ADS/drive-relative path bypass, case-split identity,
 latch-ring and read-window eviction disclosures); fixes and disclosures landed in the
 post-review commits. Independent QA must precede a shipped-subset claim.
+
+## ADR-010 | 2026-10-16 | Request-wide quota admission with explicit recovery
+
+**Context.** Independent count-before-create checks raced on real FalkorDB 42201:
+consult 009's cap-one probe admitted four nodes. A write-first graph barrier fixed
+that probe but did not establish safety for a sequential multi-query events batch.
+The interrupted registry-coupled engine patch also broke standalone callers.
+
+**Decision.** Authenticated REST/MCP creators inject an explicit tenant quota policy.
+An owner-token Redis mutex covers identity planning, physical-node count and all
+request writes. Nested creators inherit the same policy and validate tenant binding.
+The mutex has no expiry; ambiguous writes retain it. Source and Session deduplication
+counts actual new identities. Revocation ledger growth is reserved before state changes.
+Quota rejection makes no batch mutations; other errors retain sequential partial writes.
+Trusted standalone engine calls remain uncapped unless given an explicit/inherited policy.
+
+**Alternatives.** Process-local locks cannot serialize separate service workers.
+Expiring leases without fencing permit a paused writer to race a successor. Neither
+count-and-create nor a single-query experiment proves whole-request admission.
+
+**Consequences.** Supported operation requires one stable primary, no coordination-key
+eviction/loss and cooperating public writers. This is not failover fencing. Crashes
+can block later writes until all writers stop and DB work is confirmed quiescent;
+only then may an operator remove the exact tenant key. A full graph can reject a
+safety operation needing another ledger node. Future DB ACL wiring must include
+the coordination namespace. No cap or graph schema migration is introduced.
+
+**Evidence.** docs/consults/009-p014-quota/decision.md; tests/unit/test_quota.py;
+tests/integration/test_p014_quota.py; independent docs/qa/P-014.md and
+docs/qa/redteam-P-014.md, including separate-process races and exact snapshots.
