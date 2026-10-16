@@ -1,8 +1,9 @@
 # CURRENT STATE (overwritten after every feature / checkpoint)
 
-- **Phase:** **Phase B** revoke correctness (FIX_PROMPT Phase B): P-011 + P-012 closed; remain P-024
-  + P-031, then checkpoint B (push + tag `phase-B`). Phase A fully closed; Phase C specs
-  drafted (`docs/fixes/P-014..P-036`). Updated Fri 2026-10-16 17:18 IST.
+- **Phase:** **Phase B complete** (FIX_PROMPT Phase B: P-011, P-012, P-024, P-031 all committed +
+  green; `make check` PASS; `make dogfood` PASS=16 / EXPECTED-FAIL=6). Enter **Phase C**
+  (security hardening); P-015 is consult-required before implementation. Updated
+  Fri 2026-10-16 18:00 IST.
 - **Last implementation commits:** 1243744/031f86a/83d7b73 (P-016 QA follow-up: stdio default-tenant
   token bypass fixed - red-team F-1 with red-at-parent regression; MCP errors actionable; README
   auth reality + 13-tool list; QA addenda), ef9033f (P-012 consult trio filed: domain + oracle
@@ -64,6 +65,9 @@
   hosted account/submission. Git origin is configured; this continuation has not pushed.
 
 ---
+
+### 2026-10-16 ~18:00 IST | Phase B checkpoint | P-011 + P-012 + P-024 + P-031 committed | STATUS: done
+- Brief close entry: Phase B code + tests committed with `make check` + `make dogfood` green; QA trio for P-013/P-025 delivered `docs/qa/P-013.md` (PASS) + red-team + devex reports (see those). Next: checkpoint B push + Phase C consult (P-015).
 
 ### 2026-10-16 17:18 IST | Phase B | P-011 + P-012 closed | STATUS: done
 - **P-011 (recoverable revokes) closed.** `revoke()` now finishes a `running` Revocation instead of
