@@ -37,14 +37,29 @@ def app_client():
     get_settings.cache_clear()
     db = Db(settings)
     registry = TenantRegistry(db, settings)
+    registry._qa_owned_tenants = set()
     client = TestClient(create_app(db, settings))
-    yield db, registry, client
-    for rec in registry.list_tenants():
-        try:
-            db.select(f"ped:{rec.tenant_id}").delete()
-        except Exception:  # noqa: BLE001 - an empty graph raises on delete (FalkorDB)
-            pass
-        db.query(registry.gname, "MATCH (t:Tenant {id:$id}) DELETE t", {"id": rec.tenant_id})
+    try:
+        yield db, registry, client
+    finally:
+        cleanup_errors = []
+        for tid in registry._qa_owned_tenants:
+            try:
+                db.select(graph_name(tid)).delete()
+            except Exception as exc:  # noqa: BLE001 - an empty graph raises on delete
+                try:
+                    absent = graph_name(tid) not in db.list_graphs()
+                except Exception:  # noqa: BLE001 - unavailable DB cannot prove absence
+                    absent = False
+                if not absent:
+                    cleanup_errors.append(exc)
+            try:
+                db.query(registry.gname, "MATCH (t:Tenant {id:$id}) DELETE t", {"id": tid})
+            except Exception as exc:  # noqa: BLE001 - finish other owned cleanup first
+                cleanup_errors.append(exc)
+        client.close()
+        if cleanup_errors:
+            raise ExceptionGroup("owned tenant cleanup failed", cleanup_errors)
 
 
 def _mk_tenant(registry, client):
@@ -52,6 +67,7 @@ def _mk_tenant(registry, client):
                         for _ in range(11))
     r = client.post("/admin/tenants", headers={"X-Admin-Token": ADMIN}, json={"id": tid})
     assert r.status_code == 200, r.text
+    registry._qa_owned_tenants.add(tid)
     return tid, r.json()["token"]
 
 
