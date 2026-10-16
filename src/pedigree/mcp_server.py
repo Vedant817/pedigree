@@ -28,6 +28,9 @@ def _call(fn, *a, **kw):
         return {"ok": False, "error": {"code": "internal", "message": str(exc)}}
 
 
+_UNAUTHORIZED_MSG = "invalid or missing tenant token"
+
+
 class PedigreeMCPServer:
     def __init__(self, db=None, settings=None, default_tenant_id=None, default_tenant_token=None):
         self.settings = settings if settings is not None else get_settings()
@@ -49,15 +52,18 @@ class PedigreeMCPServer:
         else:
             if tenant_id is None:
                 tenant_id = self.default_tenant_id
-            if self.default_tenant_id is None or tenant_id != self.default_tenant_id:
+            # F-1 (red-team P-016): the tokenless convenience path must present the
+            # CONFIGURED default token, and it must resolve to the configured default
+            # tenant. The tenant id alone must never authorize, and a wrong
+            # PEDIGREE_MCP_TOKEN must not silently "work".
+            if not self.default_tenant_id or not self.default_tenant_token:
                 return None, None
-            if not tenant_id:
+            if tenant_id != self.default_tenant_id:
                 return None, None
-            try:
-                self.registry.get_record(tenant_id)
-            except Exception:
+            rec = self.registry.resolve(self.default_tenant_token)
+            if rec is None or rec.tenant_id != self.default_tenant_id:
                 return None, None
-            tid = tenant_id
+            tid = rec.tenant_id
         gname = graph_name(tid)
         ensure_schema(self.db, gname)
         return tid, gname
@@ -81,7 +87,7 @@ class PedigreeMCPServer:
                                                "detail": {"kind": kind, "channel": "POST /v1/events"}}}
             tid, gname = self._resolve(tenant_id, token)
             if gname is None:
-                return {"ok": False, "error": {"code": "unauthorized", "message": tid}}
+                return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             cap = self.registry.get_record(tid).node_cap
             if node_count(self.db, gname) >= cap:
                 return {"ok": False, "error": {"code": "quota_exceeded", "message": "node cap exceeded"}}
@@ -101,7 +107,7 @@ class PedigreeMCPServer:
                               artifact_key: str | None = None, id: str | None = None) -> dict:
             tid, gname = self._resolve(tenant_id, token)
             if gname is None:
-                return {"ok": False, "error": {"code": "unauthorized", "message": tid}}
+                return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             cap = self.registry.get_record(tid).node_cap
             if node_count(self.db, gname) >= cap:
                 return {"ok": False, "error": {"code": "quota_exceeded", "message": "node cap exceeded"}}
@@ -121,7 +127,7 @@ class PedigreeMCPServer:
                                   id: str | None = None) -> dict:
             tid, gname = self._resolve(tenant_id, token)
             if gname is None:
-                return {"ok": False, "error": {"code": "unauthorized", "message": tid}}
+                return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             cap = self.registry.get_record(tid).node_cap
             if node_count(self.db, gname) >= cap:
                 return {"ok": False, "error": {"code": "quota_exceeded", "message": "node cap exceeded"}}
@@ -145,7 +151,7 @@ class PedigreeMCPServer:
                                                "detail": {"by": str(by)[:16]}}}
             tid, gname = self._resolve(tenant_id, token)
             if gname is None:
-                return {"ok": False, "error": {"code": "unauthorized", "message": tid}}
+                return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             return _call(lambda: (corroborate(self.db, gname, memory_id, source_id, by="agent"), {"ok": True})[1])
 
         @srv.tool()
@@ -160,9 +166,9 @@ class PedigreeMCPServer:
             """
             tid, gname = self._resolve(token=token)
             if gname is None:
-                return {"ok": False, "error": {"code": "unauthorized"}}
+                return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             if record and node_count(self.db, gname) >= self.registry.get_record(tid).node_cap:
-                return {"ok": False, "error": {"code": "quota_exceeded"}}
+                return {"ok": False, "error": {"code": "quota_exceeded", "message": "node cap exceeded"}}
             return _call(lambda: check_action(
                 self.db, gname, {"tool": tool, "summary": summary, "effect": effect,
                                  "risk": risk, "audience": audience},
@@ -175,7 +181,7 @@ class PedigreeMCPServer:
                             kind: str = "revoke") -> dict:
             tid, gname = self._resolve(tenant_id, token)
             if gname is None:
-                return {"ok": False, "error": {"code": "unauthorized", "message": tid}}
+                return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             return _call(lambda: revoke(self.db, gname, tid, root_id=root_id, reason=reason,
                                        dry_run=dry_run, kind=kind))
 
@@ -184,7 +190,7 @@ class PedigreeMCPServer:
                                root_id: str = "", dry_run: bool = False) -> dict:
             tid, gname = self._resolve(tenant_id, token)
             if gname is None:
-                return {"ok": False, "error": {"code": "unauthorized", "message": tid}}
+                return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             return _call(lambda: reinstate(self.db, gname, tid, root_id=root_id, dry_run=dry_run))
 
         @srv.tool()
@@ -192,7 +198,7 @@ class PedigreeMCPServer:
                            node_id: str = "", max_depth: int = 12) -> dict:
             tid, gname = self._resolve(tenant_id, token)
             if gname is None:
-                return {"ok": False, "error": {"code": "unauthorized", "message": tid}}
+                return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             return _call(lambda: run_blame(self.db, gname, node_id, max_depth=max_depth))
 
         @srv.tool()
@@ -200,7 +206,7 @@ class PedigreeMCPServer:
                             node_id: str = "", max_depth: int = 12) -> dict:
             tid, gname = self._resolve(tenant_id, token)
             if gname is None:
-                return {"ok": False, "error": {"code": "unauthorized", "message": tid}}
+                return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             return _call(lambda: run_impact(self.db, gname, node_id, max_depth=max_depth))
 
         @srv.tool()
@@ -208,7 +214,7 @@ class PedigreeMCPServer:
                             roots: list[str] | None = None) -> dict:
             tid, gname = self._resolve(tenant_id, token)
             if gname is None:
-                return {"ok": False, "error": {"code": "unauthorized", "message": tid}}
+                return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             return _call(lambda: whatif(self.db, gname, tid, roots or [], reason="what-if"))
 
         @srv.tool()
@@ -216,14 +222,14 @@ class PedigreeMCPServer:
                                    limit: int = 50) -> dict:
             tid, gname = self._resolve(tenant_id, token)
             if gname is None:
-                return {"ok": False, "error": {"code": "unauthorized", "message": tid}}
+                return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             return _call(lambda: audit_sources(self.db, gname, limit=limit))
 
         @srv.tool()
         def pedigree_report(tenant_id: str | None = None, token: str | None = None) -> dict:
             tid, gname = self._resolve(tenant_id, token)
             if gname is None:
-                return {"ok": False, "error": {"code": "unauthorized", "message": tid}}
+                return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             return _call(lambda: report(self.db, gname))
 
     def run(self, transport: str = "stdio", host: str = "127.0.0.1", port: int = 8011):
