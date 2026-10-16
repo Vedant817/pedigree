@@ -65,10 +65,18 @@ def test_whatif_reaps_stale_copies(fresh_graph):
 
     stale = whatif_graph_name(tenant, "deadbeef")
     db.select(gname).copy(stale)
-    assert stale in db.list_graphs()
-    whatif(db, gname, tenant, ["s_bad"])
-    assert stale not in db.list_graphs()
-    assert not [g for g in db.list_graphs() if g.startswith(f"{gname}:wi:")]
+    try:
+        # A genuinely expired foreign lease is stale; an unmarked fresh copy may
+        # belong to another live worker and must never be guessed stale.
+        db.query(stale, "CREATE (:WhatIfLease {owner:$owner, expires_at:$expires})",
+                 {"owner": "test-other-worker", "expires": 0})
+        assert stale in db.list_graphs()
+        whatif(db, gname, tenant, ["s_bad"])
+        assert stale not in db.list_graphs()
+        assert not [g for g in db.list_graphs() if g.startswith(f"{gname}:wi:")]
+    finally:
+        if stale in db.list_graphs():
+            db.select(stale).delete()
 
 
 def test_whatif_rejects_empty_and_oversized_root_lists(fresh_graph):

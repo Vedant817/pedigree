@@ -30,6 +30,12 @@ Q_INDEX_REVOCATION_STATE = "CREATE INDEX FOR (n:Revocation) ON (n.state)"
 Q_INDEX_SOURCE_URI = "CREATE INDEX FOR (s:Source) ON (s.uri)"
 Q_INDEX_SOURCE_HASH = "CREATE INDEX FOR (s:Source) ON (s.content_hash)"
 Q_INDEXES = "CALL db.indexes()"
+Q_WHATIF_STATUSES = """
+MATCH (n:Node) WHERE n:Source OR n:Memory OR n:Action RETURN n.id, n.status
+"""
+Q_WHATIF_ACTIONS = "MATCH (a:Action) RETURN a.id, a.tool, a.summary, a.effect, a.risk, a.status"
+Q_WHATIF_CREATE_LEASE = "CREATE (:WhatIfLease {owner:$owner, expires_at:$expires})"
+Q_WHATIF_LEASE = "MATCH (m:WhatIfLease) RETURN m.owner, m.expires_at LIMIT 1"
 
 # --- lookups ----------------------------------------------------------------
 Q_FIND_IDS = "MATCH (n:Node) WHERE n.id IN $ids RETURN n.id, n.status"
@@ -228,7 +234,11 @@ Q_COPY = None  # GRAPH.COPY is issued via the client's copy() helper, not as Cyp
 Q_PAGERANK_SOURCES = """
 CALL algo.pageRank('Node','DERIVED_FROM') YIELD node, score
 WHERE 'Source' IN labels(node) AND node.status = 'ok'
-RETURN node.id, node.kind, score ORDER BY score DESC LIMIT $k
+RETURN node.id, node.kind, score ORDER BY score DESC, node.id LIMIT $k
+"""
+Q_AUDIT_UNRANKED_SOURCES = """
+MATCH (s:Source {status:'ok'}) WHERE NOT s.id IN $ranked
+RETURN s.id, s.kind ORDER BY s.id LIMIT $k
 """
 #: exact reach count for many roots at once (paired with the PageRank ranking above)
 Q_DESCENDANT_COUNTS = """

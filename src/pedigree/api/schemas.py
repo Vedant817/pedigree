@@ -66,7 +66,7 @@ class CorroborateRequest(StrictModel):
 
 
 class WhatIfRequest(StrictModel):
-    roots: list[str] = Field(default_factory=list, max_length=8)
+    roots: list[str] = Field(default_factory=list, min_length=1, max_length=5)
     reason: str = Field(default="what-if", max_length=300)
 
 
