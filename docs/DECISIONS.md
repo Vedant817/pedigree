@@ -256,3 +256,27 @@ route-level gating; no revoke/blame/gate algorithm change. **Evidence:**
 `docs/consults/007-capture-trust/{redteam,domain,architect,decision}.md`,
 `tests/integration/test_source_identity.py`, `tests/security/test_capture_trust.py`.
 
+
+## ADR-009 | 2026-10-16 | OpenCode observed read views and explicit read-only enforcement
+
+**Context.** Genuine installed OpenCode read payloads exist; a bounded native-write probe
+failed at the free provider before tool execution. The old plugin sketch does not match
+the actual API. Hashing current filesystem bytes would falsely identify a prior partial read.
+
+**Decision.** Ship an explicitly enabled read-only adapter slice. Hash the observed display
+view with a versioned range/representation namespace; keep contents and absolute paths local.
+Use actual REST schemas, pair runtime call/session identities, deny block/reverify/outages,
+and unconditionally deny unsupported tools. No operator token or agent trust upgrade.
+F-08 remains implementing for full coding-agent capture; no installed write/approval/coverage claim.
+
+**Alternatives.** Guessing write/action metadata or silently allowing uncaptured tools was
+rejected. Durable replay/health state remains F-22; the read-only slice cannot automatically
+execute side-effecting tools even after a restart. This restriction is explicit in install docs.
+
+**Consequences.** This slice supports read-only inspection, not normal coding sessions.
+Read-view hashes do not match whole-file artifact keys; cross-session write linkage remains
+unsupported. All three consultants recommended the observed-read-first boundary.
+
+**Evidence.** docs/consults/008-opencode-capture/{question,domain,architect,specialist,decision}.md;
+genuine read fixture and separate opencode-write-recheck-2026-10-16.md. Independent Node/API
+QA must precede a shipped-subset claim.
