@@ -9,7 +9,7 @@ import secrets
 import time
 from dataclasses import dataclass
 
-from ..config import get_settings, graph_name, validate_id
+from ..config import get_settings, graph_name, validate_tenant
 from ..db.client import Db
 from ..db.queries import Q_REGISTRY_ALL, Q_REGISTRY_BY_ID, Q_REGISTRY_SET_STATUS, Q_REGISTRY_UPSERT
 from ..db.schema import ensure_schema
@@ -48,10 +48,13 @@ class TenantRegistry:
         return len(rows) > 0
 
     def create_tenant(self, tenant_id: str, node_cap: int | None = None) -> TenantCredential:
-        validate_id(tenant_id)
+        validate_tenant(tenant_id)
         if tenant_id in RESERVED_TENANT_IDS:
             raise InvalidArgument("reserved tenant id", detail={"id": tenant_id})
-        cap = node_cap or self.settings.pedigree_node_cap
+        if node_cap is not None and (not isinstance(node_cap, int) or node_cap < 1 or node_cap > 1_000_000):
+            raise InvalidArgument("node_cap must be between 1 and 1000000",
+                                  detail={"node_cap": node_cap})
+        cap = node_cap if node_cap is not None else (self.settings.pedigree_node_cap)
         token = f"ped_{tenant_id}_{secrets.token_urlsafe(32)}"
         digest = _sha(token)
         # ensure unique

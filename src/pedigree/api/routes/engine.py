@@ -35,10 +35,10 @@ AGENT_SAFE_KINDS = frozenset({"web", "tool_output", "mcp_tool_desc", "other"})
 
 def operator_authorized(request: Request, settings) -> bool:
     """True only when the deployment's operator credential is configured and matches."""
-    expected = getattr(settings, "pedigree_admin_token", "") or ""
+    expected = (getattr(settings, "pedigree_admin_token", "") or "").strip()
     if not expected:
         return False
-    presented = request.headers.get("X-Admin-Token", "")
+    presented = request.headers.get("X-Admin-Token", "").strip()
     return bool(presented) and hmac.compare_digest(presented, expected)
 
 

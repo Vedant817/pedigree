@@ -8,8 +8,8 @@ from ..schemas import ResumeRequest, TenantCreate
 
 
 def _require_admin(request: Request, settings) -> None:
-    expected = (settings.pedigree_admin_token or "").encode("utf-8")
-    header = request.headers.get("x-admin-token", "").encode("utf-8")
+    expected = (settings.pedigree_admin_token or "").strip().encode("utf-8")
+    header = request.headers.get("x-admin-token", "").strip().encode("utf-8")
     if not expected or not hmac.compare_digest(header, expected):
         raise Unauthorized("admin token required")
 
