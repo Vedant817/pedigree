@@ -84,4 +84,8 @@ def test_advertised_url_answers_mcp_initialize(db: Db) -> None:
             proc.kill()
             proc.wait(timeout=10)
         log.close()
-        os.unlink(log.name)
+        try:
+            os.unlink(log.name)
+        except OSError:
+            # Windows can keep the handle briefly after terminate(); harmless temp file.
+            pass
