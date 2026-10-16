@@ -107,14 +107,6 @@ class Settings(BaseSettings):
                 raise ValueError(f"{name} must be between 1 and 60000")
         return self
 
-    @model_validator(mode="after")
-    def _check_timeouts(self) -> "Settings":  # noqa: UP037
-        for name in ("read_timeout_ms", "write_timeout_ms"):
-            v = getattr(self, name)
-            if v < 1 or v > 60_000:
-                raise ValueError(f"{name} must be between 1 and 60000")
-        return self
-
 
 DEV_ENVS = {"dev", "test", "local"}
 KNOWN_DEFAULT_ADMIN_TOKENS = {"change-me-admin", "change-me", "changeme"}

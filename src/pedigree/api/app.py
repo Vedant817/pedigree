@@ -133,7 +133,12 @@ def create_app(db: Db | None = None, settings=None) -> FastAPI:
             ).start()
             yield
 
-    app = FastAPI(title="Pedigree API", version="0.1.0", lifespan=lifespan, docs_url=_docs_url(settings))
+    docs_url = _docs_url(settings)
+    app = FastAPI(
+        title="Pedigree API", version="0.1.0", lifespan=lifespan, docs_url=docs_url,
+        redoc_url="/redoc" if docs_url else None,
+        openapi_url="/openapi.json" if docs_url else None,
+    )
     app.state.db = db
     app.state.settings = settings
     app.state.registry = registry
