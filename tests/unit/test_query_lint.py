@@ -19,47 +19,69 @@ import re
 
 SRC = pathlib.Path(__file__).resolve().parents[2] / "src" / "pedigree"
 
-# A labelled id anchor: `MATCH (x:Memory {id:` ... (any of the six type labels).
-# Formatting-tolerant and case-insensitive: P010-QA-1 showed `Memory{id:`, `m : Memory`
-# and lowercase `match` are all valid Cypher and must not evade the lint.
+# Two labelled-anchor shapes, both quadratic without the :Node(id) index:
+#   1. property map - `MATCH (x:Memory {id:...})` / `MERGE (:Memory {id:...})`;
+#   2. separate WHERE - `MATCH (x:Memory) WHERE x.id = ...`.
+# Formatting-tolerant and case-insensitive: P010-QA-1 round 1 showed `Memory{id:`,
+# `m : Memory` and lowercase `match` evade a naive regex; round 2 added the anonymous
+# `(:Memory {id:` and the WHERE shape. Accepted residual (obfuscation only; none
+# present in src/): comments inside the pattern, backtick quoting, `WHERE $m = m.id`.
+_TYPE_LABELS = r"(?:Memory|Action|Source|Session|Agent|Revocation)"
 LABEL_ANCHOR = re.compile(
-    r"match\s*\(\s*\w+\s*:\s*(?:Memory|Action|Source|Session|Agent|Revocation)\s*\{\s*id\s*:",
+    rf"(?:match|merge)\s*\(\s*\w*\s*:\s*{_TYPE_LABELS}\s*\{{\s*id\s*:",
     re.IGNORECASE,
 )
+WHERE_ID_ANCHOR = re.compile(
+    rf"\(\s*(\w+)\s*:\s*{_TYPE_LABELS}\s*\)\s*(?:,\s*\([^()]*\)\s*)*where\s+\1\s*\.\s*id\s*=",
+    re.IGNORECASE,
+)
+ANCHOR_PATTERNS = (LABEL_ANCHOR, WHERE_ID_ANCHOR)
 
 
 def test_no_label_anchored_id_lookups():
     offenders: list[str] = []
     for path in SRC.rglob("*.py"):
         text = path.read_text(encoding="utf-8")
-        for m in LABEL_ANCHOR.finditer(text):
-            lineno = text.count("\n", 0, m.start()) + 1
-            offenders.append(f"{path.relative_to(SRC)}:{lineno}: {m.group(0)}...")
+        for pattern in ANCHOR_PATTERNS:
+            for m in pattern.finditer(text):
+                lineno = text.count("\n", 0, m.start()) + 1
+                offenders.append(f"{path.relative_to(SRC)}:{lineno}: {m.group(0)}...")
     assert not offenders, (
         "id anchors must be written on :Node so the unique index is used "
-        "(MATCH (x:Node {id:...}) WHERE x:<Label>):\n" + "\n".join(offenders)
+        "(MATCH (x:Node {id:...}) WHERE x:<Label>):\n" + "\n".join(sorted(set(offenders)))
     )
 
 
 def test_anchor_regex_catches_formatting_variants():
-    """P010-QA-1: the lint must not be evadable by whitespace/case variants."""
+    """P010-QA-1 rounds 1+2: no valid label-scanning shape may evade the lint."""
     variants = (
         "MATCH (m:Memory {id:$m})",
         "match (m:Memory {id:$m})",
         "MATCH (m : Memory { id : $m })",
         "MATCH (m:Memory{id:$m})",
         "MATCH( m:Session {id: $sess})",
+        "MERGE (m:Memory {id:$m})",
+        "MERGE (:Memory {id:$m})",
+        "MATCH (:Memory {id:$m})",
+        "MATCH (m:Memory) WHERE m.id = $m",
+        "match (m : Action)\nwhere m . id = $m",
+        "MATCH (m:Memory), (s:Source) WHERE m.id = $m",
     )
-    undetected = [v for v in variants if not LABEL_ANCHOR.search(v)]
+    undetected = [v for v in variants if not any(p.search(v) for p in ANCHOR_PATTERNS)]
     assert not undetected, f"lint regex must catch: {undetected}"
 
 
 def test_anchor_regex_ignores_safe_forms():
+    """No false positives on index-backed or non-id forms."""
     safe = (
         "MATCH (m:Node {id:$m}) WHERE m:Memory",
-        "MATCH (n:Memory {artifact_key:$k})",
+        "MATCH (m:Node:Memory {id:$m})",  # :Node label present -> index-backed
+        "MATCH (n:Memory {artifact_key:$k})",  # has its own index
+        "MATCH (n:Node) WHERE n.id = $id",  # anchored on :Node via WHERE
+        "MATCH (m:Memory) WHERE m.artifact_key = $k",
+        "MATCH (s:Source) WHERE NOT s.id IN $ranked",
         "WHERE n:Memory",
         "MATCH (n:Node) WHERE n:Memory RETURN n.id",
     )
-    flagged = [s for s in safe if LABEL_ANCHOR.search(s)]
+    flagged = [s for s in safe if any(p.search(s) for p in ANCHOR_PATTERNS)]
     assert not flagged, f"lint regex must not flag: {flagged}"
