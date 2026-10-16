@@ -57,7 +57,7 @@ def test_wrong_env_token_is_rejected(db: Db) -> None:
     """A wrong PEDIGREE_MCP_TOKEN must NOT silently authorize tokenless calls."""
     registry = TenantRegistry(db)
     tenant = "mcpsec" + uuid.uuid4().hex[:8]
-    cred = registry.create_tenant(tenant)
+    registry.create_tenant(tenant)  # real token exists but is NOT what the env presents
     try:
         payload = _blame_tokenless(tenant, env_token=f"ped_{tenant}_wrongwrongwrong")
         assert payload["ok"] is False, payload
