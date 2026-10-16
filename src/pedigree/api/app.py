@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import uuid
 from collections import defaultdict
 from pathlib import Path
@@ -56,11 +57,43 @@ class CorrelationMiddleware(BaseHTTPMiddleware):
         return response
 
 
+class RootDispatcher:
+    """Serve the UI at / and the MCP streamable-HTTP app at /mcp (P-016).
+
+    The MCP ASGI app's own route is "/mcp" and it must see the original path, so
+    requests under /mcp are passed through unchanged (docs/02-ARCHITECTURE.md:50;
+    spike docs/tech/examples/mcp/mount_in_fastapi.py, mcp 2.3.0).
+    """
+
+    def __init__(self, mcp_app, static_app) -> None:
+        self._mcp_app = mcp_app
+        self._static_app = static_app
+
+    async def __call__(self, scope, receive, send) -> None:
+        if scope["type"] == "http" and scope["path"].startswith("/mcp"):
+            await self._mcp_app(scope, receive, send)
+        else:
+            await self._static_app(scope, receive, send)
+
+
 def create_app(db: Db | None = None, settings=None) -> FastAPI:
     settings = settings or get_settings()
     db = db or Db(settings)
     registry = TenantRegistry(db, settings)
-    app = FastAPI(title="Pedigree API", version="0.1.0")
+    # Function-local import keeps `import pedigree.api.app` free of mcp_server side
+    # effects (P-025 covers the rest).
+    from ..mcp_server import build_mcp
+
+    mcp_srv = build_mcp(db=db, settings=settings)
+    mcp_app = mcp_srv.server.streamable_http_app()
+
+    @contextlib.asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        # Required when the streamable-HTTP app is served outside its own server.
+        async with mcp_srv.server.session_manager.run():
+            yield
+
+    app = FastAPI(title="Pedigree API", version="0.1.0", lifespan=lifespan)
     app.state.db = db
     app.state.settings = settings
     app.state.registry = registry
@@ -75,7 +108,8 @@ def create_app(db: Db | None = None, settings=None) -> FastAPI:
     routes.events.register(app, db, registry, settings)
     routes.gate.register(app, db, registry, settings)
     routes.workspace.register(app, db)
-    app.mount("/", StaticFiles(directory=Path(__file__).resolve().parents[1] / "ui", html=True), name="workspace")
+    ui = StaticFiles(directory=Path(__file__).resolve().parents[1] / "ui", html=True)
+    app.mount("/", RootDispatcher(mcp_app, ui), name="workspace")
     return app
 
 

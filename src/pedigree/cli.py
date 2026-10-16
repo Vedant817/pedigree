@@ -178,7 +178,7 @@ def main(argv: list[str] | None = None) -> int:
         from .mcp_server import build_mcp
 
         srv = build_mcp(
-            settings,
+            settings=settings,
             default_tenant_id=os.getenv("PEDIGREE_MCP_TENANT"),
             default_tenant_token=os.getenv("PEDIGREE_MCP_TOKEN"),
         )
