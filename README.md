@@ -211,8 +211,9 @@ gate friction remain unmeasured.
 - **Input surface:** static parameterised Cypher with a lint gate, id/URI/artifact validation,
   body-size and array caps, per-tenant rate limits and node quotas, bounded query timeouts, and
   the registry tenant id reserved.
-- **No secrets in the repo:** `.env` is ignored, `.env.example` is committed, a secret scan runs
-  over the working tree *and* the git history in `make check`.
+- **Secret checks:** `.env` is ignored and `.env.example` is committed. `make check` scans
+  tracked files; `python scripts/secret_scan.py --history` also scans Git history and is
+  run explicitly at release checkpoints. Pattern scanning is not a proof of absence.
 
 ## Evaluation
 

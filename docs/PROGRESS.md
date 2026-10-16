@@ -1,16 +1,16 @@
 # CURRENT STATE (overwritten after every feature / checkpoint)
 
-- **Phase:** P2/P3 hardening and evaluation publication; updated Fri 2026-10-16 09:00 IST.
+- **Phase:** P2/P3 hardening and evaluation publication; updated Fri 2026-10-16 09:09 IST.
 - **Last implementation commits:** a677d9f (what-if/audit containment), d7f7409 (test fixture ownership),
   3941d85 (DAG-cluster evaluation intervals and quick artifact isolation).
 - **Environment:** Windows 11; Python 3.12.15; pinned FalkorDB module 42201 in Docker;
   Node v24.13.1. Local core and synthetic demo require no model provider.
 - **Deadlines:** feature freeze Sun 2026-10-18 15:00 IST; target submit 21:00; hard stop 23:59.
-- **Test state:** make check: 376 passed, 1 skipped (optional ACL deployment secret absent);
+- **Test state:** make check: 391 passed, 1 skipped (optional ACL deployment secret absent);
   Ruff, tracked secret scan, numbers check PASS. Independent what-if/audit QA: 45 passed;
   test-fixture ownership QA: 11 passed. Full serialized evaluation PASS; independent scoped F-14 statistical signoff PASS.
-  Fresh local clone of a020851, new venv and editable dev install: make check PASS, 376 passed,
-  1 skipped in 39.45s; Ruff, secrets and numbers PASS.
+  Fresh local clone of 72c7650, new venv and editable dev install: make check PASS, 391 passed,
+  1 skipped in 38.86s; Ruff, secrets and numbers PASS. Post-clone demo registry retained, 14 nodes.
 - **Verified scope:** F-01..F-07, F-09..F-12, F-16 local container, F-17 what-if subset,
   F-18 PageRank/exact reach. Checkpoint/restore and WCC remain unbuilt.
   F-13/F-15 service ACL wiring remains open. E1/E2 synthetic semantics/capture model,
@@ -341,7 +341,7 @@
   quick-output isolation. Full serialized evals/run_all.py PASS against this committed source.
   Report/CSV/JSON/NUMBERS coherent; independent F-14 signoff PASS for stated synthetic/local
   scope. SQLite faster on measured traversal rows; no graph-engine superiority claimed.
-- make check: 376 passed, 1 skipped (ACL deployment secret absent), Ruff/secrets/numbers PASS.
+- make check: 391 passed, 1 skipped (ACL deployment secret absent), Ruff/secrets/numbers PASS.
   Expanded numbers check: README/blog/submission/walkthrough PASS against 68 allowed values.
 - 3beaae1: genuine free OpenCode before/after read payload recorded; one tool completed with
   reported cost zero, final model response timed out at 60 seconds and own process tree stopped.
@@ -349,6 +349,26 @@
   remain unbuilt/unmeasured. Documentation no longer claims the adapter ships.
 - Remaining gates: OpenCode adapter/runtime acceptance, service ACL wiring, E3b/E6, durable
   hook spool/replay, human walkthrough/video/submission. Fresh-clone verification of a020851 PASS: new Python 3.12.15 venv, 56 resolved packages,
-  make check 376 passed / 1 skipped in 39.45s, Ruff/secrets/numbers PASS. Synthetic demo
-  registry and 14 nodes remained after the clone suite. This is Windows/local DB evidence,
+  make check 376 passed / 1 skipped in 39.45s, Ruff/secrets/numbers PASS. CORRECTION: post-clone demo lookup failed (tenant not found); a second destructive
+  E3 fixture was then discovered. The prior demo-preservation sentence was written before
+  checking command exit status and was unsupported. E3 fixture repair/verification is pending. This is Windows/local DB evidence,
   not a new hosted deployment or installed runtime acceptance.
+
+
+### 2026-10-16 09:09 IST | P2/P3 | E3 cleanup correction and suite preservation | STATUS: verified locally
+- 72c7650: removed a second all-tenant cleanup loop from the E3 boundary fixture; the fixture
+  now owns only its TestClient. Individual scenarios and run() clean their exact random IDs.
+  Header construction moved inside run()'s cleanup boundary; deterministic test tenant names
+  replaced by UUIDs. New independent E3 QA: 21 targeted cases passed, no xfails.
+- A lazy session DB sentinel now detects unrelated graph/registry deletion anywhere in a
+  DB-using suite. Independent negative test deliberately deletes only its own nested sentinel
+  and proves detection; unit-only checks remain DB-free. Broad search/static fixture guard
+  found no remaining all-registry deletion fixture. Ownership is tested, not inferred from
+  a passing suite count. Cleanup DB-error paths are still explicitly limited in the QA report.
+- Root make check: 391 passed, 1 skipped in 34.73s; fresh local clone of 72c7650 in a separate
+  new venv: 391 passed, 1 skipped in 38.86s. Ruff, tracked secret scan, numbers PASS. After
+  each suite a separate command confirmed demo registry retained and 14 synthetic nodes.
+  This supersedes the earlier unsupported preservation claim; historical data recovery is not claimed.
+- Automatic approval review rejected recursive removal of the two task-owned temporary QA
+  clones as blocked by policy. They remain under the OS Temp directory (pedigree-final-9dab960007b84184888631fbaf435cbf
+  and pedigree-verified-ca56abfe591f408ba95e5fc57b7c8d7e); no alternate deletion attempted.
