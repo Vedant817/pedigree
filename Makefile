@@ -7,7 +7,7 @@ PY := .venv/bin/python
 endif
 
 .DEFAULT_GOAL := help
-.PHONY: help setup start-db stop-db db-status test test-quick lint check check-perf eval eval-quick demo seed clean-clone
+.PHONY: help setup start-db stop-db db-status test test-quick lint check check-perf eval eval-quick demo seed clean-clone dogfood dogfood-strict
 
 help:
 	@echo "Pedigree targets:"
@@ -24,6 +24,8 @@ help:
 	@echo "  make eval-quick  2-minute evaluation subset"
 	@echo "  make demo        seed the demo tenant (synthetic scenarios S1+S8)"
 	@echo "  make seed        alias for demo"
+	@echo "  make dogfood     brutal end-to-end user pass (spawns a server; writes scratch/dogfood/)"
+	@echo "  make dogfood-strict  same, but every expected-failure must now pass"
 
 setup:
 	uv venv --python 3.12 .venv 2>/dev/null || python -m venv .venv
@@ -66,3 +68,9 @@ demo seed:
 
 clean-clone:
 	bash scripts/clean_clone_check.sh
+
+dogfood:
+	$(PY) scripts/dogfood.py
+
+dogfood-strict:
+	$(PY) scripts/dogfood.py --strict
