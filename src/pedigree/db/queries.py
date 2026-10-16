@@ -3,6 +3,12 @@
 The only string interpolation allowed is a node label taken from a fixed allow-list
 (`_LABELS`); every literal value travels as a query parameter. A lint test
 (tests/unit/test_queries_static.py) enforces that no other f-string/substitution exists.
+
+P-010: id anchors are always written on the Node label
+(`MATCH (x:Node {id:$v}) WHERE x:<Label>`) so the unique `:Node(id)` index
+(`Q_INDEX_NODE_ID`) is used; anchoring the same lookup on the type label plans as a
+Node By Label Scan and made the revoke cascade quadratic (AUDIT.md P-010).
+Lint: tests/unit/test_query_lint.py; plan assertions: tests/perf/test_revoke_scaling.py.
 """
 
 from __future__ import annotations
@@ -123,7 +129,8 @@ def q_create_orphan(label: str) -> str:
 # only downgrade, never delete a human/scanner attestation) but a human/scanner value
 # replaces an agent one (consult 007 / ADR-008).
 Q_CORROBORATE = """
-MATCH (m:Memory {id:$m}), (s:Source {id:$s})
+MATCH (m:Node {id:$m}), (s:Node {id:$s})
+WHERE m:Memory AND s:Source
 MERGE (m)-[r:CORROBORATED_BY]->(s)
 SET r.by = CASE WHEN r.by IS NULL THEN $by
                 WHEN $by IN ['human','scanner'] THEN $by
@@ -132,24 +139,26 @@ RETURN m.id, s.id
 """
 
 # --- sessions / agents ------------------------------------------------------
-Q_GET_SESSION = "MATCH (se:Session {id:$id}) RETURN se.id LIMIT 1"
+Q_GET_SESSION = "MATCH (se:Node {id:$id}) WHERE se:Session RETURN se.id LIMIT 1"
 Q_CREATE_SESSION = """
 CREATE (se:Node:Session) SET se.id = $id, se.tenant = $tenant, se.runtime = $runtime,
     se.agent_id = $agent, se.status = 'ok', se.started_at = $now, se.created_at = $now
 RETURN se.id
 """
 Q_SESSION_READ = """
-MATCH (se:Session {id:$sess}), (n:Node {id:$n})
+MATCH (se:Node {id:$sess}), (n:Node {id:$n})
+WHERE se:Session
 MERGE (se)-[r:READ]->(n) SET r.at = $now
 RETURN n.id
 """
 # last K distinct read targets of a session (conservative influence window)
 Q_READ_WINDOW = """
-MATCH (se:Session {id:$sess})-[r:READ]->(n:Node)
+MATCH (se:Node {id:$sess})-[r:READ]->(n:Node)
+WHERE se:Session
 WITH n, max(r.at) AS at ORDER BY at DESC LIMIT $k
 RETURN n.id, n.status
 """
-Q_SESSION_INFO = "MATCH (se:Session {id:$sess}) RETURN se.runtime, se.agent_id LIMIT 1"
+Q_SESSION_INFO = "MATCH (se:Node {id:$sess}) WHERE se:Session RETURN se.runtime, se.agent_id LIMIT 1"
 
 # --- traversal --------------------------------------------------------------
 # algo.BFS follows only outgoing edges of ONE type; FEEDS is the mirror of DERIVED_FROM.
@@ -197,14 +206,16 @@ Q_PARENTS_OF = """
 UNWIND $ids AS i MATCH (c:Node {id:i})-[:DERIVED_FROM]->(p:Node) RETURN c.id, p.id
 """
 Q_SUPPORT_OF = """
-UNWIND $ids AS i MATCH (m:Memory {id:i})-[:CORROBORATED_BY]->(s:Source) RETURN m.id, s.id, s.status
+UNWIND $ids AS i MATCH (m:Node {id:i})-[:CORROBORATED_BY]->(s:Source)
+WHERE m:Memory
+RETURN m.id, s.id, s.status
 """
 Q_ACTION_DETAILS = """
-UNWIND $ids AS i MATCH (a:Action {id:i})
+UNWIND $ids AS i MATCH (a:Node {id:i}) WHERE a:Action
 RETURN a.id, a.tool, a.summary, a.effect, a.risk, coalesce(a.artifacts, []), a.status
 """
 Q_MEMORY_ARTIFACTS = """
-UNWIND $ids AS i MATCH (m:Memory {id:i}) WHERE m.artifact IS NOT NULL
+UNWIND $ids AS i MATCH (m:Node {id:i}) WHERE m:Memory AND m.artifact IS NOT NULL
 RETURN m.id, m.artifact, m.status
 """
 Q_REVOCATION_LATEST = """
@@ -212,7 +223,8 @@ MATCH (v:Revocation {root_id:$id}) WHERE v.state IN ['running','done']
 RETURN v.id, v.state, v.started_at ORDER BY v.started_at DESC LIMIT 1
 """
 Q_REVOCATION_SET_STATE = """
-MATCH (v:Revocation {id:$rid}) SET v.state = $state, v.finished_at = $now,
+MATCH (v:Node {id:$rid}) WHERE v:Revocation
+SET v.state = $state, v.finished_at = $now,
     v.n_tainted = $t, v.n_preserved = $p, v.n_actions = $a
 RETURN v.id
 """
@@ -330,7 +342,8 @@ Q_DEMO_IDENTITIES = """
 UNWIND $ids AS i MATCH (n:Node {id:i}) RETURN n.id, labels(n), properties(n)
 """
 Q_DEMO_ADD_SUPPORT = """
-MATCH (m:Memory {id:$memory_id}), (s:Source {id:$source_id})
+MATCH (m:Node {id:$memory_id}), (s:Node {id:$source_id})
+WHERE m:Memory AND s:Source
 MERGE (m)-[c:CORROBORATED_BY]->(s) ON CREATE SET c.by = $by
 RETURN m.id
 """
@@ -344,7 +357,8 @@ UNWIND $ids AS id MATCH (a:Node {id:id})-[r:DERIVED_FROM|CORROBORATED_BY]->(b:No
 WHERE b.id IN $ids RETURN a.id, b.id, type(r) ORDER BY a.id, b.id LIMIT $limit
 """
 Q_GATE_SUPPORT = """
-UNWIND $ids AS i MATCH (n:Memory {id:i})-[c:CORROBORATED_BY]->(s:Source)
+UNWIND $ids AS i MATCH (n:Node {id:i})-[c:CORROBORATED_BY]->(s:Source)
+WHERE n:Memory
 RETURN n.id, s.id, s.status, c.by
 """
 Q_INV_OK_HAS_NO_BAD_PARENT = """

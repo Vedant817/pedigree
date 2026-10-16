@@ -49,6 +49,7 @@ testpaths = ["tests"]
 markers = [
   "slow: long-running tests (deselected by make test-quick)",
   "e2e: end-to-end tests that start the service",
+  "perf: heavy real-FalkorDB perf gates (run via make check-perf)",
 ]
 timeout = 300
 filterwarnings = ["ignore::DeprecationWarning"]

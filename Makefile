@@ -7,7 +7,7 @@ PY := .venv/bin/python
 endif
 
 .DEFAULT_GOAL := help
-.PHONY: help setup start-db stop-db db-status test test-quick lint check eval eval-quick demo seed clean-clone
+.PHONY: help setup start-db stop-db db-status test test-quick lint check check-perf eval eval-quick demo seed clean-clone
 
 help:
 	@echo "Pedigree targets:"
@@ -16,9 +16,10 @@ help:
 	@echo "  make stop-db     stop the local FalkorDB"
 	@echo "  make db-status   show DB reachability and module version"
 	@echo "  make test        full test suite (skips nothing)"
-	@echo "  make test-quick  fast subset (deselects slow tests)"
+	@echo "  make test-quick  fast subset (deselects slow and perf tests)"
 	@echo "  make lint        ruff check"
 	@echo "  make check       lint + test-quick + secret scan + numbers check"
+	@echo "  make check-perf  heavy perf gates on the live DB (P-010)"
 	@echo "  make eval        full evaluation run (writes evals/results/*.csv)"
 	@echo "  make eval-quick  2-minute evaluation subset"
 	@echo "  make demo        seed the demo tenant (synthetic scenarios S1+S8)"
@@ -42,7 +43,7 @@ test:
 	$(PY) -m pytest -q
 
 test-quick:
-	$(PY) -m pytest -q -m "not slow"
+	$(PY) -m pytest -q -m "not slow and not perf"
 
 lint:
 	$(PY) -m ruff check .
@@ -50,6 +51,9 @@ lint:
 check: lint test-quick
 	$(PY) scripts/secret_scan.py
 	$(PY) scripts/check_numbers.py
+
+check-perf:
+	$(PY) -m pytest -q -m "perf"
 
 eval:
 	$(PY) evals/run_all.py
