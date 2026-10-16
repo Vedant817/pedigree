@@ -8,12 +8,13 @@ ADR-009 in [`docs/DECISIONS.md`](../../docs/DECISIONS.md).
 
 **Honesty boundary.** Verified: the genuine installed-runtime hook payload
 (OpenCode 1.19.0, `docs/consults/opencode-recheck-2026-10-16-shape.json`) maps
-byte-for-byte to the documented REST contract, and adapter behaviour is covered
-by the builtin Node suites plus a hook-replay integration test against a real
-API and FalkorDB. **Not verified:** acceptance of this plugin file by an
-installed OpenCode session, write/edit/shell payload shapes (the provider
-blocked the write probe), and coverage in real work. Hook-replay tests are not
-installed-runtime proof. F-08 remains *implementing*.
+field-exactly (allowlisted wire keys; the capture digest is recomputed
+independently in tests) to the documented REST contract, and adapter behaviour
+is covered by the builtin Node suites plus a hook-replay integration test
+against a real API and FalkorDB. **Not verified:** acceptance of this plugin
+file by an installed OpenCode session, write/edit/shell payload shapes (the
+provider blocked the write probe), and coverage in real work. Hook-replay tests
+are not installed-runtime proof. F-08 remains *implementing*.
 
 ## Install
 
@@ -46,7 +47,10 @@ For every native `read` call the plugin:
 1. Denies the call unless the tool is `read` (every other tool — including
    write, edit, shell and MCP tools — is denied before execution).
 2. Validates the path: inside the canonical project root, not a `..`/symlink
-   escape, not a credential file (`.env*`, keys, `.ssh`, `.aws`, …).
+   escape, not a credential file (`.env*`, keys, `.ssh`, `.aws`, …). On Windows,
+   drive-relative (`C:file`) and alternate-stream (`file:stream`, `id_rsa::$DATA`)
+   forms are denied outright, and existing paths are canonicalized with the
+   native resolver so `CASE.TXT` and `case.txt` yield one identity.
 3. Ensures the session, then calls `POST /v1/gate` with
    `{action:{tool:"read", summary:"read <relative path>", effect:"reversible",
    risk:"low"}, session_id, record:false}`. `allow`/`warn` proceed; `block`,
@@ -91,6 +95,22 @@ Known limits (must not be over-read):
 - The runtime firing `tool.execute.after` only for completed reads is an
   unverified assumption; if a failed read still fires it, the anomalous display
   latches the session (fail-closed, but it surfaces as a capture gap).
+- Latch memory is bounded: after more than 64 tracked sessions churned, a
+  session evicted from the tracking map is remembered as incomplete only within
+  a 256-entry ring; beyond that, an old session ID that reappears after heavy
+  churn can be treated as new. Bounded memory over unbounded forgetting
+  (Red-team F-08, disclosure).
+- The gate consults a bounded influence window (`pedigree_read_window`, default
+  the last 50 distinct reads per session). A revoked source evicted from that
+  window by 50 newer reads is no longer consulted server-side (the red-team
+  probe observed one read allowed after eviction); re-reads of a revoked view
+  are denied only while that view is inside the window. Server semantics,
+  disclosed; `tests/security/test_security_F08.py` carries a strict xfail
+  watchdog that flips if eviction semantics change.
+- TOCTOU: paths are validated in the before hook and again in the after hook,
+  but a symlink swapped between those points is outside the threat model. The
+  digest covers only the *observed display view* (what the runtime reported),
+  never asserted as identical to the bytes on disk.
 - Durable replay/ack state across plugin restarts is out of scope (F-22).
   Restarting loses dedup/latch state for that session, while unsupported tools
   remain unconditionally denied.
@@ -108,12 +128,17 @@ node --test adapters/opencode/tests/fixture-mapping.test.js adapters/opencode/te
   adapters/opencode/tests/bounds-config.test.js
 ```
 
-- `tests/unit/test_opencode_adapter_suite.py` runs the same suite under pytest.
+- `tests/unit/test_opencode_adapter_suite.py` runs the same suite (37 tests)
+  under pytest.
 - `tests/integration/test_opencode_plugin.py` starts a real local API and
   FalkorDB, then drives the genuine fixture through `tests/driver.js` with a
   Node subprocess: persisted read view + independently recomputed digest,
-  untrusted integrity, session read window, revoke-then-deny, tenant isolation.
-  This is a **hook replay**, not installed OpenCode execution.
+  untrusted integrity, session read window, revoke-then-deny, tenant isolation,
+  and (on Windows) `CASE.TXT`/`case.txt` convergence on one Source. This is a
+  **hook replay**, not installed OpenCode execution.
+- `tests/security/test_security_F08.py` holds the red-team regressions: Windows
+  stream and drive-relative paths denied with zero network connections (silent
+  listener) and a strict-xfail read-window eviction watchdog.
 - `tests/driver.js` is a manual replay harness: a job JSON
   `{"project": "<dir>", "hooks": [{"phase": "before"|"after", "input": …, "output": …}]}`
   prints one JSON result per hook and exits `0` even for per-hook denials.

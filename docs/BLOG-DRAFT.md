@@ -36,8 +36,8 @@ this one, along which path, and which of them had independent support.
 ## What Pedigree does
 
 - **Record lineage** through the Claude Code hook, REST API and MCP. Runtime observations and
-  agent-reported dependencies are distinct evidence. The OpenCode adapter is unbuilt; a
-  temporary observation plugin captured one genuine read-hook shape.
+  agent-reported dependencies are distinct evidence. The OpenCode adapter is an opt-in read-only
+  capture slice (hook-replay verified, not yet verified in an installed session).
 - **Revoke**: mark one source bad and the engine finds everything downstream, down to the commit,
   with a reason path for each.
 - **Preserve**: a belief that also has an independent, human-attested supporting source survives

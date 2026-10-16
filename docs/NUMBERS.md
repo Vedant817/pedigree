@@ -87,6 +87,7 @@ e4b_closure_sqlite_n4100 = 0.52   # evals/run_e4b_sqlite.py (stdlib sqlite3)
 e4b_closure_sqlite_n820 = 0.28   # evals/run_e4b_sqlite.py (stdlib sqlite3)
 falkordb_module_version = 42201   # pedigree db status / MODULE LIST on v4.22.1
 falkordb_version = 4.22.1   # scripts/fetch-falkordb.sh (pinned)
+opencode_recheck_version = 1.19.0   # docs/consults/opencode-recheck-2026-10-16.md (installed opencode.exe)
 python_min = 3.11   # pyproject.toml requires-python
 tracks_entered = 2   # docs/DECISIONS.md ADR-000
 <!-- NUMBERS:END -->

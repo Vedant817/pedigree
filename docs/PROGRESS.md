@@ -1,14 +1,18 @@
 # CURRENT STATE (overwritten after every feature / checkpoint)
 
-- **Phase:** P2/P3 hardening and evaluation publication; updated Fri 2026-10-16 09:42 IST.
-- **Last implementation commits:** f475979 (OpenCode ADR-009 record), a677d9f (what-if/audit containment),
-  d7f7409 (test fixture ownership), 3941d85 (DAG-cluster evaluation intervals and quick artifact isolation).
+- **Phase:** P2/P3 hardening and evaluation publication; updated Fri 2026-10-16 10:31 IST.
+- **Last implementation commits:** 8dd6509 (F-08 OpenCode read-only slice incl. review hardening),
+  f475979 (OpenCode ADR-009 record), a677d9f (what-if/audit containment), d7f7409 (test fixture
+  ownership).
 - **Environment:** Windows 11; Python 3.12.15; pinned FalkorDB module 42201 in Docker;
   Node v24.13.1. Local core and synthetic demo require no model provider.
 - **Deadlines:** feature freeze Sun 2026-10-18 15:00 IST; target submit 21:00; hard stop 23:59.
-- **Test state:** make check: 394 passed, 1 skipped (optional ACL deployment secret absent);
-  Ruff, tracked secret scan, numbers check PASS. F-08 slice: builtin Node suite 35 passed;
-  hook-replay integration against live API + real FalkorDB passed; independent QA/red-team NOT yet run.
+- **Test state:** make check: 396 passed, 1 skipped (optional ACL deployment secret absent),
+  1 xfailed (strict read-window watchdog), Ruff, tracked secret scan and numbers check PASS;
+  `scripts/check_secrets.sh` PASS including git history. F-08 slice: builtin Node suite 37 passed;
+  hook-replay integration (live API + real FalkorDB) 3 passed; security regressions 1 passed
+  + 1 strict xfail. QA round 1 FAIL (secret-scan canary + stale docs) fixed pre-push; red-team
+  F-08 findings fixed/disclosed; independent round-2 re-verification in flight.
   Independent what-if/audit QA: 45 passed; test-fixture ownership QA: 11 passed. Full serialized
   evaluation PASS; independent scoped F-14 statistical signoff PASS. Fresh local clone of 72c7650,
   new venv and editable dev install: make check PASS, 391 passed, 1 skipped in 38.86s.
@@ -18,14 +22,16 @@
   E3 authored S1/S6/S8, E4/E4b local measurements are distinct from real-session evidence.
 - **Capture:** OpenCode adapter implemented as an explicitly enabled read-only slice (ADR-009,
   `adapters/opencode/`): native reads gated and captured as observed read views, every other tool
-  denied, failed capture latches the session. Its tests replay the genuine 1.19.0 payload; installed
-  acceptance of the plugin file, write shapes and real coverage remain unmeasured. Claude hook has
-  API/subprocess proof, not installed-runtime proof.
+  denied, failed capture latches the session. Review round hardened Windows path handling
+  (alternate-stream/drive-relative denial, native case canonicalization) and disclosed the bounded
+  latch memory, read-window and TOCTOU limits (adapter README). Its tests replay the genuine 1.19.0
+  payload; installed acceptance of the plugin file, write shapes and real coverage remain unmeasured.
+  Claude hook has API/subprocess proof, not installed-runtime proof.
 - **Data safety correction:** the old isolation fixture deleted all registry tenants. It now
   deletes only its own successful creates and reports cleanup failures. Independent real-DB
   sentinel survival passes. Earlier runs cannot establish that pre-existing data was preserved.
 - **Next 3 actions:**
-  1. Independent QA/red-team of the F-08 slice (fresh Node/API reruns, adversarial cases), then fix findings.
+  1. Land the independent round-2 re-verification verdict for the F-08 fix round (round-1 QA/red-team findings are fixed or disclosed).
   2. Resolve service ACL wiring with independent tenant-boundary QA.
   3. Finish durable hook spool/replay and remaining release checks before feature freeze.
 - **Human pending:** video recording, walkthrough/architecture review, organizer track decision,
@@ -402,3 +408,28 @@
 - Scope honesty: F-08 remains implementing; installed acceptance of this plugin file, write/edit/
   shell shapes (provider-blocked) and real coverage remain unverified.
 - make check: 394 passed, 1 skipped in 42.37s; Ruff, tracked secret scan, numbers PASS.
+
+
+### 2026-10-16 10:31 IST | Phase P2/P3 | F-08 review round: QA round-1 + red-team findings fixed/disclosed | STATUS: fixes landed; independent round-2 re-verification in flight
+- QA round 1 (`docs/qa/F-08.md`) verdict FAIL: `make check` red on this slice's own privacy canary
+  matching the tracked secret scanner (F08-QA-1, High), stale root README "adapter unbuilt" lines
+  (F08-QA-2), "byte-for-byte" wording (F08-QA-3). Red-team round (`docs/qa/redteam-F-08.md`,
+  evidence `scratch/redteam-f08/`) found a High Windows ADS credential bypass (`id_rsa::$DATA`
+  etc.), a Medium drive-relative `C:file` wrong-file provenance, a Medium case-split Source
+  identity (non-native realpath), three disclosure-level limits (latch-ring forgetting, gate
+  read-window eviction, TOCTOU swap), and pre-existing P-014 (out of scope, `AUDIT.md`).
+- Fixes: win32 path-grammar denial (`path_stream`) for alternate-stream/drive-relative forms;
+  native realpath for root and resolution (case-convergent identity); canary assembled at runtime
+  and the unpushed commit rewritten (`c14d7fb` -> `8dd6509`) so no credential-shaped literal exists
+  in history; stale docs across README/FEATURES/KNOWN_ISSUES/BLOG-DRAFT corrected; disclosures
+  added to the adapter README known limits.
+- New permanent coverage: `tests/security/test_security_F08.py` (stream/drive-relative denial with
+  a silent listener proving zero connections; strict-xfail read-window eviction watchdog); win32
+  regressions in `paths.test.js`; case-convergence live integration test.
+- Evidence: `make check` 396 passed, 1 skipped, 1 xfailed; Ruff/secret/numbers PASS;
+  `scripts/check_secrets.sh` PASS including history; Node suite 37 passed; security 1 passed + 1
+  strict xfail (`--runxfail` shows exactly the recorded eviction semantics); integration 3 passed
+  on live API + FalkorDB 42201; red-team live re-run shows case variants converging on one Source
+  (pre-fix: two).
+- Honesty: F-08 remains implementing; hook-replay only; the three disclosures are limits, not
+  guarantees changed.

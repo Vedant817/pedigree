@@ -69,7 +69,7 @@ Docs: [full setup](#setup) · [data model](#graph-data-model) ·
 ## Architecture
 
 ```
- Claude Code hook   OpenCode adapter (planned)   REST client   MCP client
+ Claude Code hook   OpenCode adapter (read-only)   REST client   MCP client
       |                   |               |             |
       v                   v               v             v
   POST /v1/events ---- POST /v1/* ---- MCP (stdio / streamable HTTP at /mcp)
@@ -87,8 +87,9 @@ Docs: [full setup](#setup) · [data model](#graph-data-model) ·
 Capture is the choke point: runtimes send evidence of what happened, `src/pedigree/adapters.py`
 translates the fields we understand into engine operations, and everything else is ignored rather
 than guessed. MCP/API clients can report dependencies; those reports are agent-level evidence,
-not proof of complete lineage or trusted operator attestation. The OpenCode lane is planned: only
-a temporary observation plugin has captured one genuine read-hook shape.
+not proof of complete lineage or trusted operator attestation. The OpenCode lane is an opt-in
+read-only capture slice (`adapters/opencode/`, ADR-009) verified by hook replay only - it is not
+verified against an installed OpenCode session and may write nothing in real work.
 
 ## Graph data model
 
@@ -189,10 +190,15 @@ documented (a stalled hook must not block the tool unless the matcher sets
 
 ### OpenCode plugin
 
-The OpenCode adapter is not implemented in this checkout. A temporary observation plugin
-in a bounded free-model session captured genuine before/after payloads for one read
-(`docs/consults/opencode-recheck-2026-10-16.md`). Full adapter coverage and real-session
-gate friction remain unmeasured.
+`adapters/opencode/` implements an **opt-in, read-only** capture slice (ADR-009). With
+`PEDIGREE_OPENCODE_ENABLED=1` the native `read` tool is validated (project containment, credential
+exclusions, symlink escapes, Windows stream/drive-relative forms), gated via `/v1/gate`, and
+captured as an observed read view via `/v1/events`; every other tool is denied before execution and
+any capture gap latches the session (fail-closed). Unset or any value other than `1` disables it
+entirely. Verified by hook replay of the genuine 1.19.0 payload (Node suites, live API/FalkorDB
+integration, `docs/qa/F-08.md`, `docs/qa/redteam-F-08.md`); **not** verified against an installed
+OpenCode session, and write/edit/shell coverage plus real-session gate friction remain unmeasured
+(`docs/consults/opencode-recheck-2026-10-16.md`, `docs/features/F-08-opencode.md`).
 
 ## Security model
 
@@ -283,9 +289,10 @@ Aligned manually with `docs/03-EVAL-AND-DEMO.md` section 7; that document is the
 - Hooks see only what the runtime exposes; paraphrase through an unhooked channel is invisible.
 - Bash risk classification is a documented regex heuristic, not a sandbox. External effects
   (pushes already pulled, emails sent) are listed, not undone.
-- One genuine OpenCode read-hook payload is recorded; full adapter coverage and E6 real-session
-  coverage/friction remain unmeasured. Claude hook capture is verified against the real HTTP
-  API, not against an installed runtime.
+- The OpenCode adapter covers one genuine read-hook shape as an opt-in read-only slice
+  (hook-replay verified, not installed-session verified); write/edit/shell payload shapes and E6
+  real-session coverage/friction remain unmeasured. Claude hook capture is verified against the
+  real HTTP API, not against an installed runtime.
 - Per-tenant ACL users are verified but not wired into the service; a single-host deployment where
   the operator token is pasted into an agent's environment still has one principal.
 - Cloud Free has no TLS and no persistence; any hosted demo holds synthetic data only.
@@ -330,7 +337,7 @@ This table is maintained manually alongside `docs/FEATURES.md`; it is not genera
 | F-05 | REST API + registry + auth + limits | done | `tests/integration/test_api.py`, `tests/security/test_security_F05.py` | `docs/qa/F-05.md` PASS |
 | F-06 | MCP server (stdio + streamable HTTP) | done | `tests/integration/test_mcp.py` | `docs/qa/F-06.md` PASS |
 | F-07 | `/v1/events` capture mapping + artifact links | done | `tests/integration/test_events.py` | `docs/qa/F-07.md` PASS |
-| F-08 | OpenCode plugin | implementing | real read payload captured | adapter unbuilt; `docs/consults/opencode-recheck-2026-10-16.md` |
+| F-08 | OpenCode plugin | implementing | `adapters/opencode/`, Node suites, `tests/integration/test_opencode_plugin.py`, `tests/security/test_security_F08.py` | opt-in read-only slice (ADR-009), hook-replay verified; not verified in an installed session; `docs/qa/F-08.md`, `docs/qa/redteam-F-08.md` |
 | F-09 | lineage workspace (graph view, revoke preview/confirm, gate form) | done | `tests/integration/test_ui_api.py`, `tests/security/test_ui_boundary.py` | `docs/qa/F-09.md` PASS |
 | F-10 | scenario JSON + `make demo` | done | `tests/integration/test_demo_seed.py`, `test_demo_qa.py` | `docs/qa/F-10.md` PASS |
 | F-11 | gate (`check_action`, `/v1/gate`, hook deny/ask, policy.yaml) | done | `tests/unit/test_gate.py`, `tests/integration/test_gate_*.py` | `docs/qa/F-11.md` PASS |

@@ -34,19 +34,42 @@ replay, not installed OpenCode execution. QA and red-team independently rerun.
 Implemented in `adapters/opencode/` (`pedigree.js` entry, `pedigree-core.js` core,
 `README.md` install/config/limits; dependency-free ESM, no npm packages):
 
-- Builtin Node suite, 35 tests: `fixture-mapping.test.js` (exact allowlisted wire
+- Builtin Node suite, 37 tests: `fixture-mapping.test.js` (exact allowlisted wire
   contract from the genuine 1.19.0 payload), `hooks.test.js` (gate/denial/ordering/
   latch matrix), `paths.test.js` (traversal, symlink/junction escape, credential
-  exclusions, display validation), `privacy.test.js` (canaries + body-key allowlist),
+  exclusions, display validation, win32 stream/drive-relative denial, case
+  canonicalization), `privacy.test.js` (canaries + body-key allowlist),
   `bounds-config.test.js` (opt-in, fail-closed misconfiguration, clamps, memory/URI
   bounds). Run under pytest by `tests/unit/test_opencode_adapter_suite.py`.
 - End-to-end hook replay: `tests/integration/test_opencode_plugin.py` drives the
   genuine fixture through a Node subprocess into a live API + real FalkorDB 42201,
   asserting the persisted Source identity with an independently recomputed digest,
   forced `untrusted` integrity, Session runtime + read window, revoke → `reverify`
-  denial with no capture, and per-tenant isolation. Driver: `tests/driver.js`.
+  denial with no capture, per-tenant isolation, and (Windows) case-variant
+  convergence on one Source. Driver: `tests/driver.js`.
 - Install contract updated from the current runtime docs + genuine recheck: project
   plugins load from `.opencode/plugins/`; the entry exports one named plugin function.
 
-Independent QA/red-team review must still rerun this before any shipped-subset claim
-(ADR-009), and installed-runtime acceptance of this plugin file remains unverified.
+## Independent review (2026-10-16) and follow-up fixes
+
+`docs/qa/F-08.md` (FAIL: the tracked privacy canary matched the repository secret
+scanner; plus stale-doc and claim-wording findings) and the red-team evidence in
+`docs/qa/redteam-F-08.md` / `scratch/redteam-f08/` resulted in:
+
+- Windows alternate data streams (`id_rsa::$DATA`, `file:stream`) and drive-relative
+  forms (`C:file`) are now denied at the path stage (`path_stream`) before any
+  transport; on-disk case is canonicalized with the native resolver so
+  `CASE.TXT`/`case.txt` mint one Source identity.
+- The canary literal no longer exists in git history (commit amended before push);
+  regression tests: `tests/security/test_security_F08.py` (stream/drive-relative
+  denial with a silent listener proving zero connections; strict-xfail watchdog for
+  read-window eviction), win32 tests in `paths.test.js`, case test above.
+- Disclosed (not fixed, not overclaimed) in `adapters/opencode/README.md` known
+  limits: bounded latch memory (evicted-session ring), the server's bounded
+  `pedigree_read_window` (default last 50 reads) influencing revocation, and TOCTOU
+  between validation and the runtime read. P-014 (`/v1/events` bypassing node_cap)
+  is pre-existing and out of this slice's scope (`AUDIT.md`).
+
+Builder fix-verification evidence is in the QA addendum (`docs/qa/F-08.md`);
+an independent QA rerun must still pass before any shipped-subset claim, and
+installed-runtime acceptance of this plugin file remains unverified.

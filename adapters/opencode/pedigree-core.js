@@ -163,6 +163,12 @@ export function isCredentialPath(rel) {
   return segments.some((s) => CREDENTIAL_SEGMENTS.has(s.toLowerCase()));
 }
 
+/** Containment test on a `path.relative` result. A `..` *segment* escapes the
+ *  root; names merely starting with `..` (`..x`, `..foo`) are literal children. */
+function escapesRoot(rel) {
+  return rel === ".." || rel.startsWith(".." + path.sep) || path.isAbsolute(rel);
+}
+
 /**
  * Resolve `candidate` against the canonical project root. Symlinks/junctions and
  * `..` escapes outside the root are denied; relative path is returned with `/`.
@@ -179,7 +185,7 @@ export function resolveWithinRoot(rootReal, candidate) {
     return { denied: "malformed" };
   }
   const relText = path.relative(rootReal, abs);
-  if (relText.startsWith("..") || path.isAbsolute(relText)) return { denied: "path_outside" };
+  if (escapesRoot(relText)) return { denied: "path_outside" };
 
   let real = null;
   try {
@@ -190,7 +196,7 @@ export function resolveWithinRoot(rootReal, candidate) {
   let rel = relText;
   if (real) {
     const relReal = path.relative(rootReal, real);
-    if (relReal.startsWith("..") || path.isAbsolute(relReal)) return { denied: "path_outside" };
+    if (escapesRoot(relReal)) return { denied: "path_outside" };
     rel = relReal;
   }
   rel = rel === "" ? "." : rel.split(path.sep).join("/");

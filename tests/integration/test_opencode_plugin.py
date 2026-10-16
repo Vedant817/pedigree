@@ -8,8 +8,9 @@ not an installed OpenCode session.
 
 Asserted here: persisted Source identity (uri + independently recomputed
 canonical digest), untrusted integrity on the agent channel, Session runtime and
-read window, gate denial after revoking the captured source, and per-tenant
-isolation of identical captures.
+read window, gate denial after revoking the captured source, per-tenant
+isolation of identical captures, and (on Windows) case-variant paths converging
+on one Source.
 """
 from __future__ import annotations
 
@@ -19,6 +20,7 @@ import os
 import shutil
 import socket
 import subprocess
+import sys
 import threading
 import uuid
 from pathlib import Path
@@ -262,3 +264,58 @@ def test_identical_captures_are_isolated_per_tenant(live_server, tmp_path):
     results_b = replay(genuine_job(project, session_id=sid, call_id="call_tenant_b2"),
                        token=cred_b["token"], base=server.base, tmp_path=tmp_path, name="tenant-b2")
     assert [result["ok"] for result in results_b] == [True, True], results_b
+
+
+@pytest.mark.skipif(not sys.platform.startswith("win"), reason="NTFS case-insensitive volume semantics")
+def test_case_variant_paths_converge_on_one_source(live_server, tmp_path):
+    """`CASE.TXT` and `case.txt` name one file on Windows; they must mint one Source."""
+    server = live_server
+    project = make_project(tmp_path)
+    (project / "case.txt").write_text("case variant\n", encoding="utf-8")
+    token = server.make_tenant(server.tenant)["token"]
+    sid = "ses_int_case"
+    project_key = expected_project_key(project)
+    uri = f"readview:v1/{project_key}/case.txt#L1-L1"
+    display_text = "case variant"
+
+    def case_job(call_id: str, file_name: str) -> dict:
+        absolute = str(project / file_name)
+        display = {
+            "type": "file", "path": absolute, "text": display_text,
+            "lineStart": 1, "lineEnd": 1, "totalLines": 1, "truncated": False,
+        }
+        return {
+            "project": str(project),
+            "hooks": [
+                {"phase": "before",
+                 "input": {"tool": "read", "sessionID": sid, "callID": call_id},
+                 "output": {"args": {"filePath": absolute}}},
+                {"phase": "after",
+                 "input": {"tool": "read", "sessionID": sid, "callID": call_id, "args": {"filePath": absolute}},
+                 "output": {"title": absolute, "output": display_text, "metadata": {"display": display}}},
+            ],
+        }
+
+    for name, file_name in (("upper", "CASE.TXT"), ("lower", "case.txt")):
+        results = replay(case_job(f"call_case_{name}", file_name),
+                         token=token, base=server.base, tmp_path=tmp_path, name=f"case-{name}")
+        assert [result["ok"] for result in results] == [True, True], results
+
+    digest = expected_digest(rel="case.txt", line_start=1, line_end=1, total_lines=1,
+                             truncated=False, text=display_text)
+    rows = server.db.ro_query(
+        server.graph,
+        "MATCH (s:Source {uri:$uri}) RETURN s.id, s.content_hash, s.integrity",
+        {"uri": uri},
+    ).result_set
+    assert len(rows) == 1, rows
+    source_id, content_hash, integrity = rows[0]
+    assert content_hash == digest
+    assert integrity == "untrusted"
+    duplicate = server.db.ro_query(
+        server.graph,
+        "MATCH (s:Source {uri:$uri}) RETURN count(s)",
+        {"uri": f"readview:v1/{project_key}/CASE.TXT#L1-L1"},
+    ).result_set
+    assert duplicate == [[0]], "no case-variant duplicate Source may exist"
+    assert read_window(server.db, server.graph, f"oc_{project_key}_{sid}") == [source_id]

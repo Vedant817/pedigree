@@ -53,6 +53,33 @@ test("traversal and outside-root reads are denied before any network call", asyn
   assert.equal(calls.length, 0);
 });
 
+test("names starting with dot-dot are literal children; real traversal stays denied (F08R2-QA-2)", async (t) => {
+  const project = makeProject();
+  t.after(() => removeProject(project));
+  const outside = path.join(project, "..", "dotdot-outside.txt");
+  fs.writeFileSync(path.join(project, "..x"), "inside dotdot file\n");
+  fs.mkdirSync(path.join(project, "..foo"));
+  fs.writeFileSync(path.join(project, "..foo", "y.txt"), "inside dotdot dir\n");
+  fs.writeFileSync(outside, "outside\n");
+  t.after(() => fs.rmSync(outside, { force: true }));
+  const root = canonicalRoot(project);
+
+  // Literal children whose names begin with ".." are inside the root (pre-fix: denied).
+  assert.deepEqual(resolveWithinRoot(root, "..x"), { rel: "..x" });
+  assert.deepEqual(resolveWithinRoot(root, "..foo/y.txt"), { rel: "..foo/y.txt" });
+
+  // Genuine escapes are still denied, including through a dot-dot-named directory
+  // and to an existing file one level above the root.
+  assert.equal(resolveWithinRoot(root, "..foo/../../dotdot-outside.txt").denied, "path_outside");
+  assert.equal(resolveWithinRoot(root, "../dotdot-outside.txt").denied, "path_outside");
+  assert.equal(resolveWithinRoot(root, "..").denied, "path_outside");
+
+  const { core, calls } = makeCore({ project });
+  const [bIn, bOut] = hookPair(project, "call_dotdot", "..x");
+  assert.deepEqual(await core.beforeHook(bIn, bOut), { decision: "allow" });
+  assert.deepEqual(calls.map((c) => (c.url.endsWith("/v1/gate") ? "gate" : "events")), ["events", "gate"]);
+});
+
 test("credential-excluded paths are denied; near-miss names are allowed", async (t) => {
   const project = makeProject();
   t.after(() => removeProject(project));

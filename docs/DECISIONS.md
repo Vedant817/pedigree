@@ -278,5 +278,10 @@ Read-view hashes do not match whole-file artifact keys; cross-session write link
 unsupported. All three consultants recommended the observed-read-first boundary.
 
 **Evidence.** docs/consults/008-opencode-capture/{question,domain,architect,specialist,decision}.md;
-genuine read fixture and separate opencode-write-recheck-2026-10-16.md. Independent Node/API
-QA must precede a shipped-subset claim.
+genuine read fixture and separate opencode-write-recheck-2026-10-16.md. Implementation:
+`adapters/opencode/**` (37 builtin Node tests), `tests/integration/test_opencode_plugin.py`
+(live API + FalkorDB 42201 hook replay), `tests/security/test_security_F08.py`. Review:
+`docs/qa/F-08.md` (FAIL on the tracked secret-scan canary; stale-doc findings) and
+`docs/qa/redteam-F-08.md` (Windows ADS/drive-relative path bypass, case-split identity,
+latch-ring and read-window eviction disclosures); fixes and disclosures landed in the
+post-review commits. Independent QA must precede a shipped-subset claim.
