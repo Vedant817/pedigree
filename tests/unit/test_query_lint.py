@@ -21,18 +21,24 @@ SRC = pathlib.Path(__file__).resolve().parents[2] / "src" / "pedigree"
 
 # Two labelled-anchor shapes, both quadratic without the :Node(id) index:
 #   1. property map - `MATCH (x:Memory {id:...})` / `MERGE (:Memory {id:...})`;
-#   2. separate WHERE - `MATCH (x:Memory) WHERE x.id = ...`.
-# Formatting-tolerant and case-insensitive: P010-QA-1 round 1 showed `Memory{id:`,
-# `m : Memory` and lowercase `match` evade a naive regex; round 2 added the anonymous
-# `(:Memory {id:` and the WHERE shape. Accepted residual (obfuscation only; none
-# present in src/): comments inside the pattern, backtick quoting, `WHERE $m = m.id`.
+#   2. separate WHERE - `MATCH (x:Memory) WHERE x.id = ...` (optional per-pattern
+#      parentheses and a leading node/relationship pattern list).
+# Formatting-tolerant and case-insensitive (P010-QA-1 rounds 1-3). SCOPE: the lint
+# guards the canonical spellings and their near variants - the shapes this codebase
+# has used or could plausibly introduce. Deliberate grammar paraphrase beyond that
+# is accepted residual (comments inside the pattern, backtick quoting, reversed
+# operand order `WHERE $m = m.id`, or extra Cypher clauses between the anchor and
+# the WHERE); none of them exist in src/ and the behavioural guard is the
+# EXPLAIN/perf gate plus code review, not this regex.
 _TYPE_LABELS = r"(?:Memory|Action|Source|Session|Agent|Revocation)"
 LABEL_ANCHOR = re.compile(
     rf"(?:match|merge)\s*\(\s*\w*\s*:\s*{_TYPE_LABELS}\s*\{{\s*id\s*:",
     re.IGNORECASE,
 )
 WHERE_ID_ANCHOR = re.compile(
-    rf"\(\s*(\w+)\s*:\s*{_TYPE_LABELS}\s*\)\s*(?:,\s*\([^()]*\)\s*)*where\s+\1\s*\.\s*id\s*=",
+    rf"\(\s*(\w+)\s*:\s*{_TYPE_LABELS}\s*\)"
+    rf"\s*(?:,\s*\([^()]*\)(?:\s*-?\s*\[[^\]]*\]\s*-?\s*>?\s*\([^()]*\))*\s*)*"
+    rf"where\s+\(*\s*\1\s*\.\s*id\s*\)*\s*=",
     re.IGNORECASE,
 )
 ANCHOR_PATTERNS = (LABEL_ANCHOR, WHERE_ID_ANCHOR)
@@ -66,6 +72,8 @@ def test_anchor_regex_catches_formatting_variants():
         "MATCH (m:Memory) WHERE m.id = $m",
         "match (m : Action)\nwhere m . id = $m",
         "MATCH (m:Memory), (s:Source) WHERE m.id = $m",
+        "MATCH (m:Memory) WHERE (m.id = $m)",
+        "MATCH (m:Memory), (a:Action)-[:R]->(b) WHERE m.id = $m",
     )
     undetected = [v for v in variants if not any(p.search(v) for p in ANCHOR_PATTERNS)]
     assert not undetected, f"lint regex must catch: {undetected}"
