@@ -5,7 +5,7 @@ import uuid
 import pytest
 
 from pedigree.api.registry import TenantRegistry
-from pedigree.config import get_settings
+from pedigree.config import get_settings, graph_name
 from pedigree.db.client import Db
 from pedigree.mcp_server import build_mcp
 
@@ -22,7 +22,15 @@ def tenant_and_server():
     tid = "mcp" + uuid.uuid4().hex[:10]
     cred = reg.create_tenant(tid)
     srv = build_mcp(db, settings, tid, cred.token)
-    return tid, cred.token, srv.server
+    try:
+        yield tid, cred.token, srv.server
+    finally:
+        # P010-QA-2: tests must not leak tenant graphs/registry rows.
+        try:
+            db.select(graph_name(tid)).delete()
+        except Exception:  # noqa: BLE001 - missing graph raises
+            pass
+        db.query(reg.gname, "MATCH(t:Tenant {id:$id}) DELETE t", {"id": tid})
 
 
 def test_health_and_record_source(tenant_and_server):

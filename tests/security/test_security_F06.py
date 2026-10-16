@@ -8,7 +8,7 @@ import uuid
 import pytest
 
 from pedigree.api.registry import TenantRegistry
-from pedigree.config import get_settings
+from pedigree.config import get_settings, graph_name
 from pedigree.db.client import Db
 from pedigree.mcp_server import build_mcp
 
@@ -22,10 +22,25 @@ def db():
     return Db(get_settings())
 
 
-def test_mcp_tenant_id_without_token_is_rejected(db):
+@pytest.fixture
+def tenants(db):
+    """P010-QA-2: delete tenant graphs/registry rows created by the test."""
+    created: list[str] = []
+    yield created
+    reg = TenantRegistry(db, get_settings())
+    for tid in created:
+        try:
+            db.select(graph_name(tid)).delete()
+        except Exception:  # noqa: BLE001 - missing graph raises
+            pass
+        db.query(reg.gname, "MATCH(t:Tenant {id:$id}) DELETE t", {"id": tid})
+
+
+def test_mcp_tenant_id_without_token_is_rejected(db, tenants):
     reg = TenantRegistry(db, get_settings())
     tid = "mcp" + uuid.uuid4().hex[:10]
     reg.create_tenant(tid)
+    tenants.append(tid)
     srv = build_mcp(db, get_settings())  # no default tenant/token
     async def invoke():
         return await srv.server.call_tool("pedigree_record_source", {"tenant_id": tid, "kind": "web", "uri": "x"})
@@ -34,10 +49,11 @@ def test_mcp_tenant_id_without_token_is_rejected(db):
     assert payload["ok"] is False
 
 
-def test_mcp_quota_enforced(db):
+def test_mcp_quota_enforced(db, tenants):
     reg = TenantRegistry(db, get_settings())
     tid = "mq" + uuid.uuid4().hex[:10]
     cred = reg.create_tenant(tid, node_cap=1)
+    tenants.append(tid)
     srv = build_mcp(db, get_settings(), tid, cred.token)
     # first write
     async def w1():
@@ -53,12 +69,13 @@ def test_mcp_quota_enforced(db):
     assert p2["error"]["code"] == "quota_exceeded"
 
 
-def test_mcp_cross_tenant_token_mismatch_rejected(db):
+def test_mcp_cross_tenant_token_mismatch_rejected(db, tenants):
     reg = TenantRegistry(db, get_settings())
     tid1 = "ma" + uuid.uuid4().hex[:10]
     tid2 = "mb" + uuid.uuid4().hex[:10]
     c1 = reg.create_tenant(tid1)
     reg.create_tenant(tid2)
+    tenants.extend([tid1, tid2])
     srv = build_mcp(db, get_settings(), tid1, c1.token)
     # use tid2 with token1
     async def invoke():
