@@ -1,12 +1,15 @@
 # CURRENT STATE (overwritten after every feature / checkpoint)
 
-- **Phase:** Phase C security hardening, Fri 2026-10-16 21:17 IST. P-029 hygiene and
+- **Phase:** Phase C security hardening, Sat 2026-10-17 02:01 IST. P-029 hygiene and
   P-014 request-wide quota admission have independent QA/red-team PASS. Current full
-  `make check`: 582 passed, 1 skipped, 3 deselected, 1 xfailed; Ruff, tracked secrets
+  `make check`: 698 passed, 2 skipped, 3 deselected, 1 xfailed; 29 subsequently added
+  red-team cases separately PASS against unchanged source. Ruff, tracked secrets
   and numbers PASS. P-014 committed in 303016a, P-029 test follow-up f940b23.
   P-015 consult 010 / ADR-011, implementation, independent QA/red-team and full gate
   PASS. Dogfood now 20 PASS, 3 expected failures, zero leftovers. P-021 consult 011
-  complete; decision/implementation next. No Phase-C checkpoint or push yet.
+  complete; strict validation/error/body boundaries pass QA, red-team, fullcheck and
+  dogfood (22 PASS, one metrics expected failure). P-020 consult012 complete; decision
+  and implementation next. No Phase-C checkpoint or push yet.
 - **Last implementation commits:** 1243744/031f86a/83d7b73 (P-016 QA follow-up: stdio default-tenant
   token bypass fixed - red-team F-1 with red-at-parent regression; MCP errors actionable; README
   auth reality + 13-tool list; QA addenda), ef9033f (P-012 consult trio filed: domain + oracle
@@ -54,8 +57,8 @@
   deletes only its own successful creates and reports cleanup failures. Independent real-DB
   sentinel survival passes. Earlier runs cannot establish that pre-existing data was preserved.
 - **Next 3 actions:**
-  1. Fresh-clone role verification, P-021 consult decision/ADR and test-first implementation.
-  2. Independent P-021 validation/body-limit/error QA and red-team; flip S08/S09 only on proof.
+  1. P-020 indexed authentication and correct per-instance rate limits: decision/implementation.
+  2. Independent P-020 QA/red-team; P-036 trust documentation; final Phase-C gate.
   3. P-021 validation/error containment and P-020 auth/rate limits; Phase-C checkpoint only
      after independent security reports and clean-clone verification.
 - **Human pending:** video recording, walkthrough/architecture review, organizer track decision,
@@ -642,3 +645,55 @@
 - Material caveat: agent corroboration can produce descriptive preserved status; tested
   high-risk gate still blocks. README/KNOWN_ISSUES disclose status is not operator verification.
 - No evalnumbers, provider/deployment claim or push. Next P-021, then P-020/P-036 and C gate.
+
+### 2026-10-17 01:56 IST | Phase C | P-015 fresh-clone gate / P-021 resumed | STATUS: in progress
+- Usage interruption resumed with HEAD7330f13 intact. P-015 fresh clone:
+  C:/Users/vedan/AppData/Local/Temp/pedigree-roles-dff548d8f7c64b458f6239be5e9772f0.
+  NewPython3.12.15 venv+freshdependencyresolution/install PASS; `make check`581passed,
+  2skipped,3deselected,1xfailed in323.21s; Ruff/secrets/numbers PASS. Exactskiprerun:
+  published8000URL test skippedbecauseportbusy; ACLmechanism skippeddeploymentsecretabsent.
+  MountedMCP/random-port realHTTP tests still ran. No hosted/Linux/installedagent proof.
+- Consult011 / ADR012 validates complete batches, strict aliases/fields, actual HTTP
+  byte caps, SDK tools/protocol error containment, static errors and safeclass/frame logs.
+  Domain proved SDK2.3 max_request_body_size and pre-tool input echo; real42201 NULerrors
+  and LF/tab/DEL persistence. No stripping identity bytes.
+- ActualRED: root6failed1passed (overflowforwarded; engine/authmessage+correlationecho),
+  validation19failed6passed, MCP8failed1passed. Rootcurrentboundary12PASS; validation59PASS;
+  MCP/P015compat42PASS plusdirect10PASS; independentQA71distinctcases (50independent),
+  exactcommands in docs/qa/P-021.md. Red-team/finalrootgate pending.
+- Diagnostics also catch failures inside pureASGI middleware before Starlette rethrows
+  to serverlogging. Independent actualuvicornHTTP engine/auth faultcanaries absent from
+  responses/logs. SDKstdio uses isolated checked2.3 runnerplumbing; HTTPbytecap does not
+  claim a bound on SDK stdin-line allocation.
+- Firstdogfood21PASS/1FAIL/1EXPECTED-FAIL: S04 sent ignoredlegacy mkind=fact in events;
+  strict contract nowrejectsit. Harnessremovedthatredundantignoredfield; finalrerun pending.
+  S08/S09 nowrequiretyped422(no nativeinputecho fallback). S14instrumentation remainsopen.
+- Builderfixturemistake: initial event teardown called nonexistent delete_graph,
+  leavingfive newlyminted fixtures whose exactIDs were notretained. Correctedfuturecleanup
+  to exact select(graph).delete+registryID. No historical/prefix sweep; no retrospective
+  zero-leftover claim. Laterfocusedrun cleanup/sentinel passes.
+
+### 2026-10-17 02:01 IST | Phase C | P-021 validation and containment | STATUS: done
+- Consult 011 / ADR-012 implemented with strict shared event/REST/MCP contracts,
+  complete-batch validation before writes, actual HTTP byte limits, sanitized SDK
+  argument/protocol errors, generated correlation IDs and safe class/frame logging.
+- Independent QA: 71 distinct cases, including 50 independent probes; red-team:
+  29 passed in 17.48s. Reports docs/qa/P-021.md and redteam-P-021.md. Real HTTP,
+  SDK HTTP and stdio evidence is separate from synthetic ASGI framing/fault injection.
+- Root `make check`: 698 passed, 2 skipped, 3 deselected, 1 xfailed in 277.62s;
+  Ruff, tracked secret scan and numbers PASS. The new 29-case red-team file arrived
+  after collection and separately passed unchanged source. Final collect-only:
+  730 selected / 733 total, 3 perf cases deselected; all selected cases accounted for.
+  Skips: absent ACL deployment secret and busy local published-URL port.
+- `make dogfood`: 22 PASS, 0 FAIL, 1 EXPECTED-FAIL, 0 STALE, 0 SKIP, exit 0;
+  exact run-owned cleanup PASS. S08/S09 now pass typed invalid_argument/no exception
+  reflection. S14 application metrics remains open. First S04 harness failure fixed
+  by removing an event field the old normalizer ignored. Final report:
+  scratch/dogfood/20261016T202539Z.md.
+- No raw exception values/causes or arbitrary correlation headers reach diagnostic
+  logs. Actual uvicorn engine/auth faults and pre-tool schema faults were exercised.
+  SDK stdio private runner dependency is isolated, checked and transport-tested;
+  its line allocation remains SDK-owned. No installed-agent/hosted/failover claim.
+- Earlier builder fixture cleanup error and five unidentified leftovers remain
+  disclosed above; no prefix sweep or retrospective cleanup claim. No push.
+- Next: consult 012 decision, P-020 auth/rates, then trust model and Phase-C checkpoint.

@@ -28,6 +28,10 @@ that cannot be finished goes here rather than being silently dropped.
 | 21 | 2026-10-16 | Isolation and E3 scenario fixture teardown previously enumerated and deleted all registered tenants. It now tracks only successful creates owned by that fixture, preserves a real pre-existing sentinel, and reports retained/unknown cleanup failures. Earlier runs cannot establish preservation of pre-existing data. The dedicated synthetic demo was re-seeded after repair; no recovery of arbitrary deleted data is claimed. | high | repaired; docs/qa/test-fixture-ownership.md and e3-fixture-ownership.md PASS; lazy suite sentinel added |
 
 What-if F-17 and source audit F-18 have independent QA/red-team PASS for their local subsets.
+P-021's first builder event-test teardown used a nonexistent DB helper and left five
+new test fixtures whose exact IDs were not retained. Future teardown is corrected;
+unknown historical IDs were left alone. Later sentinel passes do not prove those
+earlier leftovers were removed. No unrelated data deletion was observed.
 Lifecycle `preserved` is descriptive support state, not operator verification: an
 agent-authored corroboration edge to a healthy Source can produce it. The gate
 separately checks human/scanner attestation and blocks high-risk use when only agent

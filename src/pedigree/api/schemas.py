@@ -3,104 +3,89 @@ rejected by `extra="forbid", so identity can only come from the bearer token (F-
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
-
-class StrictModel(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-
-# ---- ingest payloads ---------------------------------------------------------
-
-class SourceCreate(StrictModel):
-    kind: str = Field(min_length=1, max_length=32)
-    uri: str | None = None
-    title: str | None = None
-    content_hash: str | None = None
-    #: Trusted claims require the tenant operator bearer (consult 010 / ADR-011).
-    #: Agent claims are rejected; ordinary agent sources are recorded untrusted.
-    integrity: Literal["trusted", "untrusted"] | None = None
-    conf: list[str] | None = None
-    id: str | None = None
-
-
-class MemoryCreate(StrictModel):
-    text: str = ""
-    mkind: str = "fact"
-    derived_from: list[str] = Field(default_factory=list)
-    corroborated_by: list[str] = Field(default_factory=list)
-    artifact: str | None = None
-    artifact_key: str | None = None
-    content_hash: str | None = None
-    conf: list[str] | None = None
-    agent_id: str | None = None
-    session_id: str | None = None
-    id: str | None = None
-    via: str = "cite"
+from ..validation import (
+    ActionFields,
+    Audience,
+    By,
+    DependencyIds,
+    Depth,
+    Effect,
+    Id,
+    MemoryFields,
+    Reason,
+    Risk,
+    Roots,
+    Runtime,
+    SourceFields,
+    SourceKind,
+    StrictModel,
+    Summary,
+    TenantId,
+    Tool,
+)
 
 
-class ActionCreate(StrictModel):
-    tool: str = Field(min_length=1, max_length=128)
-    summary: str = ""
-    relied_on: list[str] = Field(default_factory=list)
-    decision: str | None = None
-    effect: Literal["reversible", "irreversible", "unknown"] | None = None
-    risk: str | None = None
-    artifacts: list[str] = Field(default_factory=list)
-    artifact_key: str | None = None
-    session_id: str | None = None
-    agent_id: str | None = None
-    id: str | None = None
-    via: str = "cite"
+class SourceCreate(SourceFields):
+    kind: SourceKind
+
+
+class MemoryCreate(MemoryFields):
+    pass
+
+
+class ActionCreate(ActionFields):
+    pass
 
 
 class CorroborateRequest(StrictModel):
     """`human`/`scanner` require the tenant operator bearer; agents assert `agent`."""
 
-    memory_id: str
-    source_id: str
-    by: Literal["agent", "human", "scanner"] = "agent"
+    memory_id: Id
+    source_id: Id
+    by: By = "agent"
 
 
 class WhatIfRequest(StrictModel):
-    roots: list[str] = Field(default_factory=list, min_length=1, max_length=5)
-    reason: str = Field(default="what-if", max_length=300)
+    roots: Roots
+    reason: Reason = "what-if"
 
 
 class RevokeRequest(StrictModel):
-    root_id: str
-    reason: str = ""
+    root_id: Id
+    reason: Reason = ""
     dry_run: bool = False
     kind: Literal["revoke", "supersede"] = "revoke"
 
 
 class ReinstateRequest(StrictModel):
-    root_id: str
+    root_id: Id
     dry_run: bool = False
 
 
 class SessionReadRequest(StrictModel):
-    session_id: str
-    node_id: str
+    session_id: Id
+    node_id: Id
     ensure: Literal["yes", "no"] = "yes"
-    runtime: str = "other"
+    runtime: Runtime = "other"
 
 
 class EnsureSessionRequest(StrictModel):
-    session_id: str
-    runtime: str = "other"
-    agent_id: str | None = None
+    session_id: Id
+    runtime: Runtime = "other"
+    agent_id: Id | None = None
 
 
 class TenantCreate(StrictModel):
-    id: str
-    node_cap: int | None = None
+    id: TenantId
+    node_cap: Annotated[int, Field(strict=True, ge=1, le=1_000_000)] | None = None
 
 
 class ResumeRequest(StrictModel):
-    tenant: str
+    tenant: TenantId
 
 
 class EventResponse(BaseModel):
@@ -116,22 +101,22 @@ class OkResponse(BaseModel):
 
 
 class EventsPayload(StrictModel):
-    runtime: str = Field(default="generic", max_length=64)
-    session_id: str | None = None
+    runtime: Runtime = "generic"
+    session_id: Id | None = None
     events: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class GateAction(StrictModel):
-    tool: str = Field(min_length=1, max_length=128)
-    summary: str = Field(default="", max_length=300)
-    effect: Literal["reversible", "irreversible", "unknown"] | None = None
-    risk: Literal["low", "medium", "high"] | None = None
-    audience: list[str] | None = Field(default=None, max_length=8)
+    tool: Tool
+    summary: Summary = ""
+    effect: Effect | None = None
+    risk: Risk | None = None
+    audience: Audience | None = None
 
 
 class GateRequest(StrictModel):
     action: GateAction
-    relied_on: list[str] = Field(default_factory=list, max_length=64)
-    session_id: str | None = Field(default=None, max_length=128)
-    max_depth: int = Field(default=12, ge=1, le=12)
+    relied_on: DependencyIds = Field(default_factory=list)
+    session_id: Id | None = None
+    max_depth: Depth = 12
     record: bool = False

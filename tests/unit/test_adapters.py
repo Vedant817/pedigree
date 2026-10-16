@@ -5,15 +5,15 @@ mislabelled (or dropped) Sources coming from hooks.
 """
 from __future__ import annotations
 
+import pytest
+
 from pedigree.adapters import normalize_event, normalize_events
+from pedigree.errors import InvalidArgument
 
 
-def test_source_kind_wins_over_kind():
-    spec = normalize_event("generic", {"type": "source", "source_kind": "rules_file", "kind": "web",
-                                       "uri": "CLAUDE.md"})
-    assert spec is not None
-    assert spec["op"] == "source"
-    assert spec["kind"] == "rules_file"
+def test_conflicting_source_kind_rejected():
+    with pytest.raises(InvalidArgument):
+        normalize_event("generic", {"type": "source", "source_kind": "rules_file", "kind": "web", "uri": "CLAUDE.md"})
 
 
 def test_kind_is_used_when_no_source_kind():
@@ -32,36 +32,33 @@ def test_kind_only_payload_is_not_dropped():
         assert spec["kind"] == kind, kind
 
 
-def test_unknown_source_kind_defaults_to_web():
-    spec = normalize_event("generic", {"type": "source", "source_kind": "not_a_kind", "uri": "u"})
-    assert spec is not None
-    assert spec["kind"] == "web"
-
-
-def test_type_wins_over_kind_for_non_source_ops():
-    mem = normalize_event("generic", {"type": "memory", "kind": "file", "text": "t"})
-    assert mem is not None and mem["op"] == "memory"
-    act = normalize_event("generic", {"type": "action", "kind": "file", "tool": "Bash"})
-    assert act is not None and act["op"] == "action"
+@pytest.mark.parametrize("event", [
+    {"type": "source", "source_kind": "not_a_kind", "uri": "u"},
+    {"type": "memory", "kind": "file", "text": "t"},
+    {"type": "action", "kind": "file", "tool": "Bash"},
+])
+def test_unknown_or_conflicting_kind_rejected(event):
+    with pytest.raises(InvalidArgument):
+        normalize_event("generic", event)
 
 
 def test_kind_only_non_source_payloads_keep_their_op():
-    read = normalize_event("generic", {"kind": "read", "node_id": "n1"})
+    read = normalize_event("generic", {"kind": "read", "node_id": "n1", "session_id": "s"})
     assert read is not None and read["op"] == "session_read"
     ses = normalize_event("generic", {"kind": "session", "session_id": "s"})
     assert ses is not None and ses["op"] == "session"
 
 
-def test_unknown_events_are_ignored():
-    assert normalize_event("generic", {"kind": "nonsense"}) is None
-    assert normalize_event("generic", {"type": "nonsense"}) is None
+@pytest.mark.parametrize("key", ["kind", "type"])
+def test_unknown_events_are_rejected(key):
+    with pytest.raises(InvalidArgument):
+        normalize_event("generic", {key: "nonsense"})
 
 
 def test_batch_inherits_session_id_and_keeps_order():
     specs = normalize_events("claude-code", {"session_id": "s1", "events": [
         {"type": "session"},
         {"kind": "web", "uri": "http://x"},
-        {"type": "nonsense"},
         {"type": "memory", "text": "t"},
     ]})
     assert [s["op"] for s in specs] == ["session", "source", "memory"]

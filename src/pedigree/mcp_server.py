@@ -1,17 +1,23 @@
-
 """Model Context Protocol server (F-06): wraps the same engine as HTTP."""
 from __future__ import annotations
 
 import hmac
+import json
 from contextvars import ContextVar
 
+import anyio
+import mcp_types
 from mcp.server.mcpserver import MCPServer
+from mcp.server.stdio import stdio_server
+from mcp.shared.message import SessionMessage
+from starlette.responses import JSONResponse
 
 from .api.auth import authorize_source
 from .api.registry import TenantRegistry
-from .config import get_settings, graph_name
+from .config import LIMITS, get_settings, graph_name
 from .db.client import Db
 from .db.schema import ensure_schema
+from .diagnostics import error_payload, unexpected_error
 from .engine.audit import audit_sources
 from .engine.blame import blame as run_blame
 from .engine.blame import impact as run_impact
@@ -21,15 +27,143 @@ from .engine.quota import QuotaPolicy
 from .engine.revoke import reinstate, report, revoke
 from .engine.whatif import whatif
 from .errors import PedigreeError
+from .http_boundary import BodySizeMiddleware
+from .validation import validate_tool_arguments
 
 
 def _call(fn, *a, **kw):
     try:
         return {"ok": True, "result": fn(*a, **kw)}
     except PedigreeError as exc:
-        return {"ok": False, "error": {"code": exc.code, "message": str(exc), "detail": exc.detail}}
+        return {"ok": False, "error": error_payload(exc)}
     except Exception as exc:
-        return {"ok": False, "error": {"code": "internal", "message": str(exc)}}
+        return {"ok": False, "error": unexpected_error(exc, "mcp_engine")}
+
+
+def _validate_rpc(message):
+    """Validate without rendering SDK exceptions containing caller input."""
+    mcp_types.jsonrpc_message_adapter.validate_python(message)
+    if not isinstance(message, dict):
+        raise ValueError("invalid JSON-RPC message")
+    if "method" in message:
+        adapter = (mcp_types.client_request_adapter if "id" in message
+                   else mcp_types.client_notification_adapter)
+        adapter.validate_python(message)
+
+
+class _RPCBoundary:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or scope["method"] != "POST":
+            await self.app(scope, receive, send)
+            return
+        # BodySizeMiddleware is installed outside this parser.
+        message = await receive()
+        if message["type"] != "http.request":
+            return
+        try:
+            _validate_rpc(json.loads(message.get("body", b"")))
+        except Exception:
+            response = JSONResponse(status_code=400, content={"jsonrpc": "2.0", "id": None,
+                "error": {"code": -32600, "message": "Invalid JSON-RPC message"}})
+            await response(scope, receive, send)
+            return
+        delivered = False
+
+        async def replay():
+            nonlocal delivered
+            if not delivered:
+                delivered = True
+                return message
+            return await receive()
+
+        await self.app(scope, replay, send)
+
+
+class _SafeReadStream:
+    """Contain parser exceptions before the SDK runner logs or renders them."""
+    def __init__(self, stream, write_stream):
+        self.stream = stream
+        self.write_stream = write_stream
+
+    def __getattr__(self, name):
+        return getattr(self.stream, name)
+
+    async def __aenter__(self):
+        await self.stream.__aenter__()
+        return self
+
+    async def __aexit__(self, *args):
+        return await self.stream.__aexit__(*args)
+
+    def clone(self):
+        return _SafeReadStream(self.stream.clone(), self.write_stream)
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        try:
+            return await self.receive()
+        except anyio.EndOfStream:
+            raise StopAsyncIteration from None
+
+    async def receive(self):
+        while True:
+            item = await self.stream.receive()
+            try:
+                if isinstance(item, Exception):
+                    raise ValueError("invalid JSON-RPC message")
+                _validate_rpc(item.message.model_dump(by_alias=True, exclude_unset=True))
+            except Exception:
+                # No caller-controlled request ID is echoed for an invalid envelope.
+                error = mcp_types.JSONRPCError(jsonrpc="2.0", id=None, error=mcp_types.ErrorData(
+                    code=-32600, message="Invalid JSON-RPC message"))
+                await self.write_stream.send(SessionMessage(error))
+                continue
+            return item
+
+
+class _SafeMCPServer(MCPServer):
+    async def run_stdio_async(self):
+        # Installed SDK 2.3's public runner has no stream hook. Keep its observed
+        # five-line plumbing isolated here; fail closed if that contract changes.
+        lowlevel = getattr(self, "_lowlevel_server", None)
+        if not callable(getattr(lowlevel, "run", None)) or not callable(
+                getattr(lowlevel, "create_initialization_options", None)):
+            raise RuntimeError("unsupported MCP stdio runner contract")
+        async with stdio_server() as (read_stream, write_stream):
+            await lowlevel.run(_SafeReadStream(read_stream, write_stream), write_stream,
+                               lowlevel.create_initialization_options())
+
+    async def call_tool(self, name, arguments, context=None):
+        try:
+            arguments = validate_tool_arguments(name, arguments)
+            return await super().call_tool(name, arguments, context)
+        except PedigreeError as exc:
+            payload = {"ok": False, "error": error_payload(exc)}
+        except Exception as exc:
+            # SDK wrappers retain the original exception in __cause__. Neither is
+            # formatted; diagnostics records class and frame metadata only.
+            payload = {"ok": False, "error": unexpected_error(exc, "mcp_tool")}
+        return mcp_types.CallToolResult(content=[mcp_types.TextContent(
+            type="text", text=json.dumps(payload))], is_error=True)
+
+    def streamable_http_app(self, **kwargs):
+        kwargs["max_request_body_size"] = LIMITS["body_bytes"]
+        app = super().streamable_http_app(**kwargs)
+        app.add_middleware(_RPCBoundary)
+        app.add_middleware(BodySizeMiddleware)
+        return app
+
+    def sse_app(self, **kwargs):
+        kwargs["max_request_body_size"] = LIMITS["body_bytes"]
+        app = super().sse_app(**kwargs)
+        app.add_middleware(_RPCBoundary)
+        app.add_middleware(BodySizeMiddleware)
+        return app
 
 
 _UNAUTHORIZED_MSG = "invalid or missing tenant token"
@@ -56,7 +190,7 @@ class PedigreeMCPServer:
         self.db = db if db is not None else Db(self.settings)
         self.default_tenant_id = default_tenant_id
         self.default_tenant_token = default_tenant_token
-        self.server = MCPServer("pedigree", middleware=[_transport_auth_context])
+        self.server = _SafeMCPServer("pedigree", middleware=[_transport_auth_context])
         self.registry = TenantRegistry(self.db, self.settings)
         self._register_tools()
 

@@ -33,7 +33,6 @@ def register(app: FastAPI, db, registry, settings) -> None:
                 "too many events in one request",
                 detail={"limit": LIMITS["events_per_request"], "got": len(payload.events)},
             )
-        spec_list = normalize_events(payload.runtime, {"session_id": payload.session_id, "events": payload.events})
         operator = operator_authorized(request, settings)
         # Authorize every trust-bearing assertion before the first admission/write.
         for raw in payload.events:
@@ -41,6 +40,7 @@ def register(app: FastAPI, db, registry, settings) -> None:
                 if raw.get("by") in ("human", "scanner") and not operator:
                     auth.require_operator(request)
                 auth.authorize_source(request.state.principal, raw.get("source_kind") or raw.get("kind"), raw.get("integrity"))
+        spec_list = normalize_events(payload.runtime, {"session_id": payload.session_id, "events": payload.events})
         for spec in spec_list:
             if spec.get("op") == "source":
                 auth.authorize_source(request.state.principal, spec.get("kind"), spec.get("integrity"))

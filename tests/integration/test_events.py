@@ -28,7 +28,13 @@ def tenant(client):
     r = client.post("/admin/tenants", headers={"X-Admin-Token": ADMIN}, json={"id": tid})
     assert r.status_code == 200, r.text
     tok = r.json()["token"]
-    return tid, tok, {"Authorization": "Bearer " + tok}
+    try:
+        yield tid, tok, {"Authorization": "Bearer " + tok}
+    finally:
+        from pedigree.config import graph_name
+        registry = client.app.state.registry
+        registry.db.select(graph_name(tid)).delete()
+        registry.db.query(registry.gname, "MATCH(t:Tenant {id:$id}) DELETE t", {"id": tid})
 
 
 def test_events_lifecycle(client, tenant):
@@ -69,13 +75,13 @@ def test_events_rejects_oversized_batch(client, tenant):
     assert r.json()["error"]["code"] == "too_large"
 
 
-def test_events_ignores_unknown_kinds(client, tenant):
+def test_events_rejects_unknown_kinds(client, tenant):
     _tid, _tok, h = tenant
     r = client.post("/v1/events", headers=h, json={
         "runtime": "generic", "session_id": "s8",
         "events": [{"type": "not_a_real_event", "x": 1}]})
-    assert r.status_code == 200
-    assert r.json()["created"] == []
+    assert r.status_code == 422
+    assert r.json()["error"]["code"] == "invalid_argument"
 
 
 def test_events_capture_ids_converge_on_the_same_source(client, tenant):

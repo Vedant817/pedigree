@@ -4,18 +4,19 @@ from __future__ import annotations
 
 import contextlib
 import threading
-import uuid
 from collections import defaultdict
 from pathlib import Path
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.staticfiles import StaticFiles
 
 from ..config import DEV_ENVS, admin_token_problem, get_settings
 from ..db.client import Db
+from ..diagnostics import correlation_id, error_payload, unexpected_error
 from ..errors import PedigreeError
+from ..http_boundary import BodySizeMiddleware
 from . import routes
 from .registry import TenantRegistry
 from .schemas import EventResponse, OkResponse  # noqa: F401
@@ -24,38 +25,59 @@ from .schemas import EventResponse, OkResponse  # noqa: F401
 def _register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(PedigreeError)
     async def pedigree(request: Request, exc: PedigreeError):
-        return JSONResponse(status_code=exc.http_status,
-                            content={"error": {"code": exc.code, "message": str(exc),
-                                               "detail": exc.detail,
-                                               "correlation_id": getattr(request.state, "correlation_id", None)}})
+        return JSONResponse(status_code=exc.http_status, content={"error": error_payload(
+            exc, getattr(request.state, "correlation_id", None))})
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid(request: Request, exc: RequestValidationError):
+        return JSONResponse(status_code=422, content={"error": {
+            "code": "invalid_argument", "message": "invalid argument",
+            "correlation_id": getattr(request.state, "correlation_id", correlation_id())}})
 
     @app.exception_handler(Exception)
     async def generic(request: Request, exc: Exception):
-        return JSONResponse(status_code=500,
-                            content={"error": {"code": "internal", "message": str(exc),
-                                               "correlation_id": getattr(request.state, "correlation_id", None)}})
+        error = unexpected_error(exc, "http_request", getattr(request.state, "correlation_id", None))
+        return JSONResponse(status_code=500, content={"error": error},
+                            headers={"x-correlation-id": error["correlation_id"]})
 
 
-class BodySizeMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        cl = request.headers.get("content-length")
-        if cl:
-            try:
-                size = int(cl)
-            except (ValueError, TypeError):
-                return JSONResponse(status_code=400, content={"error": {"code": "invalid_argument", "message": "invalid content-length"}})
-            if size < 0 or size > 256 * 1024:
-                return JSONResponse(status_code=413, content={"error": {"code": "too_large", "message": "body too large"}})
-        return await call_next(request)
+class CorrelationMiddleware:
+    """Contain request failures before Starlette rethrows them to server logging."""
 
+    def __init__(self, app):
+        self.app = app
 
-class CorrelationMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        cid = request.headers.get("x-correlation-id") or uuid.uuid4().hex
-        request.state.correlation_id = cid
-        response = await call_next(request)
-        response.headers["x-correlation-id"] = cid
-        return response
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        cid = correlation_id()
+        scope.setdefault("state", {})["correlation_id"] = cid
+        started = finished = False
+
+        async def correlated_send(message):
+            nonlocal started, finished
+            if message["type"] == "http.response.start":
+                started = True
+                message = {**message, "headers": [
+                    (name, value) for name, value in message.get("headers", ())
+                    if name.lower() != b"x-correlation-id"
+                ] + [(b"x-correlation-id", cid.encode("ascii"))]}
+            elif message["type"] == "http.response.body" and not message.get("more_body", False):
+                finished = True
+            await send(message)
+
+        try:
+            await self.app(scope, receive, correlated_send)
+        except Exception as exc:  # noqa: BLE001 - the public failure boundary
+            error = unexpected_error(exc, "http_request", cid)
+            if not started:
+                await JSONResponse(status_code=500, content={"error": error})(scope, receive, correlated_send)
+            elif not finished:
+                # A streaming response has already committed its status. Never emit
+                # a second response or rethrow a secret-bearing cause to the server.
+                with contextlib.suppress(Exception):
+                    await correlated_send({"type": "http.response.body", "body": b"", "more_body": False})
 
 
 class RootDispatcher:

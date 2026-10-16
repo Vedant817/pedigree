@@ -158,8 +158,9 @@ command against a seeded tenant.
 `/v1/stats` · `/v1/artifacts/lookup` · `/v1/invariants` · `/` (static workspace) ·
 `/healthz` `/readyz` `/metrics` `/docs` · `POST /admin/tenants` (deployment admin credential).
 
-Typed errors use the mapping below. Generic exception-message containment remains tracked
-under P-021; correlation IDs support diagnosis. The
+Typed errors use the mapping below. Unexpected errors return a fixed internal code
+and a generated correlation ID; diagnostics retain safe class/frame metadata without
+raw exception text or inputs. The
 mapping (also in `docs/01-IDEA.md`, the interface section):
 
 ```
@@ -237,6 +238,8 @@ OpenCode session, and write/edit/shell coverage plus real-session gate friction 
 - **Input surface:** static parameterised Cypher with a lint gate, id/URI/artifact validation,
   body-size and array caps, per-tenant rate limits and node quotas, bounded query timeouts, and
   the registry tenant id reserved.
+  Event batches validate all fields before writing; unknown operations, extras and conflicting
+  aliases reject. Actual HTTP bytes are bounded, including chunked REST/MCP requests.
 - **Quota admission:** public creators share a request-wide owner-token mutex and count
   new identities before writing. Quota overflow leaves an events batch unchanged; other
   errors can leave earlier events committed. This requires a stable Redis primary with

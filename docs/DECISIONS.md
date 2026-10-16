@@ -347,3 +347,35 @@ domain's owned real-DB 42201 property/migration probe. Implementation uses the
 existing Tenant(id) index/unique-constraint helper with CREATE, and a write-first
 credential_epoch update before conditional operator issuance. Builder separate-client
 races admitted one valid creation/issuance; independent tests/reports pending.
+
+## ADR-012 | 2026-10-16 | Validate batches and contain SDK diagnostics
+
+**Context.** Dogfood reproduces malformed event scalars as Python 500 messages.
+Consult 011 measured control characters persisting or failing internally on 42201.
+Installed MCP2.3 can echo rejected inputs or discard extras before tool code runs;
+sanitizing engine lambdas alone cannot contain those errors.
+
+**Decision.** Shared strict raw/canonical validation preserves documented aliases,
+rejects malformed shapes/extras/unknown operations before batch writes, and keeps
+existing caps/role/quota behavior. Identity fields reject controls without rewriting;
+prose explicitly permits LF/tab. Bounded pure ASGI actual-byte admission protects
+REST/MCP; installed SDK limit is configured too. Safe MCP call/transport boundaries
+cover argument validation and auth faults. Static response messages/generated IDs,
+safe typed details and class/frame diagnostics replace raw exception rendering.
+
+**Alternatives.** Silent normalization hides unsupported capture. Raw exception
+logging can expose a credential embedded in a cause. Content-Length alone does not
+bound chunked requests. SDK defaults are not a shared strict application contract.
+
+**Consequences.** Unknown-event ignore and permissive scalar coercion intentionally
+become typed errors. Diagnostics lose raw exception messages but retain safe class,
+operation, correlation and frame metadata. No installed agent/deployment claim.
+
+**Evidence.** docs/consults/011-p021-validation/{domain,architect,specialist,decision}.md;
+real controls and installed SDK probes; test-first implementation/review pending.
+
+Implementation evidence: independent docs/qa/P-021.md PASS and redteam-P-021.md
+PASS. MCP stdio uses a public runner override with isolated, shape-checked observed
+SDK 2.3 `_lowlevel_server` plumbing because no public stream hook exists; its
+receive/clone boundary sanitizes parser failures before dispatch. HTTP body limits
+do not bound SDK stdin-line allocation. Actual TCP/stdio tests qualify this dependency.

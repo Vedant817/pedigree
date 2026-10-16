@@ -33,8 +33,7 @@ tree `561b7e2`; see docs/qa/P-010.md and the report this tool writes):
 - S11 forged `Content-Length`: h11 rejects a non-numeric content-length at the protocol level
   before BodySizeMiddleware runs, so the observed 400 comes from uvicorn ("Invalid HTTP request
   received."). Both layers agree on 400, so the row asserts the status only.
-- S08/S09 want 422 `invalid_argument`; because the P-021 fix may legitimately arrive as FastAPI's
-  native `{"detail": [...]}` 422 envelope, S08 accepts either shape (recorded in the evidence).
+- S08 requires the typed 422 `invalid_argument` envelope; S09 checks its error containment.
 
 Environment assumptions: the harness process and the spawned server talk to the same FalkorDB
 (default 127.0.0.1:6379) for cleanup; cleanup only ever deletes ids this run created and never
@@ -134,14 +133,14 @@ EXPECTATIONS: dict[str, Expectation] = {
         "NO partial write; request-wide admission rejects before mutation.",
     ),
     "S08": Expectation(
-        "expected-fail", "P-021",
+        "pass", "P-021",
         "malformed-event table (conf:5, artifacts:5, derived_from:'abc', NUL in uri) => want 422 "
-        "invalid_argument, never 500; today 500/404/500.",
+        "invalid_argument, never 500; shared strict validation rejects before writing.",
     ),
     "S09": Expectation(
-        "expected-fail", "P-021",
+        "pass", "P-021",
         "no-exception-leak scan over every S08 response body (must not contain 'object is not "
-        "iterable', 'Traceback', 'File \"', 'Error ('); today leaks.",
+        "iterable', 'Traceback', 'File \"', 'Error (').",
     ),
     "S10": Expectation("pass", "", "cross-tenant: B's token requesting A's node id -> 404."),
     "S11": Expectation(
@@ -507,7 +506,7 @@ def s04_full_journey(ctx: Ctx, res: ScenarioResult) -> None:
         # Explicit integrity=trusted needs operator; ordinary agent file captures are untrusted.
         {"type": "source", "kind": "file", "id": src_id, "uri": f"file:///dogfood/{tag}.md",
          "title": "dogfood design doc", "integrity": "trusted"},
-        {"type": "memory", "id": mem_id, "text": "dogfood memory", "mkind": "fact",
+        {"type": "memory", "id": mem_id, "text": "dogfood memory",
          "derived_from": [src_id]},
         {"type": "action", "id": act_id, "tool": "Read", "summary": "read the design doc",
          "relied_on": [mem_id], "effect": "reversible", "risk": "low"},
@@ -692,13 +691,10 @@ def s08_malformed_events(ctx: Ctx, res: ScenarioResult) -> None:
         resp = ctx.post("/v1/events", {"runtime": "generic", "events": [event]},
                         headers=ctx.bearer(tenant))
         body = _json(resp)
-        # P-021 may land as the product envelope {error:{code}} or as FastAPI's native
-        # {"detail":[...]} 422; both are accepted here, the 500s are not.
         strict = resp.status_code == 422 and err_code(body) == "invalid_argument"
-        native_422 = resp.status_code == 422 and isinstance(body, dict) and "detail" in body
         responses.append((name, resp.status_code, resp.text))
         res.check(f"{name} -> 422 invalid_argument",
-                  strict or native_422,
+                  strict,
                   ctx.evidence("POST", "/v1/events", resp))
     ctx.state["s08_responses"] = responses
 
@@ -1408,8 +1404,7 @@ def build_report(
         "`graph_name('registry')` -> `ped:registry`; `pedigree.config.REGISTRY_GRAPH` is only used "
         "by the unused `ensure_registry_schema`). The row reports whether it ran or skipped.")
     add("- S14 sends `X-Admin-Token`; metrics authentication is required, and P-022 tracks instrumentation.")
-    add("- S08 accepts FastAPI's native `{'detail': [...]}` 422 as well as the product envelope, "
-        "because the P-021 fix may land as Pydantic validation.")
+    add("- S08 requires the product's typed invalid_argument envelope; raw Pydantic input echoes fail.")
     add("- S11's forged Content-Length is rejected by h11 at the protocol level "
         "(\"Invalid HTTP request received.\", 400) before BodySizeMiddleware (same status either way).")
     add("- Cleanup only touches ids this run created; it never enumerates or deletes other tenants.")
