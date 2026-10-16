@@ -154,6 +154,7 @@ def check_invariants(
         (Q.Q_INV_PRESERVED_NO_SUPPORT, "preserved memory without any corroborating source", None),
         (Q.Q_INV_PRESERVED_WEAK_SUPPORT, "preserved memory without a healthy corroborating source", None),
         (Q.Q_INV_REVOKED_SHAPE, "revoked node that is not Source/Memory or lacks revoked_at", None),
+        (Q.Q_INV_REVOKED_ORPHAN, "node carrying revoked_at but not marked revoked (P-012 clobbered root)", None),
     ]
     if expected_tenant is not None:
         checks.append((Q.Q_INV_BAD_TENANT, "node with a tenant that is not the graph's tenant", {"tenant": expected_tenant}))

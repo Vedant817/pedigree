@@ -219,7 +219,7 @@ UNWIND $ids AS i MATCH (m:Node {id:i}) WHERE m:Memory AND m.artifact IS NOT NULL
 RETURN m.id, m.artifact, m.status
 """
 Q_REVOCATION_LATEST = """
-MATCH (v:Revocation {root_id:$id}) WHERE v.state IN ['running','done']
+MATCH (v:Revocation {root_id:$id}) WHERE v.state IN ['running','done'] AND v.kind IN ['revoke','supersede']
 RETURN v.id, v.state, v.started_at ORDER BY v.started_at DESC LIMIT 1
 """
 Q_REVOCATION_SET_STATE = """
@@ -232,11 +232,17 @@ Q_RUNNING_REVOCATIONS = """
 MATCH (v:Revocation {state:'running'}) RETURN v.id, v.root_id, v.tenant ORDER BY v.started_at
 """
 Q_REINSTATE_ROOT = """
-MATCH (r:Node {id:$id}) SET r.status = 'ok', r.revoked_at = NULL, r.reason = NULL, r.taint_parent = NULL
+MATCH (r:Node) WHERE r.id = $id AND r.status = 'revoked'
+  AND ('Source' IN labels(r) OR 'Memory' IN labels(r))
+SET r.status = 'ok', r.revoked_at = NULL, r.reason = NULL, r.taint_parent = NULL
+WITH r CREATE (v:Node:Revocation {id:$rid, tenant:$tenant, root_id:$id, reason:$why,
+    kind:'reinstate', state:'running', started_at:$now, created_at:$now})
 RETURN r.id
 """
-Q_REINSTATE_RESET = """
-UNWIND $ids AS i MATCH (n:Node {id:i}) SET n.status = 'ok', n.taint_parent = NULL RETURN count(n) AS n
+Q_REVOCATION_SUPERSEDE = """
+MATCH (v:Node) WHERE v:Revocation AND v.root_id = $id AND v.state = 'running' AND v.kind <> 'reinstate'
+SET v.state = 'superseded', v.finished_at = $now
+RETURN v.id
 """
 
 # --- what-if / checkpoint ---------------------------------------------------
@@ -320,6 +326,7 @@ MATCH (n:Node {status:'revoked'})
 WHERE NOT ('Source' IN labels(n) OR 'Memory' IN labels(n)) OR n.revoked_at IS NULL
 RETURN count(n) AS n
 """
+Q_INV_REVOKED_ORPHAN = "MATCH (n:Node) WHERE n.revoked_at IS NOT NULL AND n.status <> 'revoked' RETURN count(n) AS n"
 Q_INV_EDGES = "MATCH (a:Node)-[:DERIVED_FROM]->(b:Node) RETURN a.id, b.id"
 
 # --- reports ----------------------------------------------------------------

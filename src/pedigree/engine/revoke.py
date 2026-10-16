@@ -66,9 +66,9 @@ def read_structure(db: Db, gname: str, ids, *, trace: Trace | None = None):
     return parents, support
 
 
-def plan(db: Db, gname: str, roots, *, trace: Trace | None = None):
+def plan(db: Db, gname: str, roots, *, seeds=None, trace: Trace | None = None):
     """Read-only: current statuses + the final statuses a real revoke would produce."""
-    statuses = discover(db, gname, roots, trace=trace)
+    statuses = discover(db, gname, seeds if seeds is not None else roots, trace=trace)
     parents, support = read_structure(db, gname, list(statuses), trace=trace)
     final = compute_final(set(statuses), set(roots), parents, support, statuses)
     return statuses, final
@@ -169,7 +169,7 @@ def revoke(
         return out
 
 
-def resolve(db: Db, gname: str, roots, *, trace: Trace | None = None, hook=None):
+def resolve(db: Db, gname: str, roots, *, seeds=None, trace: Trace | None = None, hook=None):
     """Barrier fixpoint + support-preserving final statuses + verify loop. Returns (statuses, final).
 
     `hook` is a testing seam called once after the first discovery of the barrier fixpoint;
@@ -177,8 +177,9 @@ def resolve(db: Db, gname: str, roots, *, trace: Trace | None = None, hook=None)
     """
     final: dict = {}
     statuses: dict[str, str] = {}
+    seeds = set(seeds if seeds is not None else roots)
     for iteration in range(MAX_FIXPOINT_ITERS):
-        statuses = discover(db, gname, roots, trace=trace)
+        statuses = discover(db, gname, seeds, trace=trace)
         if hook is not None and iteration == 0:
             hook()
         todo = [i for i, st in statuses.items() if st in ("ok", "preserved")]
@@ -190,13 +191,13 @@ def resolve(db: Db, gname: str, roots, *, trace: Trace | None = None, hook=None)
         raise PedigreeError("revocation barrier did not converge", detail={"iterations": MAX_FIXPOINT_ITERS})
 
     for _ in range(MAX_VERIFY_ITERS):
-        statuses = discover(db, gname, roots, trace=trace)
+        statuses = discover(db, gname, seeds, trace=trace)
         parents, support = read_structure(db, gname, list(statuses), trace=trace)
         final = compute_final(set(statuses), set(roots), parents, support, statuses)
         batch = [[i, [f.status, f.taint_parent]] for i, f in final.items()]
         for ch in chunks(batch):
             db.query(gname, Q.Q_WRITE_FINAL, {"b": ch}, op="revoke.write", trace=trace)
-        statuses = discover(db, gname, roots, trace=trace)
+        statuses = discover(db, gname, seeds, trace=trace)
         if not any(st == "quarantined" for st in statuses.values()):
             break
     return statuses, final
@@ -274,7 +275,15 @@ def reinstate(
     dry_run: bool = False,
     trace: Trace | None = None,
 ) -> dict:
-    """Undo a revocation: reset the root and its descendants, then re-resolve the rest."""
+    """Undo one revocation: recompute statuses around the reinstated root WITHOUT erasing other
+    revoked roots (P-012).
+
+    The previous implementation blanket-reset the root's whole descendant set to 'ok' and only
+    then re-resolved the remaining roots, which silently erased any independent revocation. This
+    version flips only the explicitly reinstated root and re-derives its dependents via
+    resolve(roots=remaining revokes, seeds=remaining ∪ {root_id}); `compute_final` keeps remaining
+    revoked roots 'revoked' (Q_WRITE_FINAL has `WHERE n.status <> 'revoked'`).
+    """
     tenant = validate_tenant(tenant)
     exists, labels = node_exists(db, gname, root_id, trace)
     if not exists:
@@ -284,38 +293,56 @@ def reinstate(
 
     with tenant_lock(tenant):
         descendants = discover(db, gname, [root_id], trace=trace)
+        roots = revoked_roots(db, gname, trace=trace)
         if dry_run:
+            remaining = roots - {root_id}
+            statuses, final = plan(db, gname, remaining, seeds=remaining | {root_id}, trace=trace)
+            counts = collections.Counter(f.status for f in final.values())
             return {
                 "dry_run": True,
                 "root_id": root_id,
                 "would_reset": len(descendants) + 1,
-                "remaining_roots": len(revoked_roots(db, gname, trace=trace) - {root_id}),
+                "remaining_roots": len(remaining),
+                "counts": {
+                    "tainted": counts.get("tainted", 0),
+                    "preserved": counts.get("preserved", 0),
+                    "ok": counts.get("ok", 0),
+                },
             }
-        db.query(gname, Q.Q_REINSTATE_ROOT, {"id": root_id}, op="reinstate.root", trace=trace)
-        ids = list(descendants)
-        for ch in chunks(ids):
-            db.query(gname, Q.Q_REINSTATE_RESET, {"ids": ch}, op="reinstate.reset", trace=trace)
-        roots = revoked_roots(db, gname, trace=trace)
-        if roots:
-            statuses, final = resolve(db, gname, roots, trace=trace)
-            counts = collections.Counter(f.status for f in final.values())
-        else:
-            counts = collections.Counter()
-        return {
-            "dry_run": False,
-            "root_id": root_id,
-            "reset": len(descendants),
-            "remaining_roots": len(roots),
-            "counts": {
-                "tainted": counts.get("tainted", 0),
-                "preserved": counts.get("preserved", 0),
-                "ok": counts.get("ok", 0),
-            },
-        }
+        # Supersede any concurrent running revoke rows for this root (diagnosability).
+        db.query(gname, Q.Q_REVOCATION_SUPERSEDE, {"id": root_id, "now": now_ms()},
+                 op="reinstate.supersede", trace=trace)
+        # CAS: only flips when the root is currently revoked; returns no row otherwise.
+        new_rid = new_id("rein")
+        res = db.query(
+            gname,
+            Q.Q_REINSTATE_ROOT,
+            {"id": root_id, "rid": new_rid, "tenant": tenant, "why": "reinstate", "now": now_ms()},
+            op="reinstate.root",
+            trace=trace,
+        )
+        if not res.result_set:
+            # Not currently revoked: idempotent, nothing to recompute.
+            return {
+                "dry_run": False,
+                "idempotent": True,
+                "root_id": root_id,
+                "revocation_id": None,
+                "state": "not-revoked",
+                "remaining_roots": len(roots - {root_id}),
+                "counts": {"tainted": 0, "preserved": 0, "ok": 0},
+            }
+        remaining = roots - {root_id}
+        statuses, final = resolve(db, gname, remaining, seeds=remaining | {root_id}, trace=trace)
+        counts = collections.Counter(f.status for f in final.values())
+        out = _finish(db, gname, new_rid, statuses, final, trace)
+        out.update({"dry_run": False, "idempotent": False, "root_id": root_id,
+                    "remaining_roots": len(remaining), "reset": len(descendants)})
+        return out
 
 
 def resume_incomplete(db: Db, gname: str, *, trace: Trace | None = None) -> list[dict]:
-    """Finish every `Revocation{state:'running'}` (called on startup and by /readyz tooling)."""
+    """Finish every running Revocation."""
     res = db.ro_query(gname, Q.Q_RUNNING_REVOCATIONS, {}, op="revoke.running", trace=trace)
     out: list[dict] = []
     for rid, _root_id, tenant in res.result_set or []:
