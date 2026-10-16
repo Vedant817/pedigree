@@ -3,8 +3,9 @@
 Status values: `todo` | `spec` | `implementing` | `qa` | `done` | `cut` | `blocked`.
 A feature is `done` only when its tests pass **and** `docs/qa/F-nn.md` says PASS
 (and `docs/qa/redteam-F-nn.md` PASS where it touches a trust boundary).
-The README status table is generated from this file; never claim a feature in the README
-that is not `done` here.
+The README status table is maintained manually alongside this file, not generated.
+Use the listed status vocabulary in both; `done` describes the named tested subset and
+its evidence must retain local/runtime/deployment limitations. Planned extensions are not done.
 
 | ID | Pri | Feature | Status | Tests | QA report |
 |---|---|---|---|---|---|
@@ -15,19 +16,19 @@ that is not `done` here.
 | F-05 | P0 | REST API + registry graph + tenant tokens + auth + limits + errors | done | tests/integration/test_api.py (7), tests/security/test_security_F05.py (5) | `docs/qa/F-05.md` PASS |
 | F-06 | P0 | MCP server (stdio + Streamable HTTP): record_source, remember, record_action, revoke, blame, impact | done | tests/integration/test_mcp.py (2), tests/security/test_security_F06.py (5) | `docs/qa/F-06.md` PASS |
 | F-07 | P0 | Claude Code hook adapter + `/v1/events` mapping + recorded-payload fixtures + cross-session `artifact_key` link | done | tests/integration/test_events.py (5) | `docs/qa/F-07.md` (PASS after 413 fix) |
-| F-08 | P0 | OpenCode plugin (`pedigree.ts`) mapped from real logged payloads | blocked | isolated real session reached plugin startup; free_tier_limit before tools | docs/consults/opencode-spike.md; no fabricated after payload |
+| F-08 | P0 | OpenCode adapter (unbuilt); temporary observation plugin established one read-hook shape | implementing | genuine installed-runtime before/after read payload recorded; adapter unbuilt | docs/consults/opencode-recheck-2026-10-16.md; complete coverage unmeasured |
 | F-09 | P0 | UI v1: graph view, status colours, revoke dry-run/confirm, depth slider, affected actions | done | tests/integration/test_ui_api.py, test_ui_qa.py; tests/security/test_ui_boundary.py; real browser journeys | docs/qa/F-09.md PASS; redteam-F-09.md PASS; F-09-browser.md |
 | F-10 | P0 | Scenarios S1 + S8 as JSON + `seed_demo.py` + `make demo` | done | tests/integration/test_demo_seed.py, test_demo_qa.py | docs/qa/F-10.md PASS; redteam-F-10.md PASS |
 | F-11 | P1 | Gate: `check_action` + REST `/v1/gate` + MCP + hook deny/ask + policy.yaml classifier | done | tests/unit/test_gate.py, tests/integration/test_gate_integration.py, tests/security/test_security_F11.py, tests/security/test_F11_adversarial.py, tests/integration/test_gate_qa.py, tests/unit/test_claude_hook.py | docs/qa/F-11.md PASS; docs/qa/redteam-F-11.md PASS (documented limits) |
 | F-12 | P1 | Confidentiality labels + scenario S6 | done | tests/integration/test_confidentiality.py (5), tests/evals/test_e3_scenarios.py (5) | `docs/qa/F-12.md` PASS |
 | F-13 | P1 | Isolation hardening: per-tenant ACL users, rate limits, quotas, metrics, structured logs | implementing | tests/security/test_security_F05.py, tests/security/test_security_F06.py, tests/security/test_capture_trust.py, tests/integration/test_source_identity.py | capture trust closed (ADR-008): `docs/qa/F-13.md` PASS; ACL users verified (`tests/security/test_acl_mechanism.py`), wiring open (KNOWN_ISSUES 18) |
-| F-14 | P1 | Eval harness: generator, independent oracle, baselines B0-B5, E1, E2, stats, NUMBERS pipeline | implementing | tests/evals/test_oracle_agreement.py, tests/evals/test_stats.py, tests/evals/test_e3_scenarios.py, tests/evals/* | `evals/REPORT.md` (generated): E1, E2, E3 and E4 done; E4b (SQLite comparison) and E5/E6 report pending |
-| F-15 | P1 | E5 isolation/concurrency suite (hypothesis + threads + invariants + ACL) | implementing | tests/integration/test_isolation_concurrency.py (3), tests/security/test_acl_mechanism.py (skipped without the deployment secret) | `docs/qa/F-15.md` PASS for the tested surface; ACL wiring open |
-| F-16 | P1 | Deployment: Dockerfile (Ubuntu 24.04 single container), compose, Render, seed-on-boot | done (local) | container verified end-to-end (build + boot + seed + API + revoke) | `docs/qa/F-16.md` PASS; Render is a human step |
-| F-17 | P2 | What-if (`GRAPH.COPY`) + checkpoint/restore | todo | - | - |
-| F-18 | P2 | `audit_sources` (PageRank + descendant counts) | todo | - | - |
+| F-14 | P1 | Eval harness: generator, independent oracle, baselines B0-B5, E1, E2, stats, NUMBERS pipeline | done | tests/evals/test_oracle_agreement.py, tests/evals/test_stats.py, tests/evals/test_e3_scenarios.py, tests/evals/* | local E1/E2, E3 S1/S6/S8, E4/E4b measured; docs/qa/F-14.md PASS for scoped synthetic harness/local benchmarks; E3b/E6 NOT MEASURED |
+| F-15 | P1 | E5 isolation/concurrency suite (hypothesis + threads + invariants + ACL) | implementing | tests/integration/test_isolation_concurrency.py (3), tests/security/test_acl_mechanism.py (mechanism verified; default skip without deployment secret) | `docs/qa/F-15.md` PASS for the tested surface; ACL wiring open |
+| F-16 | P1 | Local deployment: Dockerfile (Ubuntu 24.04 single container), compose, seed-on-boot; Render open | done | container verified end-to-end (build + boot + seed + API + revoke) | `docs/qa/F-16.md` PASS; Render is a human step |
+| F-17 | P2 | What-if (`GRAPH.COPY`); checkpoint/restore remains unbuilt | done | tests/integration/test_whatif.py, tests/security/test_whatif_audit_review.py | docs/qa/F-17.md PASS; redteam-F-17.md PASS for local subset; per-process cap |
+| F-18 | P2 | `audit_sources` (PageRank + descendant counts); WCC unbuilt | done | tests/integration/test_audit.py, tests/security/test_whatif_audit_review.py | docs/qa/F-18.md PASS; redteam-F-18.md PASS for local subset |
 | F-19 | P2 | `supersede` (decision rot) + scenario S7 | todo | - | - |
-| F-20 | P2 | Evals E3, E3b, E4, E4b, E6 + REPORT.md + eval sign-off | todo | - | - |
+| F-20 | P2 | Eval publication/signoff and remaining real-session experiments | implementing | tests/evals/* | local E3 S1/S6/S8, E4/E4b measured; scoped statistician signoff PASS; E3b/E6 NOT MEASURED |
 | F-21 | P2 | UI polish: path highlight, trace strip, taint animation, preserved badges | todo | - | - |
 | F-22 | P2 | Hook spool/replay when the server is down | todo | - | - |
-| F-23 | P3 | README, blog, demo video assets, AI disclosure, submission pack | todo | - | - |
+| F-23 | P3 | README, blog, demo video assets, AI disclosure, submission pack | implementing | - | drafts exist; human review, video and final publication pending |

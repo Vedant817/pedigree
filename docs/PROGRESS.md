@@ -1,28 +1,30 @@
 # CURRENT STATE (overwritten after every feature / checkpoint)
 
-- **Phase:** P2 -> P4 in parallel (Thu/Fri 02:40 IST). Phase 1 acceptance tests are met
-  (AT1.1-AT1.6 verified; AT1.7 dogfood capture is quota-blocked and honestly recorded).
-- **Last green implementation:** 41469e0 (F-14 E4 latency) + uncommitted E3/QA pass.
-- **Environment:** Windows 11 dev host; Python 3.12.15 (uv `.venv`); Docker Desktop 29.8.2 running
-  FalkorDB `falkordb/falkordb:v4.22.1` (pinned; mandatory args); Node v24.13.1.
-- **Deadlines:** feature freeze Sun 2026-10-18 15:00 IST; submit target Sun 21:00 IST; hard stop 23:59 IST.
-- **Test state:** **300 passed, 1 skipped** (`make check`-equivalent; the skip is the ACL test
-  without the deployment secret) | ruff PASS | secret scan `--history` PASS | numbers check PASS
-  (README + blog + submission + walkthrough against 61 values in `docs/NUMBERS.md`).
-  `make eval` 80 s, `make eval-quick` 4 s; the container boots and passes end-to-end.
-- **Features [done]:** F-01..F-07 (QA PASS), F-09, F-10, F-11 (QA PASS), F-16 (QA PASS local),
-  F-13/F-15 capture-trust and isolation scope (QA PASS with documented residuals),
-  F-14 E1/E2/E3/E4 (numbers in NUMBERS.md; E4b/E5/E6 remain).
-- **Local service:** demo tenant seeded (`scratch/demo-demo.json`, git-ignored; never print it).
+- **Phase:** P2/P3 hardening and evaluation publication; updated Fri 2026-10-16 08:57 IST.
+- **Last implementation commits:** a677d9f (what-if/audit containment), d7f7409 (test fixture ownership),
+  3941d85 (DAG-cluster evaluation intervals and quick artifact isolation).
+- **Environment:** Windows 11; Python 3.12.15; pinned FalkorDB module 42201 in Docker;
+  Node v24.13.1. Local core and synthetic demo require no model provider.
+- **Deadlines:** feature freeze Sun 2026-10-18 15:00 IST; target submit 21:00; hard stop 23:59.
+- **Test state:** make check: 376 passed, 1 skipped (optional ACL deployment secret absent);
+  Ruff, tracked secret scan, numbers check PASS. Independent what-if/audit QA: 45 passed;
+  test-fixture ownership QA: 11 passed. Full serialized evaluation PASS; independent scoped F-14 statistical signoff PASS.
+- **Verified scope:** F-01..F-07, F-09..F-12, F-16 local container, F-17 what-if subset,
+  F-18 PageRank/exact reach. Checkpoint/restore and WCC remain unbuilt.
+  F-13/F-15 service ACL wiring remains open. E1/E2 synthetic semantics/capture model,
+  E3 authored S1/S6/S8, E4/E4b local measurements are distinct from real-session evidence.
+- **Capture:** one genuine installed OpenCode read before/after payload recorded using a free
+  model; the Pedigree OpenCode adapter itself is unbuilt. E3b/E6 coverage and friction NOT MEASURED.
+  Claude hook has API/subprocess proof, not installed-runtime proof.
+- **Data safety correction:** the old isolation fixture deleted all registry tenants. It now
+  deletes only its own successful creates and reports cleanup failures. Independent real-DB
+  sentinel survival passes. Earlier runs cannot establish that pre-existing data was preserved.
 - **Next 3 actions:**
-  1. Remaining eval items: E4b (SQLite closure comparison) and the E5/E6 report entries.
-  2. F-12 confidentiality scenario S6 + F-17 what-if and F-18 audit_sources (demo depth).
-  3. Phase-4 pass: docs tidy, `clean_clone_check.sh` re-run, tags `phase-0..phase-4`, and the
-     batched human message (repo remote, video, submission).
-- **Blockers:** none open. OpenCode free provider quota (F-08) and provider rate limits for
-  specialist subagents are recorded in the consults.
-- **Human pending (batch 1 reply outstanding):** GitHub repo + remote URL, Discord answer,
-  dogfood runtime choice, optional API keys in `.env`; Render account for the live URL.
+  1. Implement F-08 against the genuine read contract, then independently verify runtime capture.
+  2. Resolve service ACL wiring with independent tenant-boundary QA.
+  3. Finish durable hook spool/replay and remaining release checks before feature freeze.
+- **Human pending:** video recording, walkthrough/architecture review, organizer track decision,
+  hosted account/submission. Git origin is configured; this continuation has not pushed.
 
 ---
 
@@ -319,3 +321,29 @@
   never conflated. `tests/integration/test_audit.py` (4) covers both counts, the limit clamp, REST
   and MCP.
 - 316 passed, 1 skipped; ruff, secret scan, numbers PASS.
+
+---
+
+### 2026-10-16 08:57 IST | P2/P3 | containment, fixture ownership, coherent evaluation | STATUS: verified locally
+- a677d9f: truthful what-if cleanup, pending-capacity accounting, lease-aware reaping, typed
+  copy errors, baseline from the same atomic snapshot, five-root validation; isolated audit
+  sources retain exact zero reach and null PageRank when the procedure emits no score.
+  Independent QA/red-team: 45 passed; cap is per process, checkpoint/restore and WCC unbuilt.
+- d7f7409: repaired destructive all-tenant test teardown. Only fixture-owned successful creates
+  are cleaned; remaining/unknown graphs and registry errors are reported after other cleanup.
+  Independent QA: 11 passed including a real pre-existing tenant sentinel. Earlier runs may
+  have removed pre-existing data; only the dedicated synthetic demo was re-seeded (14 nodes,
+  S1/S6/S8, invariant PASS). No recovery of arbitrary data is claimed.
+- 3941d85: whole-DAG seed-cluster bootstrap, valid/total cluster and item denominators, retained
+  CSV intervals and E2 seed samples, consistent B0 calibration universe, exact E4b ID sets,
+  quick-output isolation. Full serialized evals/run_all.py PASS against this committed source.
+  Report/CSV/JSON/NUMBERS coherent; independent F-14 signoff PASS for stated synthetic/local
+  scope. SQLite faster on measured traversal rows; no graph-engine superiority claimed.
+- make check: 376 passed, 1 skipped (ACL deployment secret absent), Ruff/secrets/numbers PASS.
+  Expanded numbers check: README/blog/submission/walkthrough PASS against 68 allowed values.
+- 3beaae1: genuine free OpenCode before/after read payload recorded; one tool completed with
+  reported cost zero, final model response timed out at 60 seconds and own process tree stopped.
+  Observation resolves the read-shape prerequisite only; adapter and real coverage/friction
+  remain unbuilt/unmeasured. Documentation no longer claims the adapter ships.
+- Remaining gates: OpenCode adapter/runtime acceptance, service ACL wiring, E3b/E6, durable
+  hook spool/replay, human walkthrough/video/submission. Fresh-clone final check follows.

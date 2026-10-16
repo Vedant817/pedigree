@@ -8,8 +8,8 @@ wrong or malicious, nobody can answer *"what did the agent already believe and d
 
 Pedigree answers that out-of-band:
 
-- it **captures** where every belief came from (a Claude Code hook, the OpenCode plugin, the REST
-  API or MCP - never the model's own word),
+- it **records** observed or reported lineage through the Claude Code hook, REST API and MCP;
+  agent-reported dependencies remain distinct from runtime observations,
 - stores the lineage in **FalkorDB**, one graph per tenant, as fixed parameterised Cypher,
 - **revokes** a bad source and shows what it contaminated down to the commit,
 - **keeps what is independently supported** instead of cascading blindly,
@@ -38,8 +38,9 @@ story. A recursive SQL CTE can compute a closure - we measured that comparison h
 (`evals/run_e4b_sqlite.py`): for the traversal primitives alone, at every size we tested, the
 stdlib `sqlite3` recursive CTE is **faster** than `algo.BFS` (the graph query pays a round-trip),
 and we report that rather than hide it. What FalkorDB buys is not the closure: it is the
-per-tenant graph namespace (cheap, real isolation), `GRAPH.COPY` for an atomic what-if, and the
-per-graph ACL pattern - none of which a single SQLite file gives us.
+per-tenant graph namespace, `GRAPH.COPY` for an isolated what-if, and the
+per-graph ACL mechanism. SQLite can also implement logical isolation; this comparison measures
+traversal primitives, not isolation architectures. The service ACL credential wiring remains open.
 
 ## Quick start (local, mandatory path)
 
@@ -68,7 +69,7 @@ Docs: [full setup](#setup) · [data model](#graph-data-model) ·
 ## Architecture
 
 ```
- Claude Code hook   OpenCode plugin   REST client   MCP client
+ Claude Code hook   OpenCode adapter (planned)   REST client   MCP client
       |                   |               |             |
       v                   v               v             v
   POST /v1/events ---- POST /v1/* ---- MCP (stdio / streamable HTTP at /mcp)
@@ -85,7 +86,9 @@ Docs: [full setup](#setup) · [data model](#graph-data-model) ·
 
 Capture is the choke point: runtimes send evidence of what happened, `src/pedigree/adapters.py`
 translates the fields we understand into engine operations, and everything else is ignored rather
-than guessed. Nothing the model writes becomes lineage; only hooks/API calls do.
+than guessed. MCP/API clients can report dependencies; those reports are agent-level evidence,
+not proof of complete lineage or trusted operator attestation. The OpenCode lane is planned: only
+a temporary observation plugin has captured one genuine read-hook shape.
 
 ## Graph data model
 
@@ -186,9 +189,10 @@ documented (a stalled hook must not block the tool unless the matcher sets
 
 ### OpenCode plugin
 
-`.opencode/plugins/pedigree.ts` posts the same `/v1/events`. The plugin starts and is captured by
-tests, but a free provider quota blocked end-to-end session capture during the build - the honest
-state is in `docs/KNOWN_ISSUES.md`; nothing was fabricated to fill the gap.
+The OpenCode adapter is not implemented in this checkout. A temporary observation plugin
+in a bounded free-model session captured genuine before/after payloads for one read
+(`docs/consults/opencode-recheck-2026-10-16.md`). Full adapter coverage and real-session
+gate friction remain unmeasured.
 
 ## Security model
 
@@ -212,15 +216,17 @@ state is in `docs/KNOWN_ISSUES.md`; nothing was fabricated to fill the gap.
 
 ## Evaluation
 
-Real numbers only, produced by committed scripts (`make eval`) and regenerated into
-`docs/NUMBERS.md`; `make check` fails if a number in this file is not there.
+Local measurements are produced by scripts (`make eval`) and regenerated into
+`docs/NUMBERS.md`; the numeric-reference check is separate from statistical signoff.
+E1/E2, local E3 S1/S6/S8, E4 and E4b have measurement evidence; the repaired F-14
+publication pipeline has scoped statistical signoff (`docs/qa/F-14.md`). E3b/E6 are NOT MEASURED.
 
 **E1 - contamination semantics** (`evals/run_e1.py`; generated lineage DAGs, one revoked source,
 ground truth from an *independent* oracle; Pedigree's column is the engine's real `compute_final`,
 cross-checked against a real FalkorDB revoke; baselines are documented emulations of the
 semantics in the literature, not the vendors' products):
 
-| system | recall | over-invalidation | preserved correct |
+| system | recall | over-invalidation | explicit preservation-status sensitivity |
 |---|---|---|---|
 | Pedigree | 1.0 | 0.0 | 1.0 |
 | B4 full cascade (no support check) | 1.0 | 0.0493 pooled, **0.2777** in the deepest cell | 0.0 |
@@ -229,6 +235,11 @@ semantics in the literature, not the vendors' products):
 | B0 TF-IDF similarity (theta 0.475, calibrated on disjoint seeds) | 0.4714 | 0.0334 | 0.0 |
 | B5 time-travel rewind | 1.0 | 0.9557 | 0.0 |
 
+The preservation column measures explicit `preserved` status. Baselines do not emit that
+status; their zero does not mean they discard every independently supported item. Retention
+precision is not measured here. Intervals resample whole DAG seeds within the fixed generator
+grid; they do not establish performance on real sessions.
+
 Every value carries a confidence interval in `evals/REPORT.md`; the deep-cell B4 number is the
 cost of a cascade that does not check support, and the B2 number is the cost of only looking one
 hop.
@@ -236,8 +247,9 @@ hop.
 **E2 - capture fidelity** (`evals/run_e2.py`; a model of capture error, not a measurement of a
 real runtime): dropping `1%` of lineage edges leaves `0.012` of contamination undetected, `2%`
 leaves `0.0434`, `5%` leaves `0.1414`, `10%` leaves `0.2412`; the conservative read window never
-misses but flags `4.4628`-`5.7193` times the truly-affected items and about `3.3` times the
-truly-affected actions. That is the trade the window buys, stated as measured.
+misses but flags extra items equal to `4.4628`-`5.7193` times the truly-affected item count,
+and extra actions equal to about `3.3` times the truly-affected action count. These are
+extra-to-true ratios, excluding the correctly flagged items/actions from the numerator.
 
 **Isolation / concurrency** (`tests/integration/test_isolation_concurrency.py`): an isolation
 matrix plus `20` tenants x `8` writer threads, after which every graph passes the invariant
@@ -258,7 +270,7 @@ Reproduce: `make eval` (full grid) or `make eval-quick` (one cell).
 
 ## Honest limitations
 
-Copied from `docs/03-EVAL-AND-DEMO.md` section 7, which is the source of truth:
+Aligned manually with `docs/03-EVAL-AND-DEMO.md` section 7; that document is the source of truth:
 
 - Pedigree **contains, explains and reverts**; it does not detect bad sources and does not prevent
   prompt injection.
@@ -270,8 +282,9 @@ Copied from `docs/03-EVAL-AND-DEMO.md` section 7, which is the source of truth:
 - Hooks see only what the runtime exposes; paraphrase through an unhooked channel is invisible.
 - Bash risk classification is a documented regex heuristic, not a sandbox. External effects
   (pushes already pulled, emails sent) are listed, not undone.
-- The OpenCode plugin could not be captured end-to-end during the build (free provider quota);
-  Claude hook capture is verified against the real HTTP API, not against an installed runtime.
+- One genuine OpenCode read-hook payload is recorded; full adapter coverage and E6 real-session
+  coverage/friction remain unmeasured. Claude hook capture is verified against the real HTTP
+  API, not against an installed runtime.
 - Per-tenant ACL users are verified but not wired into the service; a single-host deployment where
   the operator token is pasted into an agent's environment still has one principal.
 - Cloud Free has no TLS and no persistence; any hosted demo holds synthetic data only.
@@ -304,6 +317,9 @@ Rationale and the track-count ambiguity: `docs/DECISIONS.md` ADR-000.
 
 ## Status
 
+This table is maintained manually alongside `docs/FEATURES.md`; it is not generated.
+`done` applies to the named tested subset, with local/runtime/deployment limits in the evidence.
+
 | ID | Feature | Status | Tests | QA |
 |---|---|---|---|---|
 | F-01 | skeleton, config, FalkorDB pin, schema, secret scan | done | `tests/unit/test_config.py`, `tests/integration/test_schema.py`, ... | `docs/qa/F-01.md` PASS (round 2) |
@@ -313,22 +329,22 @@ Rationale and the track-count ambiguity: `docs/DECISIONS.md` ADR-000.
 | F-05 | REST API + registry + auth + limits | done | `tests/integration/test_api.py`, `tests/security/test_security_F05.py` | `docs/qa/F-05.md` PASS |
 | F-06 | MCP server (stdio + streamable HTTP) | done | `tests/integration/test_mcp.py` | `docs/qa/F-06.md` PASS |
 | F-07 | `/v1/events` capture mapping + artifact links | done | `tests/integration/test_events.py` | `docs/qa/F-07.md` PASS |
-| F-08 | OpenCode plugin | blocked | - | free provider quota; `docs/consults/opencode-spike.md` |
+| F-08 | OpenCode plugin | implementing | real read payload captured | adapter unbuilt; `docs/consults/opencode-recheck-2026-10-16.md` |
 | F-09 | lineage workspace (graph view, revoke preview/confirm, gate form) | done | `tests/integration/test_ui_api.py`, `tests/security/test_ui_boundary.py` | `docs/qa/F-09.md` PASS |
 | F-10 | scenario JSON + `make demo` | done | `tests/integration/test_demo_seed.py`, `test_demo_qa.py` | `docs/qa/F-10.md` PASS |
 | F-11 | gate (`check_action`, `/v1/gate`, hook deny/ask, policy.yaml) | done | `tests/unit/test_gate.py`, `tests/integration/test_gate_*.py` | `docs/qa/F-11.md` PASS |
 | F-12 | confidentiality labels + scenario S6 | done | `tests/integration/test_confidentiality.py` | `docs/qa/F-12.md` PASS |
 | F-13 | isolation hardening | implementing | `tests/security/test_capture_trust.py`, `test_acl_mechanism.py` | capture trust closed (ADR-008); ACL wiring open |
-| F-14 | evaluation harness + NUMBERS pipeline | implementing | `tests/evals/*` | E1 + E2 done (`evals/REPORT.md`); E3-E6 pending |
+| F-14 | evaluation harness + NUMBERS pipeline | done | `tests/evals/*` | local E1/E2, E3 S1/S6/S8, E4/E4b measured; scoped statistical signoff PASS; E3b/E6 NOT MEASURED |
 | F-15 | isolation/concurrency suite | implementing | `tests/integration/test_isolation_concurrency.py` | stress + ACL mechanism green; ACL wiring open |
-| F-16 | deployment | done (local) | `Dockerfile`, `scripts/entrypoint.sh`, `docker-compose.yml` | container verified end-to-end; Render is a human step |
-| F-17 | what-if (`GRAPH.COPY`) | todo | - | - |
-| F-18 | `audit_sources` (PageRank + exact descendant counts) | todo | - | - |
+| F-16 | deployment (local container; hosted deployment open) | done | `Dockerfile`, `scripts/entrypoint.sh`, `docker-compose.yml` | container verified end-to-end; Render is a human step |
+| F-17 | what-if (`GRAPH.COPY`); checkpoint/restore unbuilt | done | `tests/integration/test_whatif.py`, `tests/security/test_whatif_audit_review.py` | independent QA/red-team PASS for local subset; concurrency cap is process-local |
+| F-18 | `audit_sources` (PageRank + exact descendant counts); WCC unbuilt | done | `tests/integration/test_audit.py`, `tests/security/test_whatif_audit_review.py` | independent QA/red-team PASS for local subset |
 | F-19 | `supersede` (decision rot) | todo | - | - |
-| F-20 | evals E3/E3b/E4/E4b/E6 + REPORT | todo | - | - |
+| F-20 | eval publication and remaining real-session experiments | implementing | `tests/evals/*` | local E3 S1/S6/S8, E4/E4b measured; scoped signoff PASS; E3b/E6 NOT MEASURED |
 | F-21 | workspace polish | todo | - | - |
 | F-22 | hook spool/replay when the server is down | todo | - | - |
-| F-23 | README/blog/video/submission pack | in progress | - | this pass |
+| F-23 | README/blog/video/submission pack | implementing | - | drafts exist; human review, video and final publication pending |
 
 ## License
 
