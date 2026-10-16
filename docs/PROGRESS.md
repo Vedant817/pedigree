@@ -1,7 +1,8 @@
 # CURRENT STATE (overwritten after every feature / checkpoint)
 
-- **Phase:** P2/P3 hardening, audit-fix program (FIX_PROMPT Phase A); updated Fri 2026-10-16 12:45 IST.
-- **Last implementation commits:** ccdd7cb (P-010 :Node(id) anchor fix, audit-fix program Phase A),
+- **Phase:** P2/P3 hardening, audit-fix program (FIX_PROMPT Phase A); updated Fri 2026-10-16 13:35 IST.
+- **Last implementation commits:** 32ebaeb (P-010 anchor-lint closure rounds; QA-closed),
+  ccdd7cb (P-010 :Node(id) anchor fix, audit-fix program Phase A),
   bb9511a (F-08 review fixes incl. round-2 closure, amended
   in place), 8dd6509 (F-08 OpenCode read-only slice incl. review hardening),
   f475979 (OpenCode ADR-009 record), a677d9f (what-if/audit containment), d7f7409 (test fixture
@@ -9,9 +10,10 @@
 - **Environment:** Windows 11; Python 3.12.15; pinned FalkorDB module 42201 in Docker;
   Node v24.13.1. Local core and synthetic demo require no model provider.
 - **Deadlines:** feature freeze Sun 2026-10-18 15:00 IST; target submit 21:00; hard stop 23:59.
-- **Test state:** make check: 397 passed, 1 skipped (optional ACL deployment secret absent),
+- **Test state:** make check: 399 passed, 1 skipped (optional ACL deployment secret absent),
   3 deselected (perf; `make check-perf` 3 passed - EXPLAIN index plans, 20 000-node revoke
-  1 376 ms, 60 020-node gate 4.0 ms), 1 xfailed (strict read-window watchdog), Ruff, tracked
+  1 376 ms, 60 020-node gate 4.0 ms; P-010 QA re-measured 1 371.9 ms / 2.1-4.3 ms on its own
+  harness), 1 xfailed (strict read-window watchdog), Ruff, tracked
   secret scan and numbers check PASS;
   `scripts/check_secrets.sh` PASS including git history. F-08 slice: builtin Node suite 38 passed;
   hook-replay integration (live API + real FalkorDB) 3 passed; security regressions 1 passed
@@ -37,9 +39,9 @@
   deletes only its own successful creates and reports cleanup failures. Independent real-DB
   sentinel survival passes. Earlier runs cannot establish that pre-existing data was preserved.
 - **Next 3 actions:**
-  1. Audit-fix program (FIX_PROMPT): P-010 landed (`ccdd7cb`, QA in flight); next P-013 admin-token fail-closed, P-016 `pedigree mcp` invocation + `/mcp` mount, P-025 import side effects, then the Phase A review pass.
+  1. Audit-fix program (FIX_PROMPT): P-010 QA-closed (`docs/qa/P-010.md`); next P-013 admin-token fail-closed, P-016 `pedigree mcp` invocation + `/mcp` mount, P-025 import side effects, then the Phase A review pass.
   2. F-08 review cycle closed (round-3 PASS in `docs/qa/F-08.md`); F-08 stays implementing — installed-runtime acceptance still unclaimed.
-  3. Resolve service ACL wiring with independent tenant-boundary QA; finish durable hook spool/replay before feature freeze.
+  3. Resolve service ACL wiring with independent tenant-boundary QA; finish durable hook spool/replay before feature freeze; P010-QA-2 (`ped:mcp*` test-graph leak) queued with test hygiene.
 - **Human pending:** video recording, walkthrough/architecture review, organizer track decision,
   hosted account/submission. Git origin is configured; this continuation has not pushed.
 
@@ -481,3 +483,22 @@
   write queries (`Q_CORROBORATE`, `Q_SESSION_READ`, `Q_REVOCATION_SET_STATE`, `Q_DEMO_ADD_SUPPORT`)
   are covered by the existing suite plus plan assertions, not by new behaviour tests. QA re-runs
   EXPLAIN over every query in `queries.py` and lands `docs/qa/P-010.md`.
+
+
+### 2026-10-16 13:35 IST | Phase A (FIX_PROMPT) | P-010 QA closure: PASS at declared lint scope | STATUS: closed; next Phase A items P-013/P-016/P-025
+- Independent QA (`docs/qa/P-010.md`, rounds at `09f0f7b` -> `32ebaeb`): fresh `make check`
+  399 passed / 1 skipped / 3 deselected / 1 xfailed, `make check-perf` 3 passed, `make test`
+  400 passed, `scripts/check_secrets.sh` PASS. Own EXPLAIN census of all 84 query constants
+  (11 rewritten anchors index-backed; counterfactual without `ensure_schema` shows label scans).
+  Own perf harness: 10k chain revoke 658 ms, 20k 1 372 ms, ternary-tree 9 841 nodes 539 ms,
+  gate 2.1-4.3 ms; pre-fix 10k revoke 17 841 ms reproduces the audit. 15/15 semantic equivalence
+  checks and demo seeding identical; no overclaims found. Builder's numbers confirmed.
+- Three follow-up rounds closed P010-QA-1 (lint evadable by formatting/grammar variants):
+  `4e070a8` (whitespace/case tolerance), `88ba332` (anonymous variable + WHERE form),
+  `32ebaeb` (parenthesised predicate + relationship in the leading pattern list). Lint scope
+  declared final in the module comment with a documented accepted-residual list (deliberate
+  paraphrase only; none present in `src/`). Round 4: CLOSED at declared scope, safe battery
+  0 true false positives, pre-fix sensitivity 11/11.
+- New finding P010-QA-2 (Info, pre-existing, out of P-010 scope): `tests/integration/test_mcp.py`
+  and `tests/security/test_security_F06.py` leak `ped:mcp*` graphs (34 in the local DB). Queued
+  with test hygiene; no code or latency impact.
