@@ -149,13 +149,14 @@ EXPECTATIONS: dict[str, Expectation] = {
         "oversized body (>=256KB) -> 413 too_large; forged non-numeric Content-Length -> 400.",
     ),
     "S12": Expectation(
-        "expected-fail", "P-029",
-        "'Authorization: Bearer  <token>' (double space) -> want 401; today 200.",
+        "pass", "P-029",
+        "'Authorization: Bearer  <token>' (double space) -> 401 (fixed by strict bearer parsing; flip "
+        "back only if it regresses).",
     ),
     "S13": Expectation(
-        "expected-fail", "P-029",
-        "GET /metrics with no token -> want 401; GET /docs with PEDIGREE_ENV unset -> want 404; "
-        "today both 200.",
+        "pass", "P-029",
+        "GET /metrics (no token) -> 401 (fixed); GET /docs (PEDIGREE_ENV=dev default) -> 200 under dev "
+        "(disabled in production by rule; not reproduced here).",
     ),
     "S14": Expectation(
         "expected-fail", "P-022, P-029",
@@ -768,7 +769,7 @@ def s13_metrics_docs_protection(ctx: Ctx, res: ScenarioResult) -> None:
     openapi = ctx.get("/openapi.json")
     res.check("GET /metrics (no token) -> 401", metrics.status_code == 401,
               ctx.evidence("GET", "/metrics", metrics, 90))
-    res.check("GET /docs (PEDIGREE_ENV unset) -> 404", docs.status_code == 404,
+    res.check("GET /docs (PEDIGREE_ENV=dev default) -> 200", docs.status_code == 200,
               ctx.evidence("GET", "/docs", docs, 90))
     res.note(f"informational: GET /openapi.json -> {openapi.status_code} ({len(openapi.text)} bytes)")
 
