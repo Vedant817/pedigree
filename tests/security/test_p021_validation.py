@@ -1,4 +1,6 @@
 """Public malformed inputs must fail before any graph mutation."""
+import logging
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -59,3 +61,33 @@ def test_direct_rest_uses_same_strict_fields(boundary, path, payload):
     response = client.post("/v1/" + path, headers=headers, json=payload)
     assert response.status_code == 422, response.text
     assert snapshot(db, graph) == before
+
+
+def _logged(caplog) -> str:
+    return " ".join(record.getMessage() for record in caplog.records
+                    if record.name == "pedigree.errors")
+
+
+def test_validation_failure_logs_field_and_type_not_values(boundary, caplog):
+    db, graph, client, headers = boundary
+    with caplog.at_level(logging.INFO, logger="pedigree.errors"):
+        response = client.post("/v1/sources", headers=headers,
+                               json={"kind": "web", "stray_canary": "http://canary.invalid"})
+    assert response.status_code == 422, response.text
+    assert "stray_canary" not in response.text          # the envelope stays opaque
+    logged = _logged(caplog)
+    assert response.json()["error"]["correlation_id"] in logged
+    assert "stray_canary" in logged                      # field path is diagnosable
+    assert "extra_forbidden" in logged
+    assert "canary.invalid" not in logged                # submitted values are never logged
+
+
+def test_typed_rejection_logs_the_authored_reason(boundary, caplog):
+    db, graph, client, headers = boundary
+    with caplog.at_level(logging.INFO, logger="pedigree.errors"):
+        response = client.post("/admin/tenants", json={"id": "registry"},
+                               headers={"x-admin-token": "validation-fixture-admin"})
+    assert response.status_code == 422, response.text
+    logged = _logged(caplog)
+    assert response.json()["error"]["correlation_id"] in logged
+    assert "reserved tenant id" in logged

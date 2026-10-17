@@ -13,7 +13,13 @@ from starlette.staticfiles import StaticFiles
 
 from ..config import DEV_ENVS, admin_token_problem, get_settings
 from ..db.client import Db
-from ..diagnostics import correlation_id, error_payload, unexpected_error
+from ..diagnostics import (
+    correlation_id,
+    error_payload,
+    log_typed_rejection,
+    log_validation_failure,
+    unexpected_error,
+)
 from ..errors import PedigreeError
 from ..http_boundary import BodySizeMiddleware
 from ..rate_limit import RateLimiter
@@ -30,14 +36,18 @@ def _register_error_handlers(app: FastAPI) -> None:
         if exc.code == "rate_limited":
             retry = retry if type(retry) is int and 0 < retry < 10**15 else 1
             headers = {"Retry-After": str(retry)}
+        cid = getattr(request.state, "correlation_id", None)
+        log_typed_rejection(cid, exc)
         return JSONResponse(status_code=exc.http_status, content={"error": error_payload(
-            exc, getattr(request.state, "correlation_id", None))}, headers=headers)
+            exc, cid)}, headers=headers)
 
     @app.exception_handler(RequestValidationError)
     async def invalid(request: Request, exc: RequestValidationError):
+        cid = getattr(request.state, "correlation_id", None) or correlation_id()
+        log_validation_failure(cid, exc)
         return JSONResponse(status_code=422, content={"error": {
             "code": "invalid_argument", "message": "invalid argument",
-            "correlation_id": getattr(request.state, "correlation_id", correlation_id())}})
+            "correlation_id": cid}})
 
     @app.exception_handler(Exception)
     async def generic(request: Request, exc: Exception):
