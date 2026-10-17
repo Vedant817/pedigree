@@ -161,7 +161,10 @@ def test_kill_process_then_resume(db):
     try:
         gname = graph_name(tid)
         root, ids = _chain(db, tid, length=7)
-        env = {x: y for x, y in __import__("os").environ.items() if x not in ("FALKOR_PORT",)}
+        # The crash driver builds its own Db from the environment, so it must see the
+        # same FALKOR_HOST/FALKOR_PORT as this test; stripping the port made the test
+        # depend on the database being on the default 6379.
+        env = dict(__import__("os").environ)
         env.update({"PYTHONUTF8": "1", "PYTHONPATH": str(ROOT)})
         proc = subprocess.run(
             [sys.executable, str(DRIVER), tid, root],
