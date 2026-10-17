@@ -14,7 +14,7 @@ that cannot be finished goes here rather than being silently dropped.
 | 7 | 2026-10-15 | Static-Cypher lint is a guard-rail, not a proof: it cannot see strings assembled through variables or external data. Coverage now includes f-strings, `.format`/`.replace`/`.join` on literals, concatenation and `%`. Manual review + parameterised query constants remain the primary control. | low | documented |
 | 8 | 2026-10-15 | `:Revocation` nodes carry `state` (running/done) instead of `status`; the missing-status invariant explicitly exempts them. Deviation from docs/01 §5 recorded in ADR-006. | low | accepted (ADR-006) |
 | 9 | 2026-10-15 | `POST /v1/events` applies operations in order and aborts on the first typed error, so a failing batch leaves the earlier events applied (no cross-event atomicity). Acceptable for the idempotent capture channel; documented in `docs/qa/F-07.md`. | low | documented |
-| 10 | 2026-10-15 | `BodySizeMiddleware` compares against a literal `256 * 1024` instead of `LIMITS["body_bytes"]` (identical value). | informational | cosmetic |
+| 10 | 2026-10-17 | P-021 replaces the old declared-length check with actual-byte HTTP admission using the shared body limit, including chunked REST/MCP. Stdio line allocation remains owned by the MCP SDK. | informational | repaired; independent P-021 QA/red-team PASS |
 | 11 | 2026-10-15 | P-015 / ADR-011 replaces interim global-admin trust headers with stored tenant agent/operator roles. Agent trusted claims and revoke/reinstate reject; global X-Admin-Token cannot elevate an agent. Explicit operator REST/MCP calls are supported; MCP defaults and hooks require agent credentials. Legacy bearers retain agent privileges and need explicit admin operator issuance. Supplying an operator bearer to an agent grants that authority; host compromise is outside this boundary. | high | closed 2026-10-16; independent P-015 QA/red-team PASS |
 | 12 | 2026-10-15 | Claude hooks have synthetic contract and real localhost HTTP subprocess proof, but no installed-runtime execution. Web/tool-description sources and shell file I/O are not captured. ~~Repeated unmatched file reads create separate Source ids~~ - identity now converges on `(uri, content_hash)` (ADR-008), so revoking one copy covers future identical reads. | high | installed-runtime capture still open (F-07/F-08); source identity closed 2026-10-16 |
 | 13 | 2026-10-15 | Runtime registry uses ped:registry while unused REGISTRY_GRAPH and original spec say pedigree:registry. Reserved tenant id prevents collision; deployment/ACL docs must use the actual name until migrated. | medium | open, F-13 consistency |
@@ -46,3 +46,19 @@ A full graph can reject revoke/reinstate when a new ledger node is needed. See
 F-17 concurrency admission is process-local; checkpoint/restore remains unbuilt.
 F-18 WCC analysis remains unbuilt. These subset passes do not close the ACL service-wiring
 item or establish multi-process what-if coordination.
+
+P-020 authentication now performs one indexed live digest query; local latency probes
+are acceptance evidence, not a worst-case or production guarantee. Rate accounting is
+shared by REST/MCP and both roles within one instance, with separate read/write
+budgets. Extra workers and restarts multiply or reset those limits. Failed-auth
+backoff can temporarily deny a valid user sharing a blocked peer/NAT; requests
+already authenticating concurrently are not bounded by completed failure counts.
+Shipped Uvicorn launch paths disable proxy-header rewriting. Custom reverse proxies
+must establish a trustworthy peer boundary rather than accepting forwarded identity.
+See [P-020 QA](qa/P-020.md) and [red-team evidence](qa/redteam-P-020.md).
+
+[SECURITY.md](../SECURITY.md) records the trust model and operational assumptions.
+Its private disclosure contact remains an explicit human TODO before public release.
+The final [Phase C security review](qa/phase-C-security.md) retains the optional ACL
+secret skip and the strict F-08 read-window watchdog xfail; neither proves deployed
+DB isolation or complete installed-runtime capture.

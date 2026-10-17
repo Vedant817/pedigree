@@ -240,6 +240,12 @@ OpenCode session, and write/edit/shell coverage plus real-session gate friction 
   the registry tenant id reserved.
   Event batches validate all fields before writing; unknown operations, extras and conflicting
   aliases reject. Actual HTTP bytes are bounded, including chunked REST/MCP requests.
+  Authentication uses one indexed live digest lookup. Read and write budgets are separate,
+  shared across REST/MCP and agent/operator credentials within one service instance.
+  Limits reset or multiply across instances/restarts. Failed-auth backoff can temporarily
+  deny valid users sharing a peer IP. Shipped servers ignore proxy-header rewriting;
+  custom proxy deployments must establish a trustworthy peer boundary. See
+  [the rate contract](docs/fixes/P-020.md) and [trust model](SECURITY.md).
 - **Quota admission:** public creators share a request-wide owner-token mutex and count
   new identities before writing. Quota overflow leaves an events batch unchanged; other
   errors can leave earlier events committed. This requires a stable Redis primary with

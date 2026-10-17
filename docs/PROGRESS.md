@@ -1,15 +1,17 @@
 # CURRENT STATE (overwritten after every feature / checkpoint)
 
-- **Phase:** Phase C security hardening, Sat 2026-10-17 02:01 IST. P-029 hygiene and
-  P-014 request-wide quota admission have independent QA/red-team PASS. Current full
-  `make check`: 698 passed, 2 skipped, 3 deselected, 1 xfailed; 29 subsequently added
-  red-team cases separately PASS against unchanged source. Ruff, tracked secrets
-  and numbers PASS. P-014 committed in 303016a, P-029 test follow-up f940b23.
-  P-015 consult 010 / ADR-011, implementation, independent QA/red-team and full gate
-  PASS. Dogfood now 20 PASS, 3 expected failures, zero leftovers. P-021 consult 011
-  complete; strict validation/error/body boundaries pass QA, red-team, fullcheck and
-  dogfood (22 PASS, one metrics expected failure). P-020 consult012 complete; decision
-  and implementation next. No Phase-C checkpoint or push yet.
+- **Phase:** Phase C closure, Sat 2026-10-17 06:53 IST. P-014 quotas,
+  P-015 stored roles, P-020 indexed live auth/separate rate admission, P-021 strict
+  inputs/safe errors, P-029 hygiene and P-036 trust policy have independent QA and
+  red-team evidence. Final `make check`: 787 passed, 2 skipped, 3 deselected,
+  1 xfailed in 193.28s; Ruff, tracked secrets and numbers PASS. Independent final
+  security suite: 414 passed, 1 skipped, 1 xfailed in 125.30s; ownership sentinel
+  unchanged. Dogfood: 22 PASS, one expected P-022 metrics failure, no failures,
+  stale expectations or skips. Fresh-clone and Phase-C tag/push still pending.
+- **Next:** scoped P-020/P-036 commits; exact-commit fresh-clone check and history
+  scan before checkpoint C; Phase D setup/lock/CI (consult 013 in progress).
+- **Residuals:** ACL service wiring, installed runtime capture and stronger F-08
+  eviction-proof lineage are not closed. Private disclosure contact is human-owned.
 - **Last implementation commits:** 1243744/031f86a/83d7b73 (P-016 QA follow-up: stdio default-tenant
   token bypass fixed - red-team F-1 with red-at-parent regression; MCP errors actionable; README
   auth reality + 13-tool list; QA addenda), ef9033f (P-012 consult trio filed: domain + oracle
@@ -697,3 +699,20 @@
 - Earlier builder fixture cleanup error and five unidentified leftovers remain
   disclosed above; no prefix sweep or retrospective cleanup claim. No push.
 - Next: consult 012 decision, P-020 auth/rates, then trust model and Phase-C checkpoint.
+
+### 2026-10-17 06:53 IST | Phase C | P-020 and P-036 | STATUS: done
+- P-020: consult 012 / ADR-013, one indexed live digest lookup, separate shared
+  REST/MCP tenant read/write admission, destructive dual budgets, bounded state,
+  actual-peer failed-auth backoff and explicit proxy launch settings.
+- Independent QA: docs/qa/P-020.md (48 passed); redteam-P-020.md (13 passed).
+  Final docs/qa/phase-C-security.md: 414 passed, 1 skipped, 1 xfailed; sentinel PASS.
+- First root gate: 3 audit-clamp regressions, 772 passed. Restored prior bounded
+  integer semantics, kept original tests; focused rerun 47 passed. Final root
+  make check: 787 passed, 2 skipped, 3 deselected, 1 xfailed in 193.28s, exit 0;
+  Ruff, tracked secret scan and check_numbers PASS.
+- P-036: SECURITY.md, README and known limits match implemented authority and
+  runtime boundaries; independent docs/qa/P-036.md and final reread PASS.
+  Human disclosure contact remains TODO; no production certification claimed.
+- Dogfood report scratch/dogfood/20261016T204057Z.md: 22 PASS, 0 FAIL,
+  1 EXPECTED-FAIL (P-022 metrics), 0 STALE, 0 SKIP; owned scopes cleaned.
+- Next: clean-clone and history gates before the Phase C checkpoint push.
