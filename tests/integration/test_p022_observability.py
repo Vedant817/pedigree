@@ -133,6 +133,24 @@ def test_access_log_is_json_without_credentials(boundary, caplog):
     assert not any(shape in line for shape in TOKEN_SHAPES)
 
 
+def test_observability_module_is_import_idempotent():
+    """A second module identity must reuse the registered collectors.
+
+    `tests/evals/test_oracle_agreement.py` imports the package as `src.pedigree...`
+    while `evals.baselines` imports `pedigree...`; before the reuse guard the second
+    import raised DuplicateTimeseries from the shared default registry.
+    """
+    import importlib.util
+
+    import pedigree.observability as first
+
+    spec = importlib.util.spec_from_file_location("pedigree_observability_second", first.__file__)
+    clone = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(clone)
+    assert clone.GATE_DECISIONS is first.GATE_DECISIONS
+    assert clone.QUERY_SECONDS is first.QUERY_SECONDS
+
+
 def test_mcp_tools_carry_the_action_trace(fresh_graph):
     db, tenant, graph = fresh_graph
     settings = Settings(pedigree_admin_token=ADMIN_TOKEN)
