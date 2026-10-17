@@ -1,6 +1,7 @@
 # CURRENT STATE (overwritten after every feature / checkpoint)
 
-- **Phase:** Phase F in progress, Sat 2026-10-17. `main` is ahead of `origin/main`.
+- **Phase:** Phase G started Sun 2026-10-18 (G1 README checker on `3e94e17`).
+  `main` is ahead of `origin/main`. Phase F capture and the realistic seed remain as below.
   Push and tags stay a human checkpoint (`AGENTS.md`).
   Landed and still true from Phase E: P-022 QA recorded (`docs/qa/P-022.md`, PASS
   with caveats), P-006 eval signed, P-012 evidence recorded, P-023 isolation suite
@@ -23,8 +24,9 @@
   demo script, blog draft, and hygiene follow, then Phase H. Feature freeze
   Sun 2026-10-18 15:00 IST. Do not push, tag, publish, or fill human-voice
   disclosure fields. The realistic-seed tests passed (unit plus integration,
-  12 passed with the existing demo-seed file). Full `make check` has not been
-  re-run since `5afc4b5`.
+  12 passed with the existing demo-seed file). `make check` on `3e94e17`:
+  867 passed, 2 skipped, 6 deselected, 1 xfailed (313.34s); secret scan PASS;
+  `check_numbers` PASS (2 files, 70 allowed values); `check_readme` PASS.
 - **Residuals:** ACL service wiring, installed runtime capture and stronger F-08
   eviction-proof lineage remain open. Private disclosure contact is human-owned.
   No hosted CI/deployment or native macOS acceptance is claimed; the Render

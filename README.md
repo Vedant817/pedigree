@@ -525,4 +525,4 @@ Tools, what was generated, and the fields the human author still has to fill are
 
 ## License
 
-MIT. See `LICENSE`.
+MIT. See [LICENSE](LICENSE).
