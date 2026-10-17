@@ -58,7 +58,9 @@ def ensure_demo_tenant(registry, tenant: str, credentials_dir: Path) -> Path | N
 
 def main() -> int:
     try:
-        tenant = validate_tenant(os.environ.get("PEDIGREE_DEMO_TENANT", "demo"))
+        profile = os.environ.get("PEDIGREE_DEMO_PROFILE", "").strip().lower()
+        default_tenant = "demorealistic" if profile == "realistic" else "demo"
+        tenant = validate_tenant(os.environ.get("PEDIGREE_DEMO_TENANT", default_tenant))
         db = Db()
         registry = TenantRegistry(db)
         credentials_dir = Path(os.environ.get("PEDIGREE_CREDENTIALS_DIR",
@@ -67,7 +69,14 @@ def main() -> int:
         if credential_file is None:
             raise SeedError("existing demo tenant has no local credential file; restore the "
                             "private file or choose a new dedicated PEDIGREE_DEMO_TENANT")
-        result = seed_scenarios(db, tenant)
+        profile = os.environ.get("PEDIGREE_DEMO_PROFILE", "").strip().lower()
+        if profile == "realistic":
+            from pedigree.demo_realistic import seed_realistic
+            result = seed_realistic(db, tenant)
+        elif profile in {"", "authored"}:
+            result = seed_scenarios(db, tenant)
+        else:
+            raise SeedError("PEDIGREE_DEMO_PROFILE must be authored or realistic")
         print("[seed] " + json.dumps(result, sort_keys=True))
         if credential_file:
             print(f"[seed] local credential file: {credential_file} (keep private; never commit)")

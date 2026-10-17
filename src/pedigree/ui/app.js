@@ -91,7 +91,8 @@
         color:'#20374b',width:24,height:24,'border-width':3,'border-color':'#ffffff',shape:n=>({Source:'diamond',Memory:'ellipse',Action:'round-rectangle'}[n.data('type')])}},
       {selector:'edge',style:{width:1.5,'line-color':'#afc5d1','target-arrow-color':'#afc5d1','target-arrow-shape':'triangle','curve-style':'bezier'}},
       {selector:'edge[kind="CORROBORATED_BY"]',style:{'line-style':'dashed','line-color':'#177c69','target-arrow-color':'#177c69'}},
-      {selector:':selected',style:{'border-width':4,'border-color':'#176d89'}}],
+      {selector:':selected',style:{'border-width':4,'border-color':'#176d89'}},
+      {selector:'.on-path',style:{'border-width':5,'border-color':'#ad3549','background-color':'#ad3549'}}],
       layout:{name:'breadthfirst',directed:true,padding:38,spacingFactor:1.15,animate:false}});
     graph.on('tap','node',event=>select(event.target.id()));
     if (selected) select(selected.id);
@@ -130,6 +131,15 @@
       if (selected?.id !== node || epoch !== started || $('depth').value !== depth) return;
       const contents = [text('p',action === 'blame' ? 'Recorded roots' : 'Downstream influence','eyebrow')];
       if (action === 'blame') {
+        const onPath = new Set();
+        for (const root of result.roots) {
+          for (const id of root.path || []) onPath.add(id);
+          if (root.id) onPath.add(root.id);
+        }
+        if (graph) {
+          graph.elements().removeClass('on-path');
+          graph.nodes().filter(node => onPath.has(node.id())).addClass('on-path');
+        }
         for (const root of result.roots) contents.push(text('p',`${root.status}: ${(root.path || []).join(' → ') || root.id}`,'mono'));
         if (!result.roots.length) contents.push(text('p','No revoked or low-integrity roots returned within this depth.'));
       } else { contents.push(text('p',`${result.counts.n_total} downstream nodes`)); effects(result.actions); }

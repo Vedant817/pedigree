@@ -61,6 +61,9 @@ def _preflight_existing(db, gname: str, tenant: str, nodes: list[dict]) -> set[s
         elif kind == "action":
             expected.update({field: node.get(field) for field in ("tool", "summary", "effect", "risk")})
             expected["artifacts"] = node.get("artifacts", [])
+            # record_action omits the property when there are no artifacts.
+            if actual.get("artifacts") is None:
+                actual["artifacts"] = []
         else:
             raise ValueError("unknown synthetic fixture node type")
         expected_parents = set(node.get("derived_from", node.get("relied_on", [])))
