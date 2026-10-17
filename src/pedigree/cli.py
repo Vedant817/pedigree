@@ -250,7 +250,7 @@ def serve(settings: Settings, host: str, port: int) -> int:
     import uvicorn
 
     uvicorn.run("pedigree.api.app:create_app", factory=True, host=host, port=port,
-                log_level="info")
+                log_level="info", proxy_headers=False)
     return 0
 
 

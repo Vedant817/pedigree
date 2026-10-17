@@ -44,6 +44,7 @@ def register(app: FastAPI, db, registry, settings) -> None:
         for spec in spec_list:
             if spec.get("op") == "source":
                 auth.authorize_source(request.state.principal, spec.get("kind"), spec.get("integrity"))
+        auth.admit(request, "write")
         created: list[str] = []
         # In-batch alias map: a capture id names a node, but identity is derived from the
         # artifact (ADR-008), so later events in the same batch that reference the id are
@@ -126,6 +127,7 @@ def register(app: FastAPI, db, registry, settings) -> None:
     def artifact_lookup(key: str, request: Request):
         auth.authenticate(request)
         gname = request.state.graph_name
+        auth.admit(request, "read")
         result = lookup_fn(db, gname, key)
         first, node_id = result if result else (None, None)
         if first is not None:
@@ -136,4 +138,5 @@ def register(app: FastAPI, db, registry, settings) -> None:
     def invariants(request: Request):
         auth.authenticate(request)
         gname = request.state.graph_name
+        auth.admit(request, "read")
         return {"violations": check_invariants(db, gname, request.state.tenant_id)}

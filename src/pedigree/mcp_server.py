@@ -14,7 +14,7 @@ from starlette.responses import JSONResponse
 
 from .api.auth import authorize_source
 from .api.registry import TenantRegistry
-from .config import LIMITS, get_settings, graph_name
+from .config import LIMITS, SOURCE_KINDS, get_settings, graph_name
 from .db.client import Db
 from .db.schema import ensure_schema
 from .diagnostics import error_payload, unexpected_error
@@ -26,8 +26,9 @@ from .engine.ingest import corroborate, record_action, record_source, remember
 from .engine.quota import QuotaPolicy
 from .engine.revoke import reinstate, report, revoke
 from .engine.whatif import whatif
-from .errors import PedigreeError
+from .errors import InvalidArgument, PedigreeError
 from .http_boundary import BodySizeMiddleware
+from .rate_limit import RateLimiter
 from .validation import validate_tool_arguments
 
 
@@ -147,7 +148,11 @@ class _SafeMCPServer(MCPServer):
         except Exception as exc:
             # SDK wrappers retain the original exception in __cause__. Neither is
             # formatted; diagnostics records class and frame metadata only.
-            payload = {"ok": False, "error": unexpected_error(exc, "mcp_tool")}
+            cause = exc.__cause__
+            if isinstance(cause, PedigreeError):
+                payload = {"ok": False, "error": error_payload(cause)}
+            else:
+                payload = {"ok": False, "error": unexpected_error(exc, "mcp_tool")}
         return mcp_types.CallToolResult(content=[mcp_types.TextContent(
             type="text", text=json.dumps(payload))], is_error=True)
 
@@ -168,16 +173,20 @@ class _SafeMCPServer(MCPServer):
 
 _UNAUTHORIZED_MSG = "invalid or missing tenant token"
 _http_headers: ContextVar[object | None] = ContextVar("pedigree_mcp_http_headers", default=None)
+_http_peer: ContextVar[str | None] = ContextVar("pedigree_mcp_http_peer", default=None)
 
 
 async def _transport_auth_context(ctx, call_next):
     # Installed SDK ServerMiddleware receives the actual per-message HTTP request.
     # ContextVar lifetime includes its async handler/threadpool, never a server field.
     marker = _http_headers.set(getattr(ctx.request, "headers", None))
+    client = getattr(ctx.request, "client", None)
+    peer_marker = _http_peer.set(getattr(client, "host", None))
     try:
         return await call_next(ctx)
     finally:
         _http_headers.reset(marker)
+        _http_peer.reset(peer_marker)
 
 
 def _forbidden():
@@ -185,16 +194,24 @@ def _forbidden():
 
 
 class PedigreeMCPServer:
-    def __init__(self, db=None, settings=None, default_tenant_id=None, default_tenant_token=None):
+    def __init__(self, db=None, settings=None, default_tenant_id=None, default_tenant_token=None, *, limiter=None):
         self.settings = settings if settings is not None else get_settings()
         self.db = db if db is not None else Db(self.settings)
         self.default_tenant_id = default_tenant_id
         self.default_tenant_token = default_tenant_token
+        self.limiter = limiter if limiter is not None else RateLimiter()
         self.server = _SafeMCPServer("pedigree", middleware=[_transport_auth_context])
         self.registry = TenantRegistry(self.db, self.settings)
         self._register_tools()
 
     def _resolve(self, tenant_id=None, token=None):
+        peer = _http_peer.get() or "local:stdio"
+        self.limiter.check_peer(peer)
+
+        def unauthorized():
+            self.limiter.failed_auth(peer)
+            return None, None, None
+
         headers = _http_headers.get()
         if headers is not None:
             # A supplied header is authoritative. Even an empty/malformed header
@@ -203,33 +220,36 @@ class PedigreeMCPServer:
             if presented is not None:
                 values = headers.getlist("authorization") if hasattr(headers, "getlist") else [presented]
                 if len(values) != 1 or not presented.startswith("Bearer "):
-                    return None, None, None
+                    return unauthorized()
                 raw = presented[7:]
                 if not raw or raw.strip() != raw or any(c.isspace() for c in raw):
-                    return None, None, None
+                    return unauthorized()
                 if token is not None and not hmac.compare_digest(raw.encode(), token.encode()):
-                    return None, None, None
+                    return unauthorized()
                 token = raw
             elif token is None:
-                return None, None, None
+                return unauthorized()
         if token is not None:
             rec = self.registry.resolve(token)
             if rec is None or (tenant_id is not None and tenant_id != rec.tenant_id):
-                return None, None, None
+                return unauthorized()
         else:
             if tenant_id is None:
                 tenant_id = self.default_tenant_id
             if not self.default_tenant_id or not self.default_tenant_token:
-                return None, None, None
+                return unauthorized()
             if tenant_id != self.default_tenant_id:
-                return None, None, None
+                return unauthorized()
             rec = self.registry.resolve(self.default_tenant_token)
             if rec is None or rec.tenant_id != self.default_tenant_id or rec.role != "agent":
-                return None, None, None
+                return unauthorized()
         tid = rec.tenant_id
         gname = graph_name(tid)
-        ensure_schema(self.db, gname)
         return tid, gname, rec
+
+    def _admit(self, tenant, gname, operation, **options):
+        self.limiter.admit(tenant, operation, **options)
+        ensure_schema(self.db, gname)
 
     def _register_tools(self):
         srv = self.server
@@ -250,6 +270,9 @@ class PedigreeMCPServer:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             def go():
                 authorize_source(principal, kind, integrity)
+                if kind not in SOURCE_KINDS:
+                    raise InvalidArgument("invalid source kind")
+                self._admit(tid, gname, "write")
                 r = record_source(self.db, gname, tid, quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap), kind=kind, uri=uri, title=title,
                                   integrity=integrity if principal.role == "operator" else "untrusted", conf=conf, id=id)
                 return {"id": r.id, "status": r.status, "low_integrity": r.low_integrity,
@@ -265,6 +288,7 @@ class PedigreeMCPServer:
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             def go():
+                self._admit(tid, gname, "write")
                 r = remember(self.db, gname, tid, quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap), text=text, mkind=mkind, derived_from=derived_from or [],
                             corroborated_by=corroborated_by or [], artifact=artifact,
                             artifact_key=artifact_key, id=id)
@@ -282,6 +306,7 @@ class PedigreeMCPServer:
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             def go():
+                self._admit(tid, gname, "write")
                 r = record_action(self.db, gname, tid, quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap), tool=tool, summary=summary,
                                   relied_on=relied_on or [], decision=decision, effect=effect,
                                   risk=risk, artifacts=artifacts or [], id=id)
@@ -298,6 +323,7 @@ class PedigreeMCPServer:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             if by in ("human", "scanner") and principal.role != "operator":
                 return _forbidden()
+            self._admit(tid, gname, "write")
             return _call(lambda: (corroborate(self.db, gname, memory_id, source_id, by=by, quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap)), {"ok": True})[1])
 
         @srv.tool()
@@ -313,6 +339,7 @@ class PedigreeMCPServer:
             tid, gname, principal = self._resolve(token=token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
+            self._admit(tid, gname, "gate", record=record)
             return _call(lambda: check_action(
                 self.db, gname, {"tool": tool, "summary": summary, "effect": effect,
                                  "risk": risk, "audience": audience},
@@ -328,6 +355,7 @@ class PedigreeMCPServer:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             if principal.role != "operator":
                 return _forbidden()
+            self._admit(tid, gname, "revoke", dry_run=dry_run)
             return _call(lambda: revoke(self.db, gname, tid, root_id=root_id, reason=reason,
                                        dry_run=dry_run, kind=kind, quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap)))
 
@@ -339,6 +367,7 @@ class PedigreeMCPServer:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             if principal.role != "operator":
                 return _forbidden()
+            self._admit(tid, gname, "reinstate", dry_run=dry_run)
             return _call(lambda: reinstate(self.db, gname, tid, root_id=root_id, dry_run=dry_run, quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap)))
 
         @srv.tool()
@@ -347,6 +376,7 @@ class PedigreeMCPServer:
             tid, gname, principal = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
+            self._admit(tid, gname, "read")
             return _call(lambda: run_blame(self.db, gname, node_id, max_depth=max_depth))
 
         @srv.tool()
@@ -355,6 +385,7 @@ class PedigreeMCPServer:
             tid, gname, principal = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
+            self._admit(tid, gname, "read")
             return _call(lambda: run_impact(self.db, gname, node_id, max_depth=max_depth))
 
         @srv.tool()
@@ -363,6 +394,7 @@ class PedigreeMCPServer:
             tid, gname, principal = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
+            self._admit(tid, gname, "whatif")
             return _call(lambda: whatif(self.db, gname, tid, roots or [], reason="what-if"))
 
         @srv.tool()
@@ -371,6 +403,7 @@ class PedigreeMCPServer:
             tid, gname, principal = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
+            self._admit(tid, gname, "read")
             return _call(lambda: audit_sources(self.db, gname, limit=limit))
 
         @srv.tool()
@@ -378,18 +411,24 @@ class PedigreeMCPServer:
             tid, gname, principal = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
+            self._admit(tid, gname, "read")
             return _call(lambda: report(self.db, gname))
 
     def run(self, transport: str = "stdio", host: str = "127.0.0.1", port: int = 8011):
         if transport == "stdio":
             self.server.run(transport="stdio")
-        elif transport == "streamable-http":
-            self.server.run(transport="streamable-http", host=host, port=port)
-        elif transport == "sse":
-            self.server.run(transport="sse", host=host, port=port)
+        elif transport in ("streamable-http", "sse"):
+            import uvicorn
+
+            app = (self.server.streamable_http_app(host=host) if transport == "streamable-http"
+                   else self.server.sse_app(host=host))
+            # Trust the socket peer by default; custom proxy deployments must
+            # deliberately configure a trustworthy proxy boundary themselves.
+            uvicorn.run(app, host=host, port=port, proxy_headers=False,
+                        log_level=self.server.settings.log_level.lower())
         else:
             raise ValueError("unknown transport")
 
 
-def build_mcp(db=None, settings=None, default_tenant_id=None, default_tenant_token=None):
-    return PedigreeMCPServer(db, settings, default_tenant_id, default_tenant_token)
+def build_mcp(db=None, settings=None, default_tenant_id=None, default_tenant_token=None, *, limiter=None):
+    return PedigreeMCPServer(db, settings, default_tenant_id, default_tenant_token, limiter=limiter)

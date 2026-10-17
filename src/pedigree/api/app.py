@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import contextlib
 import threading
-from collections import defaultdict
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -17,6 +16,7 @@ from ..db.client import Db
 from ..diagnostics import correlation_id, error_payload, unexpected_error
 from ..errors import PedigreeError
 from ..http_boundary import BodySizeMiddleware
+from ..rate_limit import RateLimiter
 from . import routes
 from .registry import TenantRegistry
 from .schemas import EventResponse, OkResponse  # noqa: F401
@@ -25,8 +25,13 @@ from .schemas import EventResponse, OkResponse  # noqa: F401
 def _register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(PedigreeError)
     async def pedigree(request: Request, exc: PedigreeError):
+        retry = exc.detail.get("retry_after") if isinstance(exc.detail, dict) else None
+        headers = None
+        if exc.code == "rate_limited":
+            retry = retry if type(retry) is int and 0 < retry < 10**15 else 1
+            headers = {"Retry-After": str(retry)}
         return JSONResponse(status_code=exc.http_status, content={"error": error_payload(
-            exc, getattr(request.state, "correlation_id", None))})
+            exc, getattr(request.state, "correlation_id", None))}, headers=headers)
 
     @app.exception_handler(RequestValidationError)
     async def invalid(request: Request, exc: RequestValidationError):
@@ -132,7 +137,7 @@ def _docs_url(settings: object) -> str | None:
     return None
 
 
-def create_app(db: Db | None = None, settings=None) -> FastAPI:
+def create_app(db: Db | None = None, settings=None, *, limiter: RateLimiter | None = None) -> FastAPI:
     settings = settings or get_settings()
     problem = admin_token_problem(settings)
     if problem is not None:
@@ -143,7 +148,8 @@ def create_app(db: Db | None = None, settings=None) -> FastAPI:
     # effects (P-025 covers the rest).
     from ..mcp_server import build_mcp
 
-    mcp_srv = build_mcp(db=db, settings=settings)
+    limiter = limiter if limiter is not None else RateLimiter()
+    mcp_srv = build_mcp(db=db, settings=settings, limiter=limiter)
     mcp_app = mcp_srv.server.streamable_http_app()
 
     @contextlib.asynccontextmanager
@@ -164,7 +170,7 @@ def create_app(db: Db | None = None, settings=None) -> FastAPI:
     app.state.db = db
     app.state.settings = settings
     app.state.registry = registry
-    app.state.rate_limit = defaultdict(lambda: __import__("collections").deque())
+    app.state.limiter = limiter
     _register_error_handlers(app)
     app.add_middleware(BodySizeMiddleware)
     app.add_middleware(CorrelationMiddleware)

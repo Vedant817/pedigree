@@ -3,7 +3,7 @@ from fastapi import FastAPI, Request, Response
 from prometheus_client import CONTENT_TYPE_LATEST, REGISTRY, generate_latest
 
 from ...config import get_settings
-from ...errors import Unauthorized
+from .admin import _require_admin
 
 
 def register(app: FastAPI, settings=None) -> None:
@@ -11,10 +11,5 @@ def register(app: FastAPI, settings=None) -> None:
 
     @app.get("/metrics")
     async def metrics(request: Request) -> Response:
-        expected = (settings.pedigree_admin_token or "").strip()
-        presented = request.headers.get("x-admin-token", "").strip()
-        if not expected or not presented or not __import__("hmac").compare_digest(
-            presented.encode("utf-8"), expected.encode("utf-8")
-        ):
-            raise Unauthorized("admin token required")
+        _require_admin(request, settings)
         return Response(generate_latest(REGISTRY), media_type=CONTENT_TYPE_LATEST)

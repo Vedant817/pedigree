@@ -3,15 +3,16 @@ import hmac
 from fastapi import FastAPI, Request
 
 from ...config import graph_name
-from ...errors import Unauthorized
+from .. import auth
 from ..schemas import ResumeRequest, TenantCreate
 
 
 def _require_admin(request: Request, settings) -> None:
+    auth.check_peer(request)
     expected = (settings.pedigree_admin_token or "").strip().encode("utf-8")
     header = request.headers.get("x-admin-token", "").strip().encode("utf-8")
     if not expected or not hmac.compare_digest(header, expected):
-        raise Unauthorized("admin token required")
+        auth.failed_auth(request, "admin token required")
 
 
 def register(app: FastAPI, registry, settings) -> None:

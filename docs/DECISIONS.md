@@ -379,3 +379,29 @@ PASS. MCP stdio uses a public runner override with isolated, shape-checked obser
 SDK 2.3 `_lowlevel_server` plumbing because no public stream hook exists; its
 receive/clone boundary sanitizes parser failures before dispatch. HTTP body limits
 do not bound SDK stdin-line allocation. Actual TCP/stdio tests qualify this dependency.
+
+## ADR-013 | 2026-10-17 | Indexed live authority and shared request admission
+
+**Context.** Role-aware registry misses still scan tenants; REST charges twice and
+shares reads with writes, while MCP has no matching rate admission. A prefetched
+authority dictionary would regress live cross-process revocation/rotation.
+
+**Decision.** Consult 012: one indexed digest OR query, stored-role/status checks,
+ambiguity rejection and no authority cache. One locked, bounded per-instance limiter
+is shared by REST and mounted MCP. Classify once, reserve all applicable buckets
+atomically before protected work, separate reads/writes and retain destructive-operation
+bounds. Failed-auth peer backoff uses a trustworthy transport peer, with shared-IP
+denial tradeoff and disabled proxy rewriting in shipped launch paths.
+
+**Alternatives.** Startup token dictionaries can be stale. Independent protocol
+buckets and nested charging permit bypasses or halve advertised capacity. Evicting
+live exhausted keys resets limits. Outcome accounting does not bound already-in-flight
+authentication work, and per-process limits are not distributed enforcement.
+
+**Consequences.** Additive credential indexes; no credential migration. A restart or
+another worker has independent rate state. State saturation fails closed; valid callers
+sharing an exhausted peer can be temporarily denied. Custom reverse-proxy deployments
+must establish an explicit trusted peer boundary.
+
+**Evidence.** docs/consults/012-p020-auth-rates/{domain,architect,specialist,decision}.md;
+real 42201 indexed plans, nullable-slot and ambiguity probes; implementation/review pending.

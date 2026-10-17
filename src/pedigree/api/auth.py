@@ -2,71 +2,56 @@
 
 from __future__ import annotations
 
-import typing as t
-
 from fastapi import Request
 
 from ..config import graph_name
-from ..db.schema import ensure_schema, node_count
+from ..db.schema import ensure_schema
 from ..errors import PedigreeError
 
 
-def _ensure(db, gname):
-    ensure_schema(db, gname)
+def peer(request: Request) -> str:
+    """ASGI transport peer; shipped servers disable proxy-header rewriting."""
+    return request.client.host if request.client is not None else "local:http"
 
 
-def _engine_context(request):
-    return request.state.tenant_id, request.app.state.db
+def check_peer(request: Request) -> str:
+    identity = peer(request)
+    request.app.state.limiter.check_peer(identity)
+    return identity
 
 
-def _gate_rate(request, tenant, settings, action="write"):
-    app_state = request.app.state
-    key = f"{tenant}:{action}"
-    # Lazy local closure with per-tenant deque in app_state.rate_limit
-    now = __import__("time").monotonic()
-    samples = app_state.rate_limit[key]
-    while samples and samples[0] <= now - 60:
-        samples.popleft()
-    if action == "revoke":
-        limit = 10
-    else:
-        limit = 120
-    if len(samples) >= limit:
-        raise PedigreeError("rate limited", code="rate_limited", detail={"limit": limit})
-    samples.append(now)
+def failed_auth(request: Request, message: str) -> None:
+    request.app.state.limiter.failed_auth(peer(request))
+    raise PedigreeError(message, code="unauthorized")
 
-def _check_quota(db, gname, cap):
-    n = node_count(db, gname)
-    if n >= cap:
-        raise PedigreeError("quota exceeded", code="quota_exceeded", detail={"nodes": n, "cap": cap})
-
-
-class _AuthResult(t.TypedDict):
-    tenant_id: str
 
 def authenticate(request: Request):
-    auth = request.headers.get("Authorization", "")
-    if not auth.startswith("Bearer "):
-        raise PedigreeError("missing or invalid Authorization", code="unauthorized")
-    raw = auth.removeprefix("Bearer ")
+    check_peer(request)
+    authorization = request.headers.get("Authorization", "")
+    if not authorization.startswith("Bearer "):
+        failed_auth(request, "missing or invalid Authorization")
+    raw = authorization.removeprefix("Bearer ")
     token = raw.strip()
-    if (not token) or (token != raw) or (" " in raw):
-        raise PedigreeError("missing or invalid Authorization", code="unauthorized")
+    if not token or token != raw or any(char.isspace() for char in raw):
+        failed_auth(request, "missing or invalid Authorization")
     registry = request.app.state.registry
-    rec = registry.resolve(token)
-    if rec is None:
-        raise PedigreeError("invalid token", code="unauthorized", detail={})
-    if rec.status != "active":
+    principal = registry.resolve(token)
+    if principal is None:
+        failed_auth(request, "invalid token")
+    if principal.status != "active":
         raise PedigreeError("tenant revoked", code="forbidden")
-    tenant = rec.tenant_id
-    db = request.app.state.db
-    gname = graph_name(tenant)
-    ensure_schema(db, gname)
+    tenant = principal.tenant_id
     request.state.tenant_id = tenant
-    request.state.graph_name = gname
-    request.state.principal = rec
-    _gate_rate(request, tenant, request.app.state.settings)
+    request.state.graph_name = graph_name(tenant)
+    request.state.principal = principal
     return tenant
+
+
+def admit(request: Request, operation: str, *, dry_run: bool = False,
+          record: bool = False) -> None:
+    request.app.state.limiter.admit(request.state.tenant_id, operation,
+                                   dry_run=dry_run, record=record)
+    ensure_schema(request.app.state.db, request.state.graph_name)
 
 
 def require_operator(request: Request) -> None:

@@ -14,6 +14,7 @@ def register(app: FastAPI, db, registry, settings) -> None:
         auth.authenticate(request)
         tenant = request.state.tenant_id
         gname = request.state.graph_name
+        auth.admit(request, "gate", record=payload.record)
         result = check_action(
             db,
             gname,

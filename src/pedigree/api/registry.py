@@ -1,5 +1,4 @@
-"""Tenant registry stored in its own graph (`ped:registry`). Tokens are random and only a
-sha256 is persisted, plus an in-process 30 s cache that is explicitly invalidated on changes."""
+"""Tenant registry: hashed credentials resolved against live indexed authority."""
 
 from __future__ import annotations
 
@@ -13,6 +12,7 @@ from ..config import get_settings, graph_name, validate_tenant
 from ..db.client import Db
 from ..db.queries import (
     Q_REGISTRY_ALL,
+    Q_REGISTRY_BY_DIGEST,
     Q_REGISTRY_BY_ID,
     Q_REGISTRY_ISSUE_OPERATOR,
     Q_REGISTRY_SET_STATUS,
@@ -24,7 +24,6 @@ from ..errors import Conflict, InvalidArgument, NotFoundInGraph
 RESERVED_TENANT_IDS = frozenset({"registry"})
 
 REGISTRY_TENANT = "registry"
-CACHE_TTL_S = 30.0
 
 
 @dataclass(frozen=True)
@@ -58,7 +57,6 @@ class TenantRegistry:
         self.settings = settings or get_settings()
         self.gname = graph_name(REGISTRY_TENANT)
         ensure_schema(db, self.gname, label="Tenant")
-        self._cache: dict[str, tuple[str, str, float]] = {}
 
     def has_tenants(self) -> bool:
         rows = self.db.ro_query(self.gname, Q_REGISTRY_ALL, {}, op="registry.list").result_set or []
@@ -131,30 +129,13 @@ class TenantRegistry:
         if not isinstance(token, str) or not token or token.strip() != token:
             return None
         digest = _sha(token)
-        now = time.monotonic()
-        cached = self._cache.get(digest)
-        # Every cache hit rechecks stored active status AND the matching digest. This
-        # prevents stale role authority after rotation by another server process.
-        if cached is not None and cached[2] > now:
-            rows = self.db.ro_query(self.gname, Q_REGISTRY_BY_ID, {"id": cached[0]},
-                                    op="registry.resolve").result_set or []
-            if rows:
-                principal = self._principal(rows[0], token, digest)
-                if principal is not None:
-                    return principal
-            self._cache.pop(digest, None)
-        for rec in self.list_tenants():
-            if rec.status != "active":
-                continue
-            rows = self.db.ro_query(self.gname, Q_REGISTRY_BY_ID, {"id": rec.tenant_id},
-                                     op="registry.resolve").result_set or []
-            if not rows:
-                continue
-            principal = self._principal(rows[0], token, digest)
-            if principal is not None:
-                self._cache[digest] = (rec.tenant_id, principal.role, now + CACHE_TTL_S)
-                return principal
-        return None
+        rows = self.db.ro_query(self.gname, Q_REGISTRY_BY_DIGEST, {"sha": digest},
+                                op="registry.resolve").result_set or []
+        # A digest matching multiple tenant candidates is corrupted/ambiguous
+        # authority, even when only one candidate has a matching textual prefix.
+        if len(rows) != 1:
+            return None
+        return self._principal(rows[0], token, digest)
 
     @staticmethod
     def _principal(row, token: str, digest: str) -> ResolvedPrincipal | None:
@@ -177,7 +158,7 @@ class TenantRegistry:
         return None
 
     def invalidate_cache(self) -> None:
-        self._cache.clear()
+        """Compatibility hook: every resolution already reads live authority."""
 
 
 def _sha(token: str) -> str:

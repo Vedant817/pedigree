@@ -98,6 +98,10 @@ def ensure_schema(db: Db, gname: str, *, label: str = "Node") -> dict:
         create_index(db, gname, Q.Q_INDEX_ACTION_ARTIFACT)
         create_index(db, gname, Q.Q_INDEX_REVOCATION_ROOT)
         create_index(db, gname, Q.Q_INDEX_REVOCATION_STATE)
+    else:
+        for statement in (Q.Q_INDEX_TENANT_AGENT_DIGEST, Q.Q_INDEX_TENANT_OPERATOR_DIGEST,
+                          Q.Q_INDEX_TENANT_LEGACY_DIGEST):
+            create_index(db, gname, statement)
     wait_indexes(db, gname)
     create_unique_constraint(db, gname, label=label, prop="id")
     wait_indexes(db, gname)
@@ -108,13 +112,9 @@ def ensure_schema(db: Db, gname: str, *, label: str = "Node") -> dict:
 
 
 def ensure_registry_schema(db: Db) -> dict:
-    """Registry graph: Tenant{id, token_sha256} with a unique id constraint."""
-    gname = REGISTRY_GRAPH
-    create_index(db, gname, Q.Q_INDEX_TENANT_ID)
-    wait_indexes(db, gname)
-    create_unique_constraint(db, gname, label="Tenant", prop="id")
-    wait_indexes(db, gname)
-    return {"graph": gname}
+    """Registry IDs and nullable role digests, with operational exact-match indexes."""
+    ensure_schema(db, REGISTRY_GRAPH, label="Tenant")
+    return {"graph": REGISTRY_GRAPH}
 
 
 def node_count(db: Db, gname: str) -> int:

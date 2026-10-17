@@ -189,9 +189,9 @@ EXPECTATIONS: dict[str, Expectation] = {
         ">=500 descendants in <20s (wall time reported), reinstate, invariants clean again.",
     ),
     "S20": Expectation(
-        "pass", "",
-        "burst: 150 rapid /v1/gate calls; report the call index of the first 429 (informational; "
-        "limits are 120 writes/60s per tenant); assert only that the server stays responsive.",
+        "pass", "P-020",
+        "burst: exactly 120 read-only gate calls succeed then rate-limit; an independent "
+        "120-write budget remains usable, with Retry-After on the next write.",
     ),
     "S21": Expectation(
         "pass", "",
@@ -1012,13 +1012,22 @@ def s20_burst_gate(ctx: Ctx, res: ScenarioResult) -> None:
             first_429 = i + 1
     unexpected = sorted({s for s in statuses if s not in (200, 429)})
     health = ctx.get("/healthz")
-    res.check("150 gate calls: only 200/429 responses", not unexpected,
+    res.check("read budget: exactly 120 gate calls succeed, then 30 rate limits",
+              not unexpected and statuses == [200] * 120 + [429] * 30,
               f"statuses: 200x{statuses.count(200)}, 429x{statuses.count(429)}"
               + (f", unexpected={unexpected}" if unexpected else ""))
     res.check("server responsive after the burst", health.status_code == 200,
               ctx.evidence("GET", "/healthz", health, 60))
-    res.note(f"first 429 at call {first_429} of 150 (informational; the limit is 120 writes/60s per "
-             f"tenant)")
+    write_statuses = [ctx.post("/v1/sessions", {"session_id": "dogfood_rate_session"},
+                              headers=ctx.bearer(tenant)).status_code for _ in range(120)]
+    limited = ctx.post("/v1/sessions", {"session_id": "dogfood_rate_session"}, headers=ctx.bearer(tenant))
+    res.check("independent write budget: 120 admitted writes, then 429 with Retry-After",
+              write_statuses == [200] * 120 and limited.status_code == 429
+              and err_code(_json(limited)) == "rate_limited"
+              and limited.headers.get("Retry-After", "").isdigit(),
+              f"writes 200x{write_statuses.count(200)}; next={limited.status_code}; "
+              f"retry_after={limited.headers.get('Retry-After')}")
+    res.note(f"first read 429 at call {first_429}; repeated Session writes create only one fixture node")
 
 
 def s21_ui_and_mcp_coexist(ctx: Ctx, res: ScenarioResult) -> None:

@@ -27,6 +27,9 @@ def _label(name: str) -> str:
 # --- schema -----------------------------------------------------------------
 Q_INDEX_NODE_ID = "CREATE INDEX FOR (n:Node) ON (n.id)"
 Q_INDEX_TENANT_ID = "CREATE INDEX FOR (t:Tenant) ON (t.id)"
+Q_INDEX_TENANT_AGENT_DIGEST = "CREATE INDEX FOR (t:Tenant) ON (t.agent_token_sha256)"
+Q_INDEX_TENANT_OPERATOR_DIGEST = "CREATE INDEX FOR (t:Tenant) ON (t.operator_token_sha256)"
+Q_INDEX_TENANT_LEGACY_DIGEST = "CREATE INDEX FOR (t:Tenant) ON (t.token_sha256)"
 Q_INDEX_MEMORY_ARTIFACT = "CREATE INDEX FOR (n:Memory) ON (n.artifact_key)"
 Q_INDEX_ACTION_ARTIFACT = "CREATE INDEX FOR (n:Action) ON (n.artifact_key)"
 Q_INDEX_REVOCATION_ROOT = "CREATE INDEX FOR (n:Revocation) ON (n.root_id)"
@@ -337,6 +340,12 @@ Q_REVOCATION_COUNTS = "MATCH (v:Revocation) RETURN v.state AS state, count(*) AS
 # --- registry (F-05) ---------------------------------------------------------
 Q_REGISTRY_UPSERT = "CREATE (t:Tenant {id:$id, status:'active', node_cap:$cap, agent_token_sha256:$agent_sha, operator_token_sha256:$operator_sha, created_at:$now})"
 Q_REGISTRY_BY_ID = "MATCH (t:Tenant {id:$id}) RETURN t.id, t.status, t.node_cap, t.created_at, t.token_sha256, t.agent_token_sha256, t.operator_token_sha256"
+Q_REGISTRY_BY_DIGEST = """
+MATCH (t:Tenant)
+WHERE t.agent_token_sha256=$sha OR t.operator_token_sha256=$sha OR t.token_sha256=$sha
+RETURN t.id,t.status,t.node_cap,t.created_at,t.token_sha256,t.agent_token_sha256,t.operator_token_sha256
+LIMIT 2
+"""
 Q_REGISTRY_ALL = "MATCH (t:Tenant) RETURN t.id, t.status, t.node_cap, t.created_at"
 Q_REGISTRY_SET_STATUS = "MATCH (t:Tenant {id:$id}) SET t.status = $status"
 Q_REGISTRY_ISSUE_OPERATOR = "MATCH (t:Tenant {id:$id}) SET t.credential_epoch = coalesce(t.credential_epoch,0) + 1 WITH t WHERE t.status = 'active' AND ($rotate OR t.operator_token_sha256 IS NULL) SET t.operator_token_sha256 = $sha RETURN t.id"

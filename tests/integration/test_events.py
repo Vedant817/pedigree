@@ -33,8 +33,11 @@ def tenant(client):
     finally:
         from pedigree.config import graph_name
         registry = client.app.state.registry
-        registry.db.select(graph_name(tid)).delete()
-        registry.db.query(registry.gname, "MATCH(t:Tenant {id:$id}) DELETE t", {"id": tid})
+        try:
+            if graph_name(tid) in registry.db.list_graphs():
+                registry.db.select(graph_name(tid)).delete()
+        finally:
+            registry.db.query(registry.gname, "MATCH(t:Tenant {id:$id}) DELETE t", {"id": tid})
 
 
 def test_events_lifecycle(client, tenant):
