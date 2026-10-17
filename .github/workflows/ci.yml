@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        python-version: ['3.12']
+    env:
+      FALKOR_HOST: 127.0.0.1
+      FALKOR_PORT: '6379'
+      PEDIGREE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.12.22'
+          enable-cache: true
+      # Docker step supplies module arguments unavailable on a services entry.
+      - name: Start pinned FalkorDB with mandatory limits
+        run: |
+          docker run -d --name pedigree-ci-db -p 127.0.0.1:6379:6379 \
+            -e 'FALKORDB_ARGS=TIMEOUT_MAX 60000 TIMEOUT_DEFAULT 20000 QUERY_MEM_CAPACITY 1073741824' \
+            falkordb/falkordb:v4.22.1
+          for attempt in $(seq 1 60); do
+            if docker exec pedigree-ci-db redis-cli ping | grep -q PONG; then exit 0; fi
+            sleep 1
+          done
+          docker logs pedigree-ci-db
+          exit 1
+      - name: Frozen install and lock freshness
+        run: |
+          uv sync --frozen --python '${{ matrix.python-version }}' --extra dev
+          uv lock --check
+      - name: Verify module version and limits
+        run: .venv/bin/python scripts/runtime.py wait-db
+      - name: Check
+        run: make check
+      - name: Numbers and full-history credential scan
+        run: |
+          .venv/bin/python scripts/check_numbers.py
+          .venv/bin/python scripts/secret_scan.py --history
+      - name: Bounded perf checks
+        run: .venv/bin/python -m pytest -q tests/perf/test_perf_lite.py
+      - name: Literal fresh committed clone
+        run: bash scripts/clean_clone_check.sh
+      - name: Stop owned database
+        if: always()
+        run: docker rm -f pedigree-ci-db

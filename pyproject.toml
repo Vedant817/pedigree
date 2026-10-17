@@ -7,7 +7,7 @@ name = "pedigree"
 version = "0.1.0"
 description = "git blame and git revert for what an AI agent believes - lineage, revocation and gating for agent memory, on FalkorDB"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [{ name = "Vedant Mahajan" }]
 dependencies = [

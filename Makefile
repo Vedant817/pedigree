@@ -28,9 +28,7 @@ help:
 	@echo "  make dogfood-strict  same, but every expected-failure must now pass"
 
 setup:
-	uv venv --python 3.12 .venv 2>/dev/null || python -m venv .venv
-	uv pip install --python $(PY) -e ".[dev]" 2>/dev/null || $(PY) -m pip install -e ".[dev]"
-	@echo "setup done. Python: $$($(PY) --version)"
+	uv sync --frozen --extra dev
 
 start-db:
 	$(PY) -m pedigree.cli db start
