@@ -116,3 +116,41 @@ confirm `make eval` exits 0.
 2. Optional polish (not required for the sign-off): one E1-intro sentence in
    `evals/REPORT.md` about the shared recurrence; requested-vs-actual note in the E4
    section.
+
+## Addendum — defect fixed, acceptance re-run (2026-10-17, same session)
+
+**Verdict flipped to SIGNED.** Required fix applied and verified; `make eval` now
+exits 0 end to end.
+
+1. `opencode_recheck_version` (`1.19.0`, source as the published line says) was added
+   to `evals/static_numbers.py`, so `run_all.py` merges it into
+   `evals/results/numbers.json` before `scripts/extract_numbers.py` rewrites the
+   block. The misleading docstring of `extract_numbers.py` ("curated static facts
+   already in docs/NUMBERS.md are preserved") now states the real behaviour.
+2. New regression test `tests/evals/test_numbers_pipeline.py` pins the invariant that
+   broke: every key published in `docs/NUMBERS.md` must exist in
+   `evals/results/numbers.json` or in `STATIC_NUMBERS`. `pytest tests/evals -q` →
+   **30 passed** (29 + the new test).
+3. Acceptance: `make eval` → **exit 0**; its final `scripts/check_numbers.py` step
+   passes (`PASS: 2 file(s) checked against 70 allowed values`, was 69);
+   `docs/NUMBERS.md` line 90 carries the key.
+4. Regenerated artifacts were committed with the fix. E1/E2 rows are identical apart
+   from the recorded `commit_sha` (now `495be9b`). E4/E4b are fresh measurements and
+   they moved with the engine revision, not only with noise:
+   `e4_revoke_real_p50_n820` 123.45 → 51.93 ms, `n2460` 318.76 → 76.92 ms, `n8200`
+   1080.59 → 81.22 ms (p95 `n8200` 1849.42 → 141.91 ms), while blame/impact/gate p50s
+   are unchanged within a millisecond, and the build phase measured ~1.5–1.6x higher
+   (1324.3 → 2049.4 ms at n=820). `engine/revoke.py`, `db/queries.py` and
+   `engine/quota.py` all changed after the previous run (see
+   `git diff 3941d85..HEAD -- src/pedigree/engine src/pedigree/db`), and every CSV
+   header records the machine and commit. `evals/REPORT.md` and `docs/NUMBERS.md`
+   were regenerated from this run, so the published tables match their own artifacts;
+   `check_numbers` passes against the prose.
+5. Found while re-running the suite, fixed separately (P-022 follow-up commit
+   `ba41f70`): import-time Prometheus collectors crashed when the package was loaded
+   under a second module identity (`tests/evals` imports `src.pedigree...` alongside
+   `pedigree...`). `observability._metric` now reuses the registered collector. The
+   30-passed result above includes that fix.
+
+The threats to validity and the honest negatives listed above are unchanged; the
+optional polish items remain open and are not sign-off blockers.

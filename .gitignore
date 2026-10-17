@@ -28,6 +28,9 @@ node_modules/
 
 # Raw, large eval outputs (CSV/MD results under evals/results/ ARE committed)
 evals/results/raw/
+# Per-run quick-eval scratch (make eval-quick); the published artifacts are the
+# committed CSVs at evals/results/.
+evals/results/quick/
 scratch/
 output/playwright/
 .playwright-cli/

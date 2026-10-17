@@ -2,8 +2,11 @@
 """extract_numbers.py - regenerate the machine block of docs/NUMBERS.md.
 
 Sources, in order:
-1. evals/results/numbers.json  (written by `make eval`; keys = value or {value, source})
-2. curated static facts already in docs/NUMBERS.md are preserved.
+1. evals/results/numbers.json  (written by `make eval`; keys = value or {value, source};
+   `run_all.py` has already merged evals/static_numbers.py into it).
+2. curated static facts: keep them in evals/static_numbers.py - this script replaces the
+   block from numbers.json, so a curated key that never reached numbers.json is dropped
+   (the P-006 sign-off defect; pinned by tests/evals/test_numbers_pipeline.py).
 
 Until the evaluation harness exists (F-14), this script reports and exits 0 without
 touching the file - it never invents a number.

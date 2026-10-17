@@ -4,12 +4,12 @@
 # ram_gb=15.7
 # python=3.12.15
 # falkor_module_version=42201
-# commit_sha=3941d85
+# commit_sha=495be9b
 # rounds=3
 # sizes=[1000, 5000, 20000]
 # scope=closure + ancestor traversal primitives only
 # keys=k = key
 nodes,edges,closure_sqlite_ms,closure_falkor_ms,ancestors_sqlite_ms,ancestors_falkor_ms,closure_nodes
-820,1230,0.28,1.81,0.02,0.86,268
-4100,6136,0.52,2.38,0.01,1.37,416
-16400,24560,0.48,4.17,0.02,3.26,336
+820,1230,0.32,1.64,0.02,0.86,268
+4100,6136,0.52,2.4,0.01,1.33,416
+16400,24560,0.45,4.1,0.02,2.99,336

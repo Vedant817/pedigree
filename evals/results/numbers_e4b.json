@@ -1,10 +1,10 @@
 {
   "e4b_closure_sqlite_n820": {
-    "value": 0.28,
+    "value": 0.32,
     "source": "evals/run_e4b_sqlite.py (stdlib sqlite3)"
   },
   "e4b_closure_falkor_n820": {
-    "value": 1.81,
+    "value": 1.64,
     "source": "evals/run_e4b_sqlite.py (algo.BFS)"
   },
   "e4b_closure_sqlite_n4100": {
@@ -12,19 +12,19 @@
     "source": "evals/run_e4b_sqlite.py (stdlib sqlite3)"
   },
   "e4b_closure_falkor_n4100": {
-    "value": 2.38,
+    "value": 2.4,
     "source": "evals/run_e4b_sqlite.py (algo.BFS)"
   },
   "e4b_closure_sqlite_n16400": {
-    "value": 0.48,
+    "value": 0.45,
     "source": "evals/run_e4b_sqlite.py (stdlib sqlite3)"
   },
   "e4b_closure_falkor_n16400": {
-    "value": 4.17,
+    "value": 4.1,
     "source": "evals/run_e4b_sqlite.py (algo.BFS)"
   },
   "e4b_closure_ratio_sqlite_over_falkor_largest": {
-    "value": 0.115,
+    "value": 0.11,
     "source": "evals/run_e4b_sqlite.py (16400 nodes)"
   }
 }

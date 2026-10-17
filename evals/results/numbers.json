@@ -7,7 +7,7 @@
     "source": "evals/run_e1.py (calibration)"
   },
   "e1_machine": {
-    "value": "Windows-11-10.0.26300-SP0; Intel64 Family 6 Model 191 Stepping 2, GenuineIntel; 15.7 GB RAM; python 3.12.15; falkor 42201; commit 3941d85",
+    "value": "Windows-11-10.0.26300-SP0; Intel64 Family 6 Model 191 Stepping 2, GenuineIntel; 15.7 GB RAM; python 3.12.15; falkor 42201; commit 495be9b",
     "source": "evals/machineinfo.py"
   },
   "e1_over_invalidation_b4_deepest_cell": {
@@ -474,6 +474,10 @@
     "value": 2,
     "source": "docs/DECISIONS.md ADR-000"
   },
+  "opencode_recheck_version": {
+    "value": "1.19.0",
+    "source": "docs/consults/opencode-recheck-2026-10-16.md (installed opencode.exe)"
+  },
   "e2_leakage_edge_drop_1pct": {
     "value": 0.012,
     "ci95": [
@@ -693,83 +697,83 @@
     "source": "evals/machineinfo.py"
   },
   "e4_revoke_real_p50_n820": {
-    "value": 123.45,
+    "value": 51.93,
     "source": "evals/run_e4.py (820 nodes)"
   },
   "e4_revoke_real_p95_n820": {
-    "value": 171.35,
+    "value": 89.34,
     "source": "evals/run_e4.py (820 nodes)"
   },
   "e4_blame_p50_n820": {
-    "value": 5.4,
+    "value": 5.45,
     "source": "evals/run_e4.py (820 nodes)"
   },
   "e4_impact_p50_n820": {
-    "value": 14.22,
+    "value": 14.48,
     "source": "evals/run_e4.py (820 nodes)"
   },
   "e4_gate_p50_n820": {
-    "value": 2.29,
+    "value": 2.23,
     "source": "evals/run_e4.py (820 nodes)"
   },
   "e4_build_n820": {
-    "value": 1324.3,
+    "value": 2049.4,
     "source": "evals/run_e4.py (820 nodes)"
   },
   "e4_revoke_real_p50_n2460": {
-    "value": 318.76,
+    "value": 76.92,
     "source": "evals/run_e4.py (2460 nodes)"
   },
   "e4_revoke_real_p95_n2460": {
-    "value": 624.49,
+    "value": 110.65,
     "source": "evals/run_e4.py (2460 nodes)"
   },
   "e4_blame_p50_n2460": {
-    "value": 5.44,
+    "value": 5.57,
     "source": "evals/run_e4.py (2460 nodes)"
   },
   "e4_impact_p50_n2460": {
-    "value": 16.85,
+    "value": 16.56,
     "source": "evals/run_e4.py (2460 nodes)"
   },
   "e4_gate_p50_n2460": {
-    "value": 2.42,
+    "value": 2.63,
     "source": "evals/run_e4.py (2460 nodes)"
   },
   "e4_build_n2460": {
-    "value": 4091.9,
+    "value": 6585.8,
     "source": "evals/run_e4.py (2460 nodes)"
   },
   "e4_revoke_real_p50_n8200": {
-    "value": 1080.59,
+    "value": 81.22,
     "source": "evals/run_e4.py (8200 nodes)"
   },
   "e4_revoke_real_p95_n8200": {
-    "value": 1849.42,
+    "value": 141.91,
     "source": "evals/run_e4.py (8200 nodes)"
   },
   "e4_blame_p50_n8200": {
-    "value": 6.18,
+    "value": 6.8,
     "source": "evals/run_e4.py (8200 nodes)"
   },
   "e4_impact_p50_n8200": {
-    "value": 16.85,
+    "value": 16.92,
     "source": "evals/run_e4.py (8200 nodes)"
   },
   "e4_gate_p50_n8200": {
-    "value": 2.82,
+    "value": 3.4,
     "source": "evals/run_e4.py (8200 nodes)"
   },
   "e4_build_n8200": {
-    "value": 15264.6,
+    "value": 23579.8,
     "source": "evals/run_e4.py (8200 nodes)"
   },
   "e4b_closure_sqlite_n820": {
-    "value": 0.28,
+    "value": 0.32,
     "source": "evals/run_e4b_sqlite.py (stdlib sqlite3)"
   },
   "e4b_closure_falkor_n820": {
-    "value": 1.81,
+    "value": 1.64,
     "source": "evals/run_e4b_sqlite.py (algo.BFS)"
   },
   "e4b_closure_sqlite_n4100": {
@@ -777,19 +781,19 @@
     "source": "evals/run_e4b_sqlite.py (stdlib sqlite3)"
   },
   "e4b_closure_falkor_n4100": {
-    "value": 2.38,
+    "value": 2.4,
     "source": "evals/run_e4b_sqlite.py (algo.BFS)"
   },
   "e4b_closure_sqlite_n16400": {
-    "value": 0.48,
+    "value": 0.45,
     "source": "evals/run_e4b_sqlite.py (stdlib sqlite3)"
   },
   "e4b_closure_falkor_n16400": {
-    "value": 4.17,
+    "value": 4.1,
     "source": "evals/run_e4b_sqlite.py (algo.BFS)"
   },
   "e4b_closure_ratio_sqlite_over_falkor_largest": {
-    "value": 0.115,
+    "value": 0.11,
     "source": "evals/run_e4b_sqlite.py (16400 nodes)"
   }
 }

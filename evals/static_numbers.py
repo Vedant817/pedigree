@@ -15,6 +15,8 @@ STATIC_NUMBERS: dict[str, dict] = {
                                 "source": "pedigree db status / MODULE LIST on v4.22.1"},
     "python_min": {"value": "3.11", "source": "pyproject.toml requires-python"},
     "tracks_entered": {"value": 2, "source": "docs/DECISIONS.md ADR-000"},
+    "opencode_recheck_version": {"value": "1.19.0",
+                                 "source": "docs/consults/opencode-recheck-2026-10-16.md (installed opencode.exe)"},
 }
 
 if __name__ == "__main__":  # pragma: no cover - manual check
