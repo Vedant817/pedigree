@@ -63,38 +63,74 @@ def _command_basename(token: str) -> str:
     return token.replace("\\", "/").rsplit("/", 1)[-1].lower()
 
 
-def invokes_network_command(summary: str) -> bool:
-    """True when ssh, scp, or sudo is the command, including after env assignments.
-
-    A path segment such as `.ssh` is not a command. If a segment cannot be
-    tokenised, fall back to a path-aware word match so a broken quote cannot
-    hide `ssh`.
-    """
-    unparsed = False
+def _command_segments(summary: str):
+    """Return parsed command token lists and segments shlex could not tokenise."""
+    parsed, unparsed = [], []
     for segment in _SHELL_SPLIT.split(summary or ""):
         if not segment.strip():
             continue
         try:
             tokens = shlex.split(segment, posix=True)
         except ValueError:
-            unparsed = True
+            unparsed.append(segment)
             continue
         index = 0
         while index < len(tokens) and _ENV_ASSIGN.match(tokens[index]):
             index += 1
-        if index < len(tokens) and _command_basename(tokens[index]) in _NETWORK_COMMANDS:
-            return True
-    if unparsed and _UNPARSED_COMMAND.search(summary or ""):
-        return True
-    return False
+        if index < len(tokens):
+            parsed.append(tokens[index:])
+    return parsed, unparsed
+
+
+def _segment_level(tokens: list[str]) -> str | None:
+    """high / medium for a real command token. Arguments that merely mention ssh or curl do not count."""
+    name = _command_basename(tokens[0])
+    rest = " ".join(tokens[1:])
+    if name in _NETWORK_COMMANDS:
+        return "high"
+    if name in {"npm", "cargo"} and re.search(r"\bpublish\b", rest, re.I):
+        return "high"
+    if name == "docker" and re.search(r"\b(?:push|publish)\b", rest, re.I):
+        return "high"
+    if name == "kubectl" and re.search(r"\bapply\b", rest, re.I):
+        return "high"
+    if name == "terraform" and re.search(r"\bapply\b", rest, re.I):
+        return "high"
+    if name == "git" and re.search(r"\bpush\b", rest, re.I):
+        return "high"
+    if name == "rm" and re.search(r"(?:^|\s)-[^\s]*[rf]", rest, re.I):
+        return "high"
+    if name == "curl" and re.search(
+            r"(?:(?:-X|--request)\s*(?:POST|PUT|DELETE|PATCH)|-X(?:POST|PUT|DELETE|PATCH)\b)", rest, re.I):
+        return "high"
+    if name == "git" and re.search(r"\bcommit\b", rest, re.I):
+        return "medium"
+    return None
+
+
+def builtin_effect_risk(summary: str):
+    parsed, unparsed = _command_segments(summary)
+    rank = {"medium": 1, "high": 2}
+    best = None
+    for tokens in parsed:
+        level = _segment_level(tokens)
+        if level is not None and (best is None or rank[level] > rank[best]):
+            best = level
+    if best != "high" and unparsed:
+        blob = "\n".join(unparsed)
+        if _IRREVERSIBLE_TEXT.search(blob) or _UNPARSED_COMMAND.search(blob):
+            best = "high"
+        elif best is None and re.search(r"\bgit\s+commit\b", blob, re.I):
+            best = "medium"
+    if best == "high":
+        return ("irreversible", "high")
+    if best == "medium":
+        return ("reversible", "medium")
+    return ("reversible", "low")
 
 
 def classify_action(policy, tool, summary, *, effect=None, risk=None):
-    classified = ("reversible", "low")
-    if _IRREVERSIBLE_TEXT.search(summary or "") or invokes_network_command(summary or ""):
-        classified = ("irreversible", "high")
-    elif re.search(r"\bgit\s+commit\b", summary or "", re.I):
-        classified = ("reversible", "medium")
+    classified = builtin_effect_risk(summary or "")
     for rule in policy.rules:
         if re.search(rule.get("tool", ".*"), tool, re.I) and re.search(rule.get("match", ".*"), summary, re.I):
             classified = (rule["effect"], rule["risk"])

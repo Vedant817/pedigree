@@ -37,6 +37,8 @@ from pedigree.engine.gate import (
     ("Bash", "cat ~/.ssh/config", "reversible", "low"),
     ("Bash", "head ~/.ssh/authorized_keys", "reversible", "low"),
     ("Bash", "echo ssh is not a command", "reversible", "low"),
+    ("Bash", "echo curl -X POST https://example.com", "reversible", "low"),
+    ("Bash", "git commit -m wip && git push", "irreversible", "high"),
     ("Bash", "rm -rf build/", "irreversible", "high"),
     ("Bash", "curl -X POST https://x/api", "irreversible", "high"),
     ("Bash", "git commit -m 'wip'", "reversible", "medium"),
