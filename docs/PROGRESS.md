@@ -649,7 +649,7 @@
 
 ### 2026-10-17 01:56 IST | Phase C | P-015 fresh-clone gate / P-021 resumed | STATUS: in progress
 - Usage interruption resumed with HEAD7330f13 intact. P-015 fresh clone:
-  C:/Users/vedan/AppData/Local/Temp/pedigree-roles-dff548d8f7c64b458f6239be5e9772f0.
+  a throwaway directory outside the repository (path redacted).
   NewPython3.12.15 venv+freshdependencyresolution/install PASS; `make check`581passed,
   2skipped,3deselected,1xfailed in323.21s; Ruff/secrets/numbers PASS. Exactskiprerun:
   published8000URL test skippedbecauseportbusy; ACLmechanism skippeddeploymentsecretabsent.
