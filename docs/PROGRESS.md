@@ -19,6 +19,8 @@
       (tests/isolation/) in progress.
     - Doc drift from the P-022 QA pass fixed: `docs/02-ARCHITECTURE.md` metrics list,
       `AUDIT.md` P-022 status, `docs/01-IDEA.md` trace scope. Commit `f4bc2eb`.
+    - G3 AI disclosure fact sheet added (`docs/AI_DISCLOSURE.md`, commit `a4916f7`);
+      human-voice fields left as clearly-marked placeholders (human-only).
   Full `make check` baseline at the Phase D close-out: 809 passed, 2 skipped,
   4 deselected, 1 xfailed (165.02s). Re-run pending after the P-023 suite lands.
 - **Next:** finish P-023 (isolation suite); then FIX_PROMPT F (P-017 capture,

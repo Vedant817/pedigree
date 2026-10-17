@@ -11,8 +11,9 @@ Governing engineering rules live in `AGENTS.md` (canonical). If this file and
 - **Product milestone:** Phase E in progress. P-022 (observability) landed and QA-recorded
   (docs/qa/P-022.md, PASS with caveats), P-006 eval signed (docs/qa/eval-signoff.md
   addendum), P-012 evidence recorded (docs/qa/P-012.md), P-023 isolation suite spec filed
-  (docs/fixes/P-023.md). P-023 implementation in progress. See `docs/PROGRESS.md`
-  `CURRENT STATE` for the authoritative live state.
+  (docs/fixes/P-023.md) and implemented (tests/isolation/, 6 tests), G3 AI disclosure
+  fact sheet added (docs/AI_DISCLOSURE.md). P-023 independent QA closure verdict pending.
+  See `docs/PROGRESS.md` `CURRENT STATE` for the authoritative live state.
 
 ## 1. Product
 
