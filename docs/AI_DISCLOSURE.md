@@ -1,9 +1,8 @@
 # AI disclosure (fact sheet)
 
 Status: complete except the **human-voice fields** marked `[EDIT: ...]`, which only
-Vedant can fill in. Everything else below is verified against the repository
-(`git log`, `docs/DECISIONS.md`, `docs/PROGRESS.md`, `docs/KNOWN_ISSUES.md`,
-`docs/NUMBERS.md`).
+Vedant can fill in. The tools below are what this repository can show. No hosted
+CI run and no Render deployment are claimed (`docs/PROGRESS.md`).
 
 ## 1. Tools and models used
 
@@ -11,8 +10,9 @@ Vedant can fill in. Everything else below is verified against the repository
 |---|---|---|
 | OpenCode (run through T3 Code) | coding agent harness; multi-agent orchestration | entire build |
 | [EDIT: model name(s) actually used, e.g. provider/model] | orchestrator, builders, QA, red-team, architect, eval statistician, tech writer, domain researcher | entire build |
-| GitHub (issues/PRs, Actions) | version control, CI | entire build |
-| Render | hosting (FalkorDB + API) | deploy only |
+| Git, local repository | version control | entire build |
+| GitHub Actions | not used; this tree does not claim a hosted CI run | — |
+| Render | not used; deployment remains a human step | — |
 
 Model names are filled in by the human; they are not guessed here.
 

@@ -104,6 +104,9 @@ def test_ui_source_uses_text_rendering_and_memory_only_token():
     for sink in ("innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "localStorage", "sessionStorage", "console.log", "eval("):
         assert sink not in source
     assert "el.textContent = value" in source
+    path_style = source[source.index("selector:'.on-path'"):]
+    path_style = path_style[:path_style.index("]") + 1]
+    assert "background-color" not in path_style
     assert "redirect:'error'" in source and "cache:'no-store'" in source
     assert "epoch++" in source and "started !== epoch" in source
     assert "same(preview,snapshot())" in source

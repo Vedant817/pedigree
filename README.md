@@ -231,13 +231,13 @@ All of it lives in `src/pedigree/db/queries.py` as constants with parameters onl
 |---|---|
 | Descendants (impact) | `MATCH (r:Node {id:$id}) CALL algo.BFS(r, $depth, 'FEEDS') YIELD nodes UNWIND nodes AS n RETURN n.id, n.status` |
 | Ancestors (blame) | same over `'DERIVED_FROM'` |
-| Reason path | `MATCH (n:Node {id:$id}) RETURN n.taint_parent` walked hop by hop, bounded |
-| Revoke barrier | `MERGE` the `:Revocation` root, then chunked `SET n.status='quarantined'` over the discovered closure |
+| Reason path | `MATCH (n:Node {id:$id}) RETURN n.taint_parent` walked until the next parent is missing or the chain repeats. `max_depth` caps the ancestor fetch, not this walk |
+| Revoke barrier | `MATCH (r:Node) WHERE r.id = $id` plus `SET` and `CREATE` of the `:Revocation` row in the same query, then chunked `SET n.status='quarantined'` over the discovered closure |
 | Final statuses | read `Q_PARENTS_OF` + `Q_SUPPORT_OF`, compute in topological order in Python, chunked `UNWIND $b ... SET n.status = b[1][0], n.taint_parent = b[1][1]` |
 | One atomic ingest with parents | `CREATE (c:Node:{label}) ... WITH c UNWIND $parents AS pid MATCH (p:Node {id:pid}) MERGE (c)-[:DERIVED_FROM]->(p) ... DERIVED_FROM/FEEDS mirror + label inheritance in one query` |
 | Source identity | `MERGE (n:Node:Source {tenant:$tenant, uri:$uri, content_hash:$hash}) ON CREATE SET ...` under a composite unique constraint `Source(uri, content_hash)` |
 | Corroboration (write-once-then-upgrade) | `MERGE (m)-[r:CORROBORATED_BY]->(s) SET r.by = CASE WHEN r.by IS NULL THEN $by WHEN $by IN ['human','scanner'] THEN $by ELSE r.by END` |
-| Read window | `MATCH (se:Session {id:$sess})-[r:READ]->(n:Node) WITH n, max(r.at) AS at ORDER BY at DESC LIMIT $k` |
+| Read window | `MATCH (se:Node {id:$sess})-[r:READ]->(n:Node) WHERE se:Session WITH n, max(r.at) AS at ORDER BY at DESC LIMIT $k` |
 | Gate input | one chunked read of the anchor ids returning `status`, `low_integrity`, `conf_eff`, `taint_parent` |
 | Load-bearing sources | `CALL algo.pageRank('Node','DERIVED_FROM') YIELD node, score WHERE 'Source' IN labels(node)` + exact descendant counts by BFS |
 | What-if | `g.copy('ped:<tenant>:wi:<hex>')`, the real revoke on the copy, diff, `delete()` |

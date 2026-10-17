@@ -92,7 +92,7 @@
       {selector:'edge',style:{width:1.5,'line-color':'#afc5d1','target-arrow-color':'#afc5d1','target-arrow-shape':'triangle','curve-style':'bezier'}},
       {selector:'edge[kind="CORROBORATED_BY"]',style:{'line-style':'dashed','line-color':'#177c69','target-arrow-color':'#177c69'}},
       {selector:':selected',style:{'border-width':4,'border-color':'#176d89'}},
-      {selector:'.on-path',style:{'border-width':5,'border-color':'#ad3549','background-color':'#ad3549'}}],
+      {selector:'.on-path',style:{'border-width':5,'border-color':'#176d89'}}],
       layout:{name:'breadthfirst',directed:true,padding:38,spacingFactor:1.15,animate:false}});
     graph.on('tap','node',event=>select(event.target.id()));
     if (selected) select(selected.id);
@@ -142,6 +142,7 @@
         }
         for (const root of result.roots) contents.push(text('p',`${root.status}: ${(root.path || []).join(' → ') || root.id}`,'mono'));
         if (!result.roots.length) contents.push(text('p','No revoked or low-integrity roots returned within this depth.'));
+        else contents.push(text('p','The outline marks that path. Fill color stays the stored status.'));
       } else { contents.push(text('p',`${result.counts.n_total} downstream nodes`)); effects(result.actions); }
       if (result.truncated) contents.push(text('p','Depth limit reached. Additional lineage exists.'));
       $('evidence').replaceChildren(...contents);

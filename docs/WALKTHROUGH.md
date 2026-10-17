@@ -61,11 +61,15 @@ hash-less capture derives a stable id from `sha256(tenant|uri)` instead, because
 NULL `content_hash` is *not* protected by the pair constraint - measured with ten concurrent
 writers.
 
+`GET /v1/artifacts/lookup` searches a Memory or Action `artifact_key`. A Source does not
+receive that key. Its identity is `(uri, content_hash)`, and the events response returns
+the node id. The same file posted three times returns the same id three times.
+
 ```bash
 # capture the same artifact three times through the hook channel: still one node
+HASH=$(python -c "print('a'*64)")
 for i in 1 2 3; do curl -s -X POST "$BASE/v1/events" -H "$H" -H 'Content-Type: application/json' \
-  -d '{"runtime":"claude-code","events":[{"type":"source","source_kind":"file","uri":"AGENTS.md","content_hash":"'$(python -c "print('a'*64)")'"}]}' >/dev/null; done
-curl -s "$BASE/v1/artifacts/lookup?key=AGENTS.md%40$(python -c "print('a'*64)")" -H "$H"
+  -d '{"runtime":"claude-code","events":[{"type":"source","source_kind":"file","uri":"AGENTS.md","content_hash":"'"$HASH"'"}]}'; echo; done
 ```
 
 ## 3. Revoke: barrier, fixpoint, then a write that matches the plan
@@ -150,7 +154,8 @@ is not a belief, and crash recovery keys on `state`.
   then one chunked read of node details plus the action details, so the answer groups by type and
   status and flags the irreversible actions individually.
 - **Blame** ("where does this come from?") is two traversals: the fast path follows `taint_parent`
-  hop by hop to the revoked root (one small query per hop, bounded), and the full path fetches
+  hop by hop to the revoked root (one small query per hop, until the parent is missing or the chain
+  repeats). `max_depth` does not cap that walk. The full path fetches
   ancestors over `DERIVED_FROM` plus the edge list and computes a shortest path in Python with
   parent pointers. `blame` on an unknown id returns `not_in_graph` - never an empty success.
 
@@ -189,15 +194,23 @@ that carry the path:
    new session would make the tool unusable.
 
 **Decision (ADR-007):** rule 1 keys on the *materialised* status, not on re-walking ancestry. The
-revoke engine already resolved containment into `status`, so a preserved belief (or its `ok`
-dependent) passes the gate; re-deriving ancestry would make the preservation feature dead on
-arrival and put a depth-12 BFS on every hook call. The cost is accepted and documented: a
-`preserved` node whose only support is agent-asserted is gated as tainted.
+revoke engine already resolved containment into `status`, so a preserved belief is not blocked as
+tainted, and its `ok` dependent is `allow` at medium risk. Re-deriving ancestry for that rule
+would make the preservation feature dead on arrival and put a depth-12 BFS on every hook call.
+`low_integrity` is copied from parents at write time and preservation does not clear it. A
+high-risk or irreversible check of that same dependent still returns `reverify` with
+`untrusted_influence`. The workspace placeholder `git push origin main` is classified that way,
+so the seeded S8 branch shows `reverify` there. A `preserved` node whose only support is
+agent-asserted is gated as tainted.
 
 ```bash
 curl -s -X POST "$BASE/v1/gate" -H "$H" -H 'Content-Type: application/json' \
      -d '{"action":{"tool":"Bash","summary":"git push origin main","effect":"irreversible","risk":"high"},
           "relied_on":["demo_s1_summary"]}'
+# S8 after revoke: medium risk allows the healthy dependent; high risk still reverifies
+curl -s -X POST "$BASE/v1/gate" -H "$H" -H 'Content-Type: application/json' \
+     -d '{"action":{"tool":"Edit","summary":"edit the policy","effect":"reversible","risk":"medium"},
+          "relied_on":["demo_s8_dependent"]}'
 ```
 
 `policy.yaml` classifies tool + command text into `effect`/`risk` when the caller does not supply

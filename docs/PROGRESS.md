@@ -33,6 +33,13 @@
   (313.34s); secret scan PASS; `check_numbers` PASS (2 files, 70 allowed
   values); `check_readme` PASS. That suite run is older than `7615eef` and
   older than the G2 drafts.
+  Architect review of `f5b8ed8`: security claims PASS. Plan and operator
+  mismatches fixed after that commit: README Cypher rows, disclosure CI and
+  Render claims, F-05/F-06 QA evidence, the F-07 and F-01 method notes, the
+  missing `fd948a0` reference, the source lookup command, the S8 gate wording,
+  and the workspace path outline. `make check` on that tree: 867 passed,
+  2 skipped, 6 deselected, 1 xfailed (259.78s); secret scan PASS;
+  `check_numbers` PASS (4 files, 70 allowed values); `check_readme` PASS.
 - **Residuals:** ACL service wiring, installed runtime capture and stronger F-08
   eviction-proof lineage remain open. Private disclosure contact is human-owned.
   No hosted CI/deployment or native macOS acceptance is claimed; the Render
@@ -178,7 +185,9 @@
   `tests/integration/test_schema.py::test_invariants_detect_missing_status`.
 - QA round 1 found 1 HIGH defect; round 2 verification PASS (role-switch after subagent rate-limit)
   - 62 passed, `make check` green, AT0.1-AT0.6, all scratch graphs cleaned.
-- Tag `phase-0` on commit `fd948a0`. Next: F-04.
+- This entry originally named tag `phase-0` on commit `fd948a0`. That object is not in this
+  repository. History was re-created. The tag `phase-0` points at
+  `9e5101c3884c6d6310e368888b5e4652be8539c0`. Next: F-04.
 - **Environment:** Windows 11 dev host; Python 3.12.15 (uv `.venv`); Docker Desktop 29.8.2 running
   FalkorDB `falkordb/falkordb:v4.22.1` (pinned; mandatory args); Node v24.13.1; 108 GB free disk.
 - **Deadlines:** feature freeze Sun 2026-10-18 15:00 IST; submit target Sun 21:00 IST; hard stop 23:59 IST.
