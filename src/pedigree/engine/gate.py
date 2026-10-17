@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import shlex
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -45,11 +46,54 @@ def load_policy(path=None) -> Policy:
         return Policy()
 
 
+_SHELL_SPLIT = re.compile(r"&&|\|\||[;&|\n]")
+_ENV_ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+# ssh/scp/sudo are matched as command tokens, not as path segments. `\bssh\b`
+# treats `cat ~/.ssh/config` as an ssh invocation because `.` is a boundary.
+_NETWORK_COMMANDS = frozenset({"ssh", "scp", "sudo"})
+_IRREVERSIBLE_TEXT = re.compile(
+    r"(?:git\s+push|(?:npm|cargo|docker)\s+(?:publish|push)|kubectl\s+apply|terraform\s+apply|"
+    r"\brm\s+[^\n]*-[^\n]*[rf]|curl\s+[^\n]*-X\s*(?:POST|PUT|DELETE|PATCH))",
+    re.I,
+)
+_UNPARSED_COMMAND = re.compile(r"(?<![\w./])(?:ssh|scp|sudo)\b", re.I)
+
+
+def _command_basename(token: str) -> str:
+    return token.replace("\\", "/").rsplit("/", 1)[-1].lower()
+
+
+def invokes_network_command(summary: str) -> bool:
+    """True when ssh, scp, or sudo is the command, including after env assignments.
+
+    A path segment such as `.ssh` is not a command. If a segment cannot be
+    tokenised, fall back to a path-aware word match so a broken quote cannot
+    hide `ssh`.
+    """
+    unparsed = False
+    for segment in _SHELL_SPLIT.split(summary or ""):
+        if not segment.strip():
+            continue
+        try:
+            tokens = shlex.split(segment, posix=True)
+        except ValueError:
+            unparsed = True
+            continue
+        index = 0
+        while index < len(tokens) and _ENV_ASSIGN.match(tokens[index]):
+            index += 1
+        if index < len(tokens) and _command_basename(tokens[index]) in _NETWORK_COMMANDS:
+            return True
+    if unparsed and _UNPARSED_COMMAND.search(summary or ""):
+        return True
+    return False
+
+
 def classify_action(policy, tool, summary, *, effect=None, risk=None):
     classified = ("reversible", "low")
-    if re.search(r"(?:git\s+push|(?:npm|cargo|docker)\s+(?:publish|push)|kubectl\s+apply|terraform\s+apply|\bssh\b|\bscp\b|\bsudo\b|\brm\s+[^\n]*-[^\n]*[rf]|curl\s+[^\n]*-X\s*(?:POST|PUT|DELETE|PATCH))", summary, re.I):
+    if _IRREVERSIBLE_TEXT.search(summary or "") or invokes_network_command(summary or ""):
         classified = ("irreversible", "high")
-    elif re.search(r"\bgit\s+commit\b", summary, re.I):
+    elif re.search(r"\bgit\s+commit\b", summary or "", re.I):
         classified = ("reversible", "medium")
     for rule in policy.rules:
         if re.search(rule.get("tool", ".*"), tool, re.I) and re.search(rule.get("match", ".*"), summary, re.I):

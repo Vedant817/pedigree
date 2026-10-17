@@ -172,6 +172,105 @@ def test_new_file_read_records_hash_and_read_link(hook, tmp_path):
     assert events[2]["node_id"] == events[1]["id"]
 
 
+def test_webfetch_records_untrusted_web_source_and_read(hook):
+    calls = []
+    hook.handle("post", {"session_id": "sess_test", "tool_name": "WebFetch",
+                         "tool_input": {"url": "https://user:secret@example.com/readme"}},
+                lambda path, payload=None: calls.append((path, payload)) or {})
+    assert calls == []
+    hook.handle("post", {"session_id": "sess_test", "tool_name": "WebFetch",
+                         "tool_input": {"url": "https://example.com/readme", "prompt": "private page"}},
+                lambda path, payload=None: calls.append((path, payload)) or {})
+    events = calls[-1][1]["events"]
+    source = events[1]
+    assert source["source_kind"] == "web"
+    assert source["integrity"] == "untrusted"
+    assert source["uri"] == "https://example.com/readme"
+    assert source["content_hash"] == hashlib.sha256(b"https://example.com/readme").hexdigest()
+    assert events[2] == {"type": "session_read", "node_id": source["id"]}
+    assert "private page" not in json.dumps(calls)
+    assert "secret" not in json.dumps(calls)
+
+
+def test_websearch_is_hash_only(hook):
+    calls = []
+    hook.handle("pre", {"session_id": "sess_test", "tool_name": "WebSearch",
+                        "tool_input": {"query": "private query"}},
+                lambda path, payload=None: calls.append((path, payload)) or {
+                    "hook": {"hookSpecificOutput": {"permissionDecision": "allow"}}})
+    assert "private query" not in json.dumps(calls)
+    assert calls[0][1]["action"]["summary"] == "WebSearch"
+    hook.handle("post", {"session_id": "sess_test", "tool_name": "WebSearch",
+                         "tool_input": {"query": "private query"}},
+                lambda path, payload=None: calls.append((path, payload)) or {})
+    source = calls[-1][1]["events"][1]
+    assert source["uri"] == "websearch:sha256:" + hashlib.sha256(b"private query").hexdigest()
+    assert source["source_kind"] == "web"
+    assert "private query" not in json.dumps(calls)
+
+
+def test_bash_cat_links_only_the_file_it_read(hook, tmp_path):
+    file = tmp_path / "notes.py"
+    file.write_bytes(b"private file body")
+    calls = []
+
+    def request(path, payload=None):
+        calls.append((path, payload))
+        return {"found": False}
+
+    command = "cat " + file.resolve().as_posix()
+    hook.handle("post", {"session_id": "sess_test", "tool_name": "Bash", "cwd": str(tmp_path),
+                         "tool_input": {"command": command}}, request)
+    events = calls[-1][1]["events"]
+    source = next(event for event in events if event["type"] == "source_read")
+    assert source["source_kind"] == "file"
+    assert source["uri"] == file.resolve().as_posix()
+    assert events[-1]["relied_on"] == [source["id"]]
+    assert events[-1]["tool"] == "Bash"
+    assert "private file body" not in json.dumps(calls)
+
+
+def test_bash_curl_get_reads_url_and_post_does_not(hook):
+    calls = []
+    hook.handle("post", {"session_id": "sess_test", "tool_name": "Bash",
+                         "tool_input": {"command": "curl -fsSL https://example.com/install.sh"}},
+                lambda path, payload=None: calls.append((path, payload)) or {})
+    events = calls[-1][1]["events"]
+    assert events[1]["uri"] == "https://example.com/install.sh"
+    assert events[-1]["relied_on"] == [events[1]["id"]]
+    calls.clear()
+    hook.handle("post", {"session_id": "sess_test", "tool_name": "Bash",
+                         "tool_input": {"command": "curl -X POST https://example.com/api"}},
+                lambda path, payload=None: calls.append((path, payload)) or {})
+    posted = calls[-1][1]["events"]
+    assert [event["type"] for event in posted] == ["session", "action_executed"]
+    assert "relied_on" not in posted[-1]
+
+
+def test_synthetic_fixture_replay(hook):
+    fixture = Path(__file__).resolve().parents[2] / "tests/fixtures/claude/synthetic-session.jsonl"
+    calls = []
+
+    def request(path, payload=None):
+        calls.append((path, payload))
+        if path == "/v1/gate":
+            return {"hook": {"hookSpecificOutput": {"permissionDecision": "allow"}}}
+        return {"found": False}
+
+    for line in fixture.read_text(encoding="utf-8").splitlines():
+        if not line.strip() or line.startswith("#"):
+            continue
+        item = json.loads(line)
+        hook.handle(item["mode"], item["payload"], request)
+    gate = calls[0][1]["action"]
+    assert gate["summary"] == "cat ~/.ssh/config"
+    assert "risk" not in gate
+    bodies = json.dumps(calls)
+    assert "https://example.com/readme" in bodies
+    assert "private query" not in bodies
+    assert "websearch:sha256:" in bodies
+
+
 def test_subprocess_stdlib_http_roundtrip():
     observed = []
     expected = {"hookSpecificOutput": {"hookEventName": "PreToolUse",

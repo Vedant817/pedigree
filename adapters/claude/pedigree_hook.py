@@ -8,7 +8,9 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import secrets
+import shlex
 import sys
 import urllib.parse
 import urllib.request
@@ -64,10 +66,161 @@ def file_key(value, cwd):
 
 
 def summary(tool, args):
-    # Never include Write.content, Edit replacement text, prompt, or tool output.
+    # Never include Write.content, Edit replacement text, prompt, tool output, or URL userinfo.
     if tool == "Bash":
         return str(args.get("command", ""))[:300]
-    return str(args.get("file_path") or args.get("url") or tool)[:300]
+    name = str(tool).lower()
+    if name == "websearch":
+        return "WebSearch"
+    if name == "webfetch":
+        captured = web_source(tool, args)
+        return captured[0][:300] if captured else "WebFetch"
+    return str(args.get("file_path") or args.get("url") or args.get("uri") or tool)[:300]
+
+
+_SHELL_SPLIT = re.compile(r"&&|\|\||[;&|\n]")
+_ENV_ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+_READ_COMMANDS = frozenset({"cat", "head", "curl", "wget"})
+_FLAG_WITH_VALUE = frozenset({
+    "-n", "--lines", "-c", "--bytes", "-o", "--output", "-H", "--header", "-A", "--user-agent",
+    "-e", "--referer", "-u", "--user", "-m", "--max-time", "--connect-timeout", "-w", "--write-out",
+    "-d", "--data", "--data-raw", "--data-binary", "--data-urlencode", "-F", "--form",
+    "-X", "--request", "--method", "--post-data", "--post-file",
+})
+_URI_LIMIT = 512
+
+
+def _basename(token):
+    return token.replace("\\", "/").rsplit("/", 1)[-1].lower()
+
+
+def command_segments(command):
+    """Tokenise a bash command. Unparseable segments are omitted, not guessed."""
+    segments = []
+    for part in _SHELL_SPLIT.split(command or ""):
+        if not part.strip():
+            continue
+        try:
+            tokens = shlex.split(part, posix=True)
+        except ValueError:
+            continue
+        index = 0
+        while index < len(tokens) and _ENV_ASSIGN.match(tokens[index]):
+            index += 1
+        if index < len(tokens):
+            segments.append(tokens[index:])
+    return segments
+
+
+def _segment_writes(name, args):
+    if name not in {"curl", "wget"}:
+        return False
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        base = arg.split("=", 1)[0]
+        if base in {"-d", "--data", "--data-raw", "--data-binary", "--data-urlencode", "-F", "--form",
+                    "--post-data", "--post-file"}:
+            return True
+        if base in {"-X", "--request", "--method"} or (arg.upper().startswith("-X") and len(arg) > 2):
+            if "=" in arg:
+                value = arg.split("=", 1)[1]
+            elif arg.upper().startswith("-X") and len(arg) > 2 and not arg.startswith("--"):
+                value = arg[2:]
+            elif index + 1 < len(args):
+                value = args[index + 1]
+            else:
+                value = ""
+            if value.upper() not in {"", "GET", "HEAD"}:
+                return True
+        index += 1
+    return False
+
+
+def _read_operands(args):
+    found = []
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        base = arg.split("=", 1)[0]
+        if arg == "-" or arg.startswith("-"):
+            index += 2 if base in _FLAG_WITH_VALUE and "=" not in arg else 1
+            continue
+        if arg.startswith(("http://", "https://")):
+            found.append(("url", arg))
+        else:
+            found.append(("path", arg))
+        index += 1
+    return found
+
+
+def bash_read_targets(command):
+    """Paths and http(s) URLs read by cat, head, curl, or wget. Writes are skipped."""
+    targets = []
+    for tokens in command_segments(command):
+        name = _basename(tokens[0])
+        args = tokens[1:]
+        if name == "sudo" and args:
+            while args and args[0].startswith("-"):
+                args = args[1:]
+            if not args:
+                continue
+            name = _basename(args[0])
+            args = args[1:]
+        if name not in _READ_COMMANDS or _segment_writes(name, args):
+            continue
+        targets.extend(_read_operands(args))
+    return targets
+
+
+def _public_url(url):
+    if not isinstance(url, str) or len(url) > _URI_LIMIT or not url.startswith(("http://", "https://")):
+        return None
+    parsed = urllib.parse.urlsplit(url)
+    if parsed.username or parsed.password:
+        return None
+    return url
+
+
+def web_source(tool, args):
+    """WebFetch URL, or a hash-only WebSearch uri. Query text is not returned."""
+    name = str(tool).lower()
+    if name == "webfetch":
+        url = _public_url(args.get("url") or args.get("uri"))
+        if url is None:
+            return None
+        return url, hashlib.sha256(url.encode()).hexdigest()
+    if name == "websearch":
+        query = args.get("query") if isinstance(args.get("query"), str) else args.get("q")
+        if not isinstance(query, str) or not query.strip():
+            return None
+        digest = hashlib.sha256(query.encode()).hexdigest()
+        return "websearch:sha256:" + digest, digest
+    return None
+
+
+def segment_command(tokens):
+    name = _basename(tokens[0])
+    args = tokens[1:]
+    if name == "sudo":
+        while args and args[0].startswith("-"):
+            args = args[1:]
+        if not args:
+            return None
+        return _basename(args[0])
+    return name
+
+
+def file_read_events(path, digest, key, send):
+    found = send("/v1/artifacts/lookup?" + urllib.parse.urlencode({"key": key}))
+    nid = found["node_id"] if found.get("found") else "src_" + secrets.token_hex(8)
+    events = []
+    if not found.get("found"):
+        kind = "rules_file" if Path(path).name in {"CLAUDE.md", "AGENTS.md", "MEMORY.md"} else "file"
+        events.append({"type": "source_read", "source_kind": kind, "uri": path,
+                       "content_hash": digest, "id": nid})
+    events.append({"type": "session_read", "node_id": nid})
+    return events
 
 
 def handle(mode, payload, send=request):
@@ -106,16 +259,54 @@ def handle(mode, payload, send=request):
                 return None
             path, digest, key = artifact
             if tool == "Read":
-                found = send("/v1/artifacts/lookup?" + urllib.parse.urlencode({"key": key}))
-                nid = found["node_id"] if found.get("found") else "src_" + secrets.token_hex(8)
-                if not found.get("found"):
-                    kind = "rules_file" if Path(path).name in {"CLAUDE.md", "AGENTS.md", "MEMORY.md"} else "file"
-                    events.append({"type": "source_read", "source_kind": kind, "uri": path,
-                                   "content_hash": digest, "id": nid})
-                events.append({"type": "session_read", "node_id": nid})
+                events.extend(file_read_events(path, digest, key, send))
             else:
                 events.append({"type": "action_executed", "tool": tool, "summary": path[:300],
                                "artifacts": [path], "artifact_key": key})
+        elif str(tool).lower() in {"webfetch", "websearch"}:
+            captured = web_source(tool, args)
+            if captured is None:
+                return None
+            uri, digest = captured
+            nid = "src_" + secrets.token_hex(8)
+            events.extend([
+                {"type": "source_read", "source_kind": "web", "integrity": "untrusted",
+                 "uri": uri, "content_hash": digest, "id": nid},
+                {"type": "session_read", "node_id": nid},
+            ])
+        elif tool == "Bash":
+            command = str(args.get("command", ""))
+            targets = bash_read_targets(command)
+            read_ids = []
+            for kind, value in targets:
+                if kind == "url":
+                    uri = _public_url(value)
+                    if uri is None:
+                        continue
+                    nid = "src_" + secrets.token_hex(8)
+                    digest = hashlib.sha256(uri.encode()).hexdigest()
+                    events.extend([
+                        {"type": "source_read", "source_kind": "web", "integrity": "untrusted",
+                         "uri": uri, "content_hash": digest, "id": nid},
+                        {"type": "session_read", "node_id": nid},
+                    ])
+                    read_ids.append(nid)
+                    continue
+                artifact = file_key(value, payload.get("cwd") or os.getcwd())
+                if artifact is None or len(artifact[0]) > _URI_LIMIT:
+                    continue
+                path, digest, key = artifact
+                linked = file_read_events(path, digest, key, send)
+                events.extend(linked)
+                read_ids.append(linked[-1]["node_id"])
+            segments = command_segments(command)
+            reads_only = bool(segments) and all(segment_command(tokens) in _READ_COMMANDS for tokens in segments)
+            if targets and not read_ids and reads_only:
+                return None
+            action = {"type": "action_executed", "tool": tool, "summary": summary(tool, args)}
+            if read_ids:
+                action["relied_on"] = read_ids
+            events.append(action)
         else:
             events.append({"type": "action_executed", "tool": tool, "summary": summary(tool, args)})
     else:

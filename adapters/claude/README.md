@@ -25,8 +25,24 @@ Each HTTP request has a one second timeout and redirects are refused. This is
 fail-open capture and gating. A successful protocol unit test does not establish
 that Claude installed or executed this configuration.
 
-Limits: Glob/Grep results are not mapped to file reads; shell file I/O, tool
-descriptions, memory-glob promotion and web response sources are not captured.
+`WebFetch` records `Source(kind=web, integrity=untrusted)` for an http(s) URL
+with no userinfo, plus a session READ. `WebSearch` records the same kind of
+source with uri `websearch:sha256:<digest>`; the query text is not sent.
+`Bash` commands `cat`, `head`, `curl`, and `wget` record READ edges for path
+or http(s) URL operands. A `curl`/`wget` write (`-X POST`, `-d`, `-F`, and the
+wget post flags) is an action and not a read. When a bash command does record
+reads, that action's `relied_on` is those nodes only, so an earlier unrelated
+read in the session is not a parent of this command. The pre-tool gate still
+sends the session id and no explicit `relied_on`, so ADR-007's read-window
+floor still applies to `git push` and any other command that does not name
+its own inputs. `ssh`, `scp`, and `sudo` are classified as command tokens:
+`cat ~/.ssh/config` is not an ssh invocation.
+
+Limits: Glob/Grep results are not mapped to file reads. Shell writes, tool
+descriptions, and memory-glob promotion are not captured. Page and search
+bodies are not fetched or stored. This adapter is validated on synthetic
+payloads only (`tests/fixtures/claude/`); installed Claude Code sessions are
+not recorded here.
 Hashing observes the current complete file, even when Read returned only a
 portion; concurrent file changes can race with this observation. Symlinks resolve
 to their target. Long Bash command summaries are truncated, with the conservative

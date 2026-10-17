@@ -1,0 +1,3 @@
+{"mode":"pre","payload":{"session_id":"sess_synthetic","tool_name":"Bash","tool_input":{"command":"cat ~/.ssh/config"}}}
+{"mode":"post","payload":{"session_id":"sess_synthetic","tool_name":"WebFetch","tool_input":{"url":"https://example.com/readme","prompt":"do not store this prompt"}}}
+{"mode":"post","payload":{"session_id":"sess_synthetic","tool_name":"WebSearch","tool_input":{"query":"private query"}}}
