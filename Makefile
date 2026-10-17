@@ -20,7 +20,7 @@ help:
 	@echo "  make test        full test suite (skips nothing)"
 	@echo "  make test-quick  fast subset (deselects slow and perf tests)"
 	@echo "  make lint        ruff check"
-	@echo "  make check       lint + test-quick + secret scan + numbers check"
+	@echo "  make check       lint + test-quick + secret scan + numbers + readme check"
 	@echo "  make check-perf  heavy perf gates on the live DB (P-010)"
 	@echo "  make eval        full evaluation run (writes evals/results/*.csv)"
 	@echo "  make eval-quick  2-minute evaluation subset"
@@ -60,6 +60,7 @@ lint:
 check: lint test-quick
 	$(PY) scripts/secret_scan.py
 	$(PY) scripts/check_numbers.py
+	$(PY) scripts/check_readme.py
 
 check-perf:
 	$(PY) -m pytest -q -m "perf"

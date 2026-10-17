@@ -16,13 +16,15 @@
   marked QA-closed.
   `make check` on `097309d`: 860 passed, 2 skipped, 6 deselected, 1 xfailed
   (262.82s); secret scan PASS; `check_numbers` PASS (2 files, 70 allowed values).
-- **Next:** finish P-027 (one-click demo login and a screen recording are not
-  built; the synthetic `demorealistic` seed and blame-path highlight are).
-  Then Phase G (README, walkthrough, demo script, blog draft, hygiene) and
-  Phase H. Feature freeze Sun 2026-10-18 15:00 IST. Do not push, tag, publish,
-  or fill human-voice disclosure fields. The realistic-seed tests passed
-  (unit plus integration, 12 passed with the existing demo-seed file). Full
-  `make check` has not been re-run since `5afc4b5`.
+- **Next:** Phase G after the README checker. P-027 one-click demo login and a
+  screen recording are still not built; the synthetic `demorealistic` seed and
+  blame-path highlight are. G1 (`scripts/check_readme.py`, required headings)
+  is in this tree as of 2026-10-18; the 20-second GIF is not. Walkthrough,
+  demo script, blog draft, and hygiene follow, then Phase H. Feature freeze
+  Sun 2026-10-18 15:00 IST. Do not push, tag, publish, or fill human-voice
+  disclosure fields. The realistic-seed tests passed (unit plus integration,
+  12 passed with the existing demo-seed file). Full `make check` has not been
+  re-run since `5afc4b5`.
 - **Residuals:** ACL service wiring, installed runtime capture and stronger F-08
   eviction-proof lineage remain open. Private disclosure contact is human-owned.
   No hosted CI/deployment or native macOS acceptance is claimed; the Render

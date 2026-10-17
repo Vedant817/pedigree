@@ -2,6 +2,22 @@
 
 **git blame and git revert for what an AI agent believes.**
 
+[CI workflow](.github/workflows/ci.yml). The workflow file is in this repo. This page does not claim a successful hosted run.
+
+A 20-second GIF is not in this repository. A human recording would go under `docs/assets/`. The video is still pending (F-23).
+
+Three measurements from [`docs/NUMBERS.md`](docs/NUMBERS.md) (E1, generated DAGs, the engine's `compute_final`): recall **1.0**, over-invalidation **0.0**, explicit preservation-status sensitivity **1.0**. Intervals and the other rows are in [Evaluation](#evaluation).
+
+Three Compose commands. Read the quick-start notes before using the credential file:
+
+```bash
+git clone https://github.com/Vedant817/pedigree.git && cd pedigree
+docker compose up --build --wait
+mkdir -p scratch && docker compose cp pedigree:/data/credentials/demo-demo.json scratch/demo-demo.json
+```
+
+No Docker on Linux: `make quickstart` (or `bash scripts/quickstart.sh`). Windows Python with a Docker database: `make quickstart-windows`.
+
 Coding agents remember things and act on them: prompt files, rule files, MCP tool
 descriptions, web pages they read, memories they write. When one of those sources turns out to be
 wrong or malicious, nobody can answer *"what did the agent already believe and do because of it?"*
@@ -20,7 +36,9 @@ Pedigree answers that out-of-band:
 > (Oct 15-18 2026). The status table below is kept in sync with `docs/FEATURES.md`: a feature
 > counts as done only when its tests and its QA evidence exist in this repository.
 
-## Why a graph (and why FalkorDB is not decoration)
+## Problem & why a graph
+
+FalkorDB is the database this product runs on, not a diagram decoration.
 
 Every question Pedigree answers is a graph question:
 
@@ -100,14 +118,28 @@ For development with a Windows Python environment and a Docker DB, use
 see the command output for the private credentials path. POSIX file modes do not
 establish Windows ACL privacy.
 
-Docs: [full setup](#setup) · [data model](#graph-data-model) ·
-[Cypher inventory](#the-cypher-the-product-depends-on) ·
+Docs: [quick start](#quick-start-local-docker-compose) · [data model](#graph-data-model) ·
+[Cypher and algorithms](#cypher--algorithms) ·
 [security model](#security-model) · [evaluation](#evaluation) ·
-[limitations](#honest-limitations) · [deploy](#deploy) ·
+[limitations](#limitations) · [deploy](#deploy) ·
 [guided tour](docs/WALKTHROUGH.md) · [decisions](docs/DECISIONS.md) ·
 [build log](docs/PROGRESS.md) · [features](docs/FEATURES.md) · [numbers](docs/NUMBERS.md)
 
-## Architecture
+## Architecture diagram
+
+```mermaid
+flowchart TD
+  hook["Claude Code hook"] --> events["POST /v1/events"]
+  opencode["OpenCode adapter, read-only"] --> events
+  rest["REST client"] --> api["POST /v1/*"]
+  mcp["MCP client"] --> mcpin["MCP stdio or /mcp"]
+  events --> engine["engine, deterministic, no LLM"]
+  api --> engine
+  mcpin --> engine
+  engine --> cypher["static parameterised Cypher"]
+  cypher --> tenant["FalkorDB graph ped:tenant"]
+  cypher --> registry["registry graph ped:registry"]
+```
 
 ```
  Claude Code hook   OpenCode adapter (read-only)   REST client   MCP client
@@ -136,16 +168,42 @@ verified against an installed OpenCode session and may write nothing in real wor
 
 One graph per tenant, `ped:<tenant>` (ids are `^[a-z0-9]{3,24}$`, so the ACL pattern
 `~ped:abc` can never match tenant `abcd`). The registry graph `ped:registry` holds
-`Tenant{id, status, node_cap, created_at, agent_token_sha256, operator_token_sha256}` stores credential
-digests. Legacy `token_sha256` remains agent-only; bearer values are never stored in the graph.
+`Tenant` rows (`id`, `status`, `node_cap`, `created_at`, and the credential digests).
+Legacy `token_sha256` remains agent-only; bearer values are never stored in the graph.
 
 Nodes (`all :Node` + a type label): `Source` (a prompt, a file, a web page, a tool output, an MCP
 tool description), `Memory` (a belief), `Action` (a tool call with `effect`/`risk`/`artifacts`),
 `Session`, `Agent`, `Revocation` (whose lifecycle property is `state`, ADR-006).
 
+```mermaid
+erDiagram
+  Source ||--o{ Memory : "DERIVED_FROM / FEEDS"
+  Source ||--o{ Action : "DERIVED_FROM / FEEDS"
+  Memory ||--o{ Memory : "DERIVED_FROM / FEEDS"
+  Memory ||--o{ Action : "DERIVED_FROM / FEEDS"
+  Memory }o--o{ Source : "CORROBORATED_BY"
+  Session }o--o{ Source : "READ"
+  Session }o--o{ Memory : "READ"
+```
+
+A `Revocation` points at a Source or Memory root through `root_id`. A `READ` can target any `:Node`; the diagram shows the two common targets.
+
 Edges: `(child)-[:DERIVED_FROM {rel, via}]->(parent)` mirrored by `(parent)-[:FEEDS]->(child)`
-(the mirror is what `algo.BFS` follows - it only traverses one relationship type), and
-`(Memory)-[:CORROBORATED_BY {by}]->(Source)` for independent support.
+(the mirror is what `algo.BFS` follows - it only traverses one relationship type),
+`(Memory)-[:CORROBORATED_BY {by}]->(Source)` for independent support, and
+`(Session)-[:READ {at}]->(Node)` for a recorded read. `Agent` is a reserved type label.
+No shipped writer creates `Agent` nodes.
+
+| Label | Fields writers can set |
+|---|---|
+| `Source` | `id`, `tenant`, `uri`, `content_hash`, `integrity`, `kind`, `status` |
+| `Memory` | `id`, `tenant`, `status`, optional `text` only when `pedigree_store_text` is on (default off), optional `artifact` / `artifact_key` |
+| `Action` | `tool`, `summary`, `effect`, `risk`, `artifacts`, `status` |
+| `Session` | `id`, `tenant`, `runtime`, `agent_id`, `status`, `started_at` |
+| `Agent` | none in the shipped writers |
+| `Revocation` | `id`, `tenant`, `root_id`, `reason`, `kind`, `state`, `started_at`; finish fields when the job completes |
+
+`:Node(id)` has a unique constraint and `Q_INDEX_NODE_ID`. Lookups anchor on `:Node`, then filter the type label. Anchoring the same lookup on the type label alone plans as a label scan. The registry graph is separate and stores tenant rows and credential digests, not lineage.
 
 Properties that carry the semantics:
 
@@ -164,7 +222,7 @@ Properties that carry the semantics:
 must be computed in topological order (`src/pedigree/engine/compute.py`, cross-checked against an
 independent oracle on generated DAGs).
 
-## The Cypher the product depends on
+## Cypher & algorithms
 
 All of it lives in `src/pedigree/db/queries.py` as constants with parameters only; a lint test
 (`tests/unit/test_queries_static.py`) fails the build on any interpolated value.
@@ -184,6 +242,34 @@ All of it lives in `src/pedigree/db/queries.py` as constants with parameters onl
 | Load-bearing sources | `CALL algo.pageRank('Node','DERIVED_FROM') YIELD node, score WHERE 'Source' IN labels(node)` + exact descendant counts by BFS |
 | What-if | `g.copy('ped:<tenant>:wi:<hex>')`, the real revoke on the copy, diff, `delete()` |
 | Invariants | a family of `count(*)` probes (missing status, bad taint parent, `ok` node under a bad parent, missing mirror, foreign tenant, ...) |
+
+Revoke-root CAS. `Q_REVOKE_ROOT` matches one `:Node` that is a Source or Memory and is not already revoked, sets it revoked, and creates the `:Revocation` row in the same query. With the `:Node(id)` index that match is one point lookup. A repeat on an already-revoked root does not create a second running revocation.
+
+```cypher
+MATCH (r:Node) WHERE r.id = $id AND r.status <> 'revoked'
+  AND ('Source' IN labels(r) OR 'Memory' IN labels(r))
+SET r.status = 'revoked', r.revoked_at = $now, r.reason = $why, r.taint_parent = NULL
+WITH r CREATE (v:Node:Revocation {id:$rid, tenant:$tenant, root_id:$id, reason:$why,
+    kind:$kind, state:'running', started_at:$now, created_at:$now})
+RETURN r.id
+```
+
+Quarantine fixpoint. `resolve` discovers descendants, then `Q_QUARANTINE_CHUNK` sets members that are still `ok` or `preserved` to `quarantined`, and repeats until a discovery finds nothing left to quarantine. The iteration cap is `MAX_FIXPOINT_ITERS` in `src/pedigree/engine/revoke.py`. Cost follows the closure that was touched, because each id lookup anchors on `:Node(id)`, not the whole tenant. A crash leaves those nodes quarantined and the revocation `running`; resume finishes the same job.
+
+```cypher
+UNWIND $ids AS i MATCH (n:Node {id:i}) WHERE n.status IN ['ok','preserved']
+SET n.status = 'quarantined' RETURN count(n) AS n
+```
+
+`compute_final` is Python, not a Cypher procedure. In topological order over the closure, a node with no revoked or tainted parent becomes `ok`. A node that still has one is `preserved` when a healthy `CORROBORATED_BY` source exists, and `tainted` otherwise. A parent that itself became `preserved` is not a bad parent, which is why the order matters. `Q_PARENTS_OF` and `Q_SUPPORT_OF` are the reads. `Q_WRITE_FINAL` writes the result in chunks, and a short verify loop repeats until no member is still quarantined. The work is linear in the closure's nodes and edges, plus one write per member.
+
+Blame. The product does not call Cypher `shortestPath`. The stored explanation is the `taint_parent` chain (`Q_TAINT_PARENT`), one indexed read per hop, bounded by `max_depth`. The ancestor set is `algo.BFS` on `DERIVED_FROM`. `bfs_paths` then returns the shortest hop path in that parent map, also depth-bounded.
+
+```cypher
+MATCH (n:Node {id:$id}) RETURN n.taint_parent
+```
+
+Gate. `check_action` classifies the command locally, then reads the named `relied_on` nodes with `Q_GATE_NODES`. An empty `relied_on` plus a session id still fills that list from `Q_READ_WINDOW` (ADR-007). A bad node on that list yields `reverify` rather than a silent allow. If the list is still empty, the decision is `allow` with reason `warning:no_lineage`; effect and risk stay whatever the classifier returned. High-risk nodes also walk ancestors up to the depth limit. The decision itself does not traverse the tenant.
 
 `docs/WALKTHROUGH.md` explains each of these with the product question it answers and a runnable
 command against a seeded tenant.
@@ -350,7 +436,7 @@ bulk loader.
 
 Reproduce: `make eval` (full grid) or `make eval-quick` (one cell).
 
-## Honest limitations
+## Limitations
 
 Aligned manually with `docs/03-EVAL-AND-DEMO.md` section 7; that document is the source of truth:
 
@@ -430,8 +516,13 @@ This table is maintained manually alongside `docs/FEATURES.md`; it is not genera
 | F-20 | eval publication and remaining real-session experiments | implementing | `tests/evals/*` | local E3 S1/S6/S8, E4/E4b measured; scoped signoff PASS; E3b/E6 NOT MEASURED |
 | F-21 | workspace polish | todo | - | - |
 | F-22 | hook spool/replay when the server is down | todo | - | - |
-| F-23 | README/blog/video/submission pack | implementing | - | drafts exist; human review, video and final publication pending |
+| F-23 | README/blog/video/submission pack | implementing | `scripts/check_readme.py` | required headings and the checker landed; video and final publication still pending |
+
+## AI disclosure
+
+Tools, what was generated, and the fields the human author still has to fill are in
+[`AI_DISCLOSURE.md`](AI_DISCLOSURE.md). This page does not invent those fields.
 
 ## License
 
-MIT - see `LICENSE`. AI assistance is disclosed in `AI_DISCLOSURE.md`.
+MIT. See `LICENSE`.
