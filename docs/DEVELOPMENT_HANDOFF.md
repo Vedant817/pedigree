@@ -75,13 +75,24 @@ Verified 2026-10-17 against the running local stack
 | `GET /openapi.json` | `404` — schema not served publicly |
 | Container image | **verified** — non-root `10001`, `HEALTHCHECK` on `/readyz` |
 | Configuration from environment only | **verified** — no secrets required for the core |
+| **Production-mode boot rehearsed** | **verified** — fails closed with no admin token; boots and serves with one. Full evidence in `docs/testing/pr-testing-workflow.md` §1.1a |
+| `docker-compose.yml` usable for production | **no** — hard-wired to demo mode, no secret passthrough. Deploy from the `Dockerfile` instead |
 | Public HTTPS deployment | **not done** — no hosting account or deployment config exists |
 | PR preview deployments | **not done** — no deployment provider is connected |
 
 The product is deployable as-is: the two-service topology in `docker-compose.yml`
-(FalkorDB + API) is correct and provider-neutral. The genuine constraint is that a
-hosted deployment needs a **persistent volume** for the graph **and** the credential
-directory. That is the first thing to evaluate when choosing a host.
+(FalkorDB + API) is correct and provider-neutral, and a production-mode boot was
+rehearsed end to end on an isolated stack. The remaining constraint is a host that can
+keep a **persistent volume** for the graph **and** the credential directory. That is the
+first thing to evaluate when choosing a host.
+
+Two deployment details that are not obvious from the code and will cost time if missed:
+
+- Deployment-admin routes authenticate with the **`x-admin-token`** header.
+  `Authorization: Bearer <admin token>` returns `401` even with a correct token. Only
+  `/v1/*` uses `Authorization: Bearer`.
+- The `Dockerfile` is the deployable artifact; `docker-compose.yml` is the local
+  development and demo path and cannot express a production configuration.
 
 ### Automated testing readiness — partial
 
@@ -129,6 +140,28 @@ Until then, direct commits to `main` remain acceptable **provided** the local ga
 and the commit stays focused. Do not open pull requests that cannot deploy — a PR
 without a deployment-ready signal is untestable, and claiming otherwise would be a false
 signal. Revisit this paragraph once the deployment blockers clear.
+
+### Open question for the feature session — source creation in production mode
+
+Observed 2026-10-17 while rehearsing a production-mode boot. `POST /v1/sources` returns
+`422 invalid_argument` for payloads that satisfy every validator in
+`engine/ingest.record_source` (`kind` and `uri` only; and again with `conf` as a list).
+A `content_hash` that is not 64 hex characters is a *known* cause and is correct
+behaviour; the minimal payloads above are not explained by it.
+
+The error envelope deliberately omits the failing reason, so this could not be narrowed
+from outside the process. It may be an artefact of the rehearsal environment
+(`PEDIGREE_DB_ACL=false` and an empty, unseeded database) rather than a defect. **This is
+reported as an open question, not a confirmed defect**, and it was not reproduced against
+the seeded demo tenant — writing to that tenant was deliberately avoided because it feeds
+the demo and submission material.
+
+Reproduction recipe for whoever owns ingest: on a production-mode instance with a
+disposable tenant, `POST /v1/sources` with body `{"kind":"file","uri":"rules/x.md"}` and
+the tenant operator token, and read the `InvalidArgument` detail from the in-process log
+or a debugger rather than from the HTTP response. The existing suite already covers
+`record_source` against a real database, so confirm whether the rehearsal environment was
+simply wrong before spending time on it.
 
 ### Observation for the security owner
 

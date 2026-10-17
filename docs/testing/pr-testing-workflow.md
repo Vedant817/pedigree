@@ -46,6 +46,52 @@ deployment step should confirm that the host can keep a persistent volume for bo
 `/data` (graph + credentials) and the FalkorDB data directory, and that it can build
 from the committed `Dockerfile` and `docker-compose.yml`.
 
+#### `docker-compose.yml` is demo-only — deploy from the `Dockerfile`
+
+Verified: the Compose `pedigree` service hard-codes `PEDIGREE_SEED_DEMO: "1"` and passes
+through **no** admin token, HMAC secret, ACL flag or public URL, with no `env_file`. It
+therefore cannot express a production deployment. A host pointed at this Compose file gets
+a demo-mode service with deployment-admin routes disabled.
+
+Consequence for the deployment step: build from the **`Dockerfile`** and set the
+environment on the service, using the FalkorDB image the Compose file already pins. The
+compose file remains the local development and demo path.
+
+### 1.1a Verified production rehearsal
+
+A full production-mode boot was rehearsed on an isolated stack (own network, own database,
+own port, disposable tenants) to de-risk the deployment step. Reproduced 2026-10-17 from
+the committed `Dockerfile` and the `falkordb/falkordb:v4.22.1` image with the module and
+query limits CI already pins.
+
+| Check | Result |
+|---|---|
+| `PEDIGREE_ENV=production`, **no** admin token | **fails closed** — `RuntimeError: refusing to start: PEDIGREE_ADMIN_TOKEN is empty`, exit 1 |
+| Same, with a strong generated token + HMAC secret | boots, `/readyz` → `{"ready":true}` in ~4 s |
+| Docker `HEALTHCHECK` (on `/readyz`) | **healthy** |
+| `GET /healthz`, `GET /` | `200`, UI served |
+| `GET /admin/tenants` without credential | `401` |
+| `GET /admin/tenants` with wrong credential | `401` |
+| `POST /admin/tenants` with correct credential | `200`, issues operator and agent tenant credentials |
+| `GET /metrics` without credential | `401` |
+| Reference an id that was never created | `404` (`not_in_graph`) — no silent empty success |
+
+Two details that will bite whoever performs the deployment:
+
+- **Deployment-admin routes use the `x-admin-token` header, not `Authorization: Bearer`.**
+  `Authorization: Bearer <admin token>` is rejected with `401` even when the token is
+  correct. Tenant-scoped `/v1/*` routes keep using `Authorization: Bearer`.
+- Demo mode bypasses the admin-token guard on purpose (`config.admin_token_problem`
+  returns early when `PEDIGREE_SEED_DEMO` is set) because demo mode disables the
+  deployment-admin routes instead of provisioning a shared credential. That is why a
+  `PEDIGREE_ENV=production` **demo** container runs without a token; it is not the guard
+  failing. The guard is enforced in `api/app.py` at application creation and was observed
+  to stop a non-demo production boot.
+
+Known configuration gaps in `docker-compose.yml`, both pre-existing and neither blocking
+the `Dockerfile` path: there is no `PEDIGREE_PUBLIC_URL` passthrough, and no demo tenant
+can be listed or rotated over HTTP outside demo mode.
+
 Required configuration (see `.env.example`); nothing else is needed for the core:
 
 ```
@@ -173,6 +219,20 @@ are taken from `src/pedigree/api/schemas.py`, `src/pedigree/api/routes/` and
   empty success is a defect.
 - Never assert on response-time numbers, exact node counts across tenants, or anything
   derived from seeded demo data.
+
+### 2.3 Fixtures that will otherwise waste a run
+
+Learned the hard way while rehearsing against a production-mode instance:
+
+- `conf` is a **list** of tags, not a number. `{"conf": 0.9}` is rejected.
+- `content_hash`, when supplied, must be **64 hex characters**.
+- Typed payloads use `extra="forbid"` and `strict=True`: unknown fields and wrong types
+  are rejected rather than ignored.
+- A bad token combined with a malformed body returns `422`, not `401` (see section 4 of
+  the handoff board).
+- Admin calls need `x-admin-token`; only `/v1/*` uses `Authorization: Bearer`.
+- The error envelope intentionally omits the failing reason, so a scenario that expects
+  a specific validation error must assert the **code**, not a message substring.
 
 ## 3. Wiring the GitHub App
 
