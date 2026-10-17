@@ -112,6 +112,24 @@ Editing `AGENTS.md` does not change an already-loaded context. A running session
 sent an explicit message telling it to re-read the files; otherwise it keeps following
 stale guidance.
 
+### Deliberate workflow change — read this
+
+The established per-feature loop in `docs/04-AGENT-OPERATING-SYSTEM.md` §2 merges small
+commits straight into `main` (`F-<nn>: ...`). `AGENTS.md` §5 replaces the *last* step of
+that loop: a meaningful change now ships as a **focused pull request** with a preview
+deployment and an automated test result before merge.
+
+This is an intentional change, not an oversight, and it is the reason `AGENTS.md` is
+declared canonical. Everything else in `docs/04` — the spec-first discipline, failing
+tests first, independent QA verification, red-team on trust boundaries, the consult
+protocol, the evidence formats, the anti-fabrication rules — still applies unchanged.
+
+Practical consequence: until preview deployments exist, a PR-based flow cannot complete.
+Until then, direct commits to `main` remain acceptable **provided** the local gates run
+and the commit stays focused. Do not open pull requests that cannot deploy — a PR
+without a deployment-ready signal is untestable, and claiming otherwise would be a false
+signal. Revisit this paragraph once the deployment blockers clear.
+
 ### Observation for the security owner
 
 On `POST` routes, FastAPI validates the request body before the handler runs, and

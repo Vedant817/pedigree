@@ -40,6 +40,12 @@ a Compose/Dockerfile pair needs no architectural change. What a host cannot do i
 provide a stable persistent volume for both the graph and the credential directory —
 that is the constraint to evaluate first when choosing a provider.
 
+The project's own README already names Render as the intended hosting step for F-16.
+Stay with that decision rather than introducing a second provider: whoever performs the
+deployment step should confirm that the host can keep a persistent volume for both
+`/data` (graph + credentials) and the FalkorDB data directory, and that it can build
+from the committed `Dockerfile` and `docker-compose.yml`.
+
 Required configuration (see `.env.example`); nothing else is needed for the core:
 
 ```
