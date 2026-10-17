@@ -9,7 +9,8 @@ Rules (deliberately mechanical and conservative):
 - Bare 1-2 digit integers and years are structural (dates, "2 tracks") and exempt.
 - Identifiers that embed digits (F-01, AT0.1, docs/02, S1, 127.0.0.1) are exempt.
 
-Usage: python scripts/check_numbers.py [files...]   (default: README.md + docs/BLOG-DRAFT.md)
+Usage: python scripts/check_numbers.py [files...]
+       (default: README.md, docs/BLOG.md, docs/BLOG-DRAFT.md, docs/DEMO_SCRIPT.md)
 """
 
 from __future__ import annotations
@@ -20,7 +21,12 @@ from pathlib import Path
 
 BEGIN = "<!-- NUMBERS:BEGIN -->"
 END = "<!-- NUMBERS:END -->"
-DEFAULT_TARGETS = ["README.md", "docs/BLOG-DRAFT.md"]
+DEFAULT_TARGETS = [
+    "README.md",
+    "docs/BLOG.md",
+    "docs/BLOG-DRAFT.md",
+    "docs/DEMO_SCRIPT.md",
+]
 
 NUM_TOKEN = re.compile(r"(?<![A-Za-z0-9_./#@-])(\d[\d,]*(?:\.\d+)?)(?![\w])")
 UNIT = re.compile(r"\s*(%|ms\b|s\b|x\b|k\b|KB\b|MB\b|GB\b|nodes\b|edges\b|bytes\b|req/s\b)")

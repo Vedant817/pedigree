@@ -17,16 +17,21 @@
   marked QA-closed.
   `make check` on `097309d`: 860 passed, 2 skipped, 6 deselected, 1 xfailed
   (262.82s); secret scan PASS; `check_numbers` PASS (2 files, 70 allowed values).
-- **Next:** Phase G after the README checker. P-027 one-click demo login and a
+- **Next:** Phase G hygiene, then Phase H. P-027 one-click demo login and a
   screen recording are still not built; the synthetic `demorealistic` seed and
-  blame-path highlight are. G1 (`scripts/check_readme.py`, required headings)
-  is in this tree as of 2026-10-18; the 20-second GIF is not. Walkthrough,
-  demo script, blog draft, and hygiene follow, then Phase H. Feature freeze
-  Sun 2026-10-18 15:00 IST. Do not push, tag, publish, or fill human-voice
-  disclosure fields. The realistic-seed tests passed (unit plus integration,
-  12 passed with the existing demo-seed file). `make check` on `3e94e17`:
-  867 passed, 2 skipped, 6 deselected, 1 xfailed (313.34s); secret scan PASS;
-  `check_numbers` PASS (2 files, 70 allowed values); `check_readme` PASS.
+  blame-path highlight are. G1 landed in `3e94e17`, `b0c9971`, and `7615eef`.
+  An independent correctness review failed the first README wording and passed
+  the corrected sentences in `7615eef`. The developer-experience review of
+  `3e94e17` passed. The 20-second GIF is not in the repo. G2 drafts are
+  `docs/WALKTHROUGH.md` (S1 six-node example), `docs/DEMO_SCRIPT.md`, and
+  `docs/BLOG.md`. They are drafts, not a recording, and they do not have their
+  own QA report. Feature freeze Sun 2026-10-18 15:00 IST. Do not push, tag,
+  publish, or fill human-voice disclosure fields. The realistic-seed tests
+  passed (unit plus integration, 12 passed with the existing demo-seed file).
+  `make check` on `3e94e17`: 867 passed, 2 skipped, 6 deselected, 1 xfailed
+  (313.34s); secret scan PASS; `check_numbers` PASS (2 files, 70 allowed
+  values); `check_readme` PASS. That suite run is older than `7615eef` and
+  older than the G2 drafts.
 - **Residuals:** ACL service wiring, installed runtime capture and stronger F-08
   eviction-proof lineage remain open. Private disclosure contact is human-owned.
   No hosted CI/deployment or native macOS acceptance is claimed; the Render

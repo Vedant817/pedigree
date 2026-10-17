@@ -80,9 +80,10 @@ The revoke is the heart of the product. It runs in four steps and the whole thin
    written during the cascade is *born quarantined* because its parent was quarantined - that is
    the race the barrier closes.
 3. **Compute.** Read the parents (`Q_PARENTS_OF`) and the corroborating sources (`Q_SUPPORT_OF`),
-   then compute final statuses in topological order in Python (`engine/compute.py`): a node whose
-   only bad parent became `preserved` is `ok`; a node with a healthy independent source is
-   `preserved`; everything else is `tainted`.
+   then compute final statuses in topological order in Python (`engine/compute.py`). A parent is
+   bad when it is revoked, tainted, or still quarantined. No bad parent becomes `ok`. A remaining
+   bad parent with a corroborating source whose status is `ok` becomes `preserved`; otherwise it
+   is `tainted`. A parent that itself became `preserved` is not bad.
 4. **Write + verify.** Chunked `UNWIND` write of the final statuses and `taint_parent`, then the
    invariant checker, then `Revocation.state='done'`. If the process dies between 2 and 4 the graph
    stays `quarantined` and `resume_incomplete()` finishes the job.
@@ -94,6 +95,50 @@ curl -s -X POST "$BASE/v1/revoke" -H "$H" -H 'Content-Type: application/json' \
 # then the real one
 curl -s -X POST "$BASE/v1/revoke" -H "$H" -H 'Content-Type: application/json' \
      -d '{"root_id":"demo_s1_web","reason":"poisoned page"}'
+```
+
+### Worked example: six nodes
+
+`demo/scenarios/S1.json` is the six-node chain. It is synthetic. Nothing in it has an
+independent corroborating source, so preservation does not appear here. After a revoke of
+`demo_s1_web`, the fixture's expected statuses are:
+
+| id | kind | after revoke |
+|---|---|---|
+| `demo_s1_web` | Source, the poisoned page | `revoked` |
+| `demo_s1_summary` | Memory derived from the page | `tainted` |
+| `demo_s1_rule` | Memory derived from the summary | `tainted` |
+| `demo_s1_edit` | Action, low risk, relied on the rule | `tainted` |
+| `demo_s1_commit` | Action, medium risk, relied on the edit | `tainted` |
+| `demo_s1_push` | Action, high risk, irreversible, relied on the commit | `tainted` |
+
+The stored blame path for the push, child first, is `demo_s1_push`, `demo_s1_commit`,
+`demo_s1_edit`, `demo_s1_rule`, `demo_s1_summary`, `demo_s1_web`.
+
+Say it in this order on camera:
+
+1. The barrier is one query. It revokes only a Source or Memory that is not already revoked, and it creates the running revocation in the same query.
+
+```cypher
+MATCH (r:Node) WHERE r.id = $id AND r.status <> 'revoked'
+  AND ('Source' IN labels(r) OR 'Memory' IN labels(r))
+SET r.status = 'revoked', r.revoked_at = $now, r.reason = $why, r.taint_parent = NULL
+WITH r CREATE (v:Node:Revocation {id:$rid, tenant:$tenant, root_id:$id, reason:$why,
+    kind:$kind, state:'running', started_at:$now, created_at:$now})
+RETURN r.id
+```
+
+2. The fixpoint discovers descendants over `FEEDS`, then quarantines members that are still `ok` or `preserved`. It repeats until a discovery finds nothing left to quarantine.
+
+```cypher
+UNWIND $ids AS i MATCH (n:Node {id:i}) WHERE n.status IN ['ok','preserved']
+SET n.status = 'quarantined' RETURN count(n) AS n
+```
+
+3. Python then reads parents and support and writes the final statuses. In this chain every descendant stays tainted, because none has a healthy corroborating source. The explanation stored on each tainted node is `taint_parent`. Blame follows that property until the next parent is missing or the chain repeats. That walk is not capped by `max_depth`. The depth cap belongs to the separate hop-path helper.
+
+```cypher
+MATCH (n:Node {id:$id}) RETURN n.taint_parent
 ```
 
 **Decision (ADR-006):** `:Revocation` carries `state` (running/done), not `status` - a revocation
@@ -133,8 +178,10 @@ overwrite a human attestation - otherwise an injected prompt could launder a poi
 proposed action and its lineage, and answers `allow`, `warn`, `reverify` or `block` with reasons
 that carry the path:
 
-1. a relied-on node with status `revoked|tainted|quarantined` -> block at medium/high risk, warn
-   at low risk, reason path = the `taint_parent` chain to the revoked root;
+1. a relied-on node that is `revoked`, `tainted`, `quarantined`, or `preserved` without trusted
+   support -> `block` at medium or high risk, `warn` at low risk. That `warn` becomes `reverify`
+   only when the list came from the session read window. An explicit `relied_on` at low risk stays
+   `warn`. The reason path is the `taint_parent` chain;
 2. a confidentiality tag outside the requested audience -> block;
 3. `low_integrity` on an irreversible or high-risk action -> reverify;
 4. an unknown id -> reverify (unknown lineage is never "safe");
