@@ -70,9 +70,15 @@ deployment answers `502` until a request wakes it. A cold start can exceed a sho
 timeout, so a suite that assumes an instantly-warm endpoint may report a false failure.
 Move `pedigree-api` to a paid plan before relying on the live URL for automated runs.
 
-A tenant credential for authenticated scenarios cannot be provisioned yet:
-`POST /admin/tenants` returns `422 invalid_argument`. See the handoff board for the
-reproduction and what has already been ruled out.
+A tenant credential for authenticated scenarios is provisioned with a JSON request:
+`POST /admin/tenants`, header `x-admin-token`, `Content-Type: application/json`,
+body `{"id":"<tenant>"}` returns `200` with agent and operator credentials. The
+earlier `422 invalid_argument` came from requests whose body was not valid JSON for
+the declared model — form-encoded bodies (the curl `-d` / PowerShell `-Body` default)
+and unknown fields both reject — and the detail-free envelope made the cause
+invisible. Reproduced and root-caused 2026-10-17 (handoff board, `docs/qa/P-003.md`);
+validation failures and authored 422s are now logged with the request correlation id.
+Re-verify against the live URL with the deployment admin token before relying on it.
 
 ### 1.1a Verified production rehearsal
 
@@ -309,7 +315,7 @@ tests pass* **off** until the suite is stable, then turn it on.
 | Two-service deployment topology | defined (`docker-compose.yml`, `Dockerfile`) |
 | Public HTTPS deployment | **not done** — needs a host account and a persistent volume |
 | Preview deployment per PR | **not done** — depends on the above |
-| TestSprite account / project / suite | **not done** — needs a TestSprite account; suite authoring is additionally blocked by the `422` recorded in the handoff board |
+| TestSprite account / project / suite | account and a backend project exist (2026-10-17); a suite is **not authored** — per-PR execution still needs the preview deployment and the GitHub App (B2/B4) |
 | GitHub App installed | **not done** — needs repository-owner authorisation |
 | Evidence PR with a TestSprite result | **not done** — depends on all of the above |
 

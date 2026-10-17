@@ -7,9 +7,10 @@ Governing engineering rules live in `AGENTS.md` (canonical). If this file and
 `AGENTS.md` disagree, `AGENTS.md` wins.
 
 - **Last updated:** 2026-10-17
-- **Updated by:** automated-testing integration pass
-- **Product milestone:** Phase D implementation and verification (see `docs/PROGRESS.md`
-  `CURRENT STATE` for the authoritative live state)
+- **Updated by:** feature-development session (Phase D verification closure)
+- **Product milestone:** Phase D implementation and verification closed; next is the
+  FIX_PROMPT Phase E feature set (see `docs/PROGRESS.md` `CURRENT STATE` for the
+  authoritative live state)
 
 ## 1. Product
 
@@ -51,7 +52,7 @@ Ownership is first-come; claim an area here before starting substantial work on 
 | Branch / area | Owner | State |
 |---|---|---|
 | `main` | feature-development session | active; several commits ahead of `origin/main` |
-| Phase D runtime + CI verification | feature-development session | in progress |
+| Phase D runtime + CI verification | feature-development session | **done** — `docs/qa/P-003.md` (PASS with caveats), `docs/qa/P-028.md` (PASS), `docs/qa/redteam-P-003.md` (PASS); findings in `docs/KNOWN_ISSUES.md` |
 | `chore/agent-guidance-and-pr-testing` (this pass) | automated-testing integration | ready for review |
 | Repository, deployment, PR-testing wiring | **unclaimed** | see section 4 |
 
@@ -129,8 +130,8 @@ the sleep; that is a cost decision, not a code one.
 |---|---|
 | Unit/integration/security/perf suite | **verified** — large green suite locally, plus a harsh-user dogfood pass |
 | CI workflow | **verified** — `.github/workflows/ci.yml` on push and PR |
-| Per-PR preview deployment signal | **not done** |
-| Third-party PR test suite | **not done** — blocked by the `422` above (no tenant can be provisioned) |
+| Per-PR preview deployment signal | **not done** — `previews: automatic` is configured; no GitHub connection yet |
+| Third-party PR test suite | **unblocked** 2026-10-17 (see the resolved 422 note); execution still needs the preview deployment and the connected triggers (B2/B4) |
 | PR-triggered automated test result | **not done** |
 
 A test result on a PR is only possible once a preview deployment exists. See
@@ -170,36 +171,42 @@ and the commit stays focused. Do not open pull requests that cannot deploy — a
 without a deployment-ready signal is untestable, and claiming otherwise would be a false
 signal. Revisit this paragraph once the deployment blockers clear.
 
-### Blocking issue for the feature session — `422 invalid_argument` on two write paths
+### Resolved 2026-10-17 — `422 invalid_argument` on write paths
 
-Now reproduced on the **live deployment**, not only in rehearsal, and on two independent
-code paths. This blocks provisioning a tenant, which in turn blocks any authenticated
-test run against the live URL.
+Reproduced locally on production-mode code with a real FalkorDB, root-caused, and
+closed by the feature session. The API was not rejecting valid provisioning requests:
+it was rejecting bodies that are not valid JSON for the declared model, and the
+detail-free public envelope made every 422 look identical.
 
 | Call | Result |
 |---|---|
-| `POST /admin/tenants` with `x-admin-token`, body `{"id":"acme"}` | `422 invalid_argument` |
-| same, with `"prod1"`, `"tenant1"`, `"demo2"`, `"e2e"` | `422 invalid_argument` (all) |
-| `POST /v1/sources` with a valid tenant operator token | `422 invalid_argument` |
+| `POST /admin/tenants`, `Content-Type: application/json`, body `{"id":"acme"}`, `x-admin-token` | `200` — tenant created, agent + operator credentials returned |
+| same body sent form-encoded (curl `-d` / PowerShell `-Body` default) | `422 invalid_argument` |
+| same, with an unknown field (e.g. `"tenant"`) | `422 invalid_argument` |
+| `POST /v1/sources` with a valid operator bearer, clean JSON body | `200` |
+| `POST /v1/sources` with an unknown field or a non-JSON body | `422 invalid_argument` |
+| `POST /admin/tenants`, correct JSON, no admin header | `401` (auth still precedes the handler) |
 
-Ruled out by inspection, so nobody repeats the search:
+Reproduction: `scratch/repro422.py` (local, production settings, real FalkorDB),
+2026-10-17. The earlier "raised inside the handler" inference was wrong: the
+`RequestValidationError` handler produces the same envelope shape as a typed error —
+the distinguishing key is that a typed error carries `error.detail`. Two fixes landed
+with this closure:
 
-- `validate_tenant` is `TENANT_RE.fullmatch`, and `^[a-z0-9]{3,24}$` accepts every id tried.
-- `RESERVED_TENANT_IDS` is only `{"registry"}`.
-- `TenantId` is `StringConstraints(strict=True, pattern=TENANT_RE.pattern)` — accepts those ids.
-- `node_cap` was omitted, so the `1..1000000` branch in `create_tenant` is not taken.
-- The `1..60000` bound in `config.py` applies to `read_timeout_ms` / `write_timeout_ms`, not `node_cap`.
+- request-validation failures are logged server-side with the correlation id, field
+  path and error type — never the submitted value or the validator message;
+- authored `invalid_argument` rejections log their static reason and the
+  identifier-shaped `detail` keys only.
 
-The response envelope is the app's own error shape with a `correlation_id`, not
-FastAPI's default `{"detail": [...]}`, so the failure is raised as a `PedigreeError`
-somewhere inside the handler rather than by request parsing. The envelope deliberately
-omits the failing reason, which is why this cannot be narrowed from outside the process.
-The obvious next step is to log `InvalidArgument.detail` server-side for the
-`correlation_id`s above; the detail is built at the raise site and then discarded.
+The exact request the live deployment received was not captured, so re-verify the
+live call with the deployment's admin token before relying on it:
 
-Do **not** assume the environment is at fault this time: it reproduces on the real
-deployment, and `GET /admin/tenants` on the same service returns `200` with the same
-credential, so admin authentication and the registry read path are both healthy.
+```bash
+curl -sS -X POST https://pedigree-api.onrender.com/admin/tenants \
+  -H "Content-Type: application/json" \
+  -H "x-admin-token: $PEDIGREE_ADMIN_TOKEN" \
+  -d '{"id":"acme"}'
+```
 
 ### Observation for the security owner
 
@@ -208,8 +215,9 @@ authentication happens inside the handler (`tenant_and_db(request)` in
 `src/pedigree/api/routes/engine.py`). Consequently a request with a **bad token and a
 malformed body** returns `422`, not `401`. No data is written and no token is
 disclosed, but the response shape and the rate limiter are reached before
-authentication. Verified behaviour, not a fix — raised here so the security owner can
-decide whether the ordering is intended.
+authentication. Verified behaviour, not a fix. Decision recorded 2026-10-17: keep the
+ordering (the exposure is a schema shape, not data, and no state change is possible);
+the accepted limitation is in `docs/KNOWN_ISSUES.md` (P-003 QA F1 / redteam-P-003 F2).
 
 ## 5. Outstanding blockers
 
@@ -255,7 +263,7 @@ host's secret store and outside version control.
 
 | Item | Verified? |
 |---|---|
-| Local gates green on `main` | reported green by the feature session — see `docs/PROGRESS.md`. **Not re-run during the automated-testing pass**: that change was documentation-only, and the full suite shares the database with work in flight. |
+| Local gates green on `main` | green — feature session root `make check` 2026-10-17 on the verification-closure tree: 809 passed, 2 skipped, 4 deselected, 1 xfailed (165.02s); Ruff, tracked secret scan and `check_numbers` PASS. Log: `scratch/make-check-phase-d-verification.log` |
 | Application serves a real build | yes — independently verified 2026-10-17 by this pass, section 4 |
 | Preview deployment per PR | **no** — blocked by B2 |
 | Third-party suite executed against a deployment | **no** — blocked by B3 |

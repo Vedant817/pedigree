@@ -1,16 +1,21 @@
 # CURRENT STATE (overwritten after every feature / checkpoint)
 
-- **Phase:** Phase D implementation, Sat 2026-10-17 19:28 IST. Commits 064e095
-  (P-028 lock/CI) and 42777f7 (P-003/P-004 non-root compose runtime + owned
-  no-Docker quickstart), plus the Phase D decision record ADR-014/consult013.
-  Full `make check`: 804 passed, 2 skipped, 4 deselected, 1 xfailed; Ruff,
-  tracked secrets and numbers PASS.
-- **Next:** independent Linux QA (README-literal compose from a fresh clone;
-  python:3.12 container quickstart and clean-clone check) and red-team on
-  credential/admin/network boundaries; then the checkpoint-D tag/push decision.
+- **Phase:** Phase D implementation and verification closed, Sat 2026-10-17 20:55 IST.
+  Commits 064e095 (P-028 lock/CI) and 42777f7 (P-003/P-004 non-root compose runtime +
+  owned no-Docker quickstart), ADR-014/consult013, then the verification closure:
+  6740b3a (P-021 diagnosable 422s), 6b69869 (P-011 port fix), 2806ecc (P-003 operator
+  text), 1b16ca1 (P-028 lock check on all install paths), e0e976b (QA reports).
+  Full `make check` on the final tree: 809 passed, 2 skipped, 4 deselected,
+  1 xfailed (165.02s); Ruff, tracked secrets (QA reports staged) and numbers PASS.
+  Verification: docs/qa/P-003.md (PASS with caveats), docs/qa/P-028.md (PASS),
+  docs/qa/redteam-P-003.md (PASS).
+- **Next:** FIX_PROMPT Phase E (verify P-006; P-022, P-023 and the oracle battery —
+  apply `docs/consults/008-p012-reinstate/oracle.md` corrections first). Checkpoint D
+  tag/push awaits the user's go.
 - **Residuals:** ACL service wiring, installed runtime capture and stronger F-08
   eviction-proof lineage remain open. Private disclosure contact is human-owned.
-  No hosted CI/deployment or native macOS acceptance is claimed.
+  No hosted CI/deployment or native macOS acceptance is claimed; the Render
+  deployment and automated-testing account are human-owned.
 - **Last implementation commits:** 1243744/031f86a/83d7b73 (P-016 QA follow-up: stdio default-tenant
   token bypass fixed - red-team F-1 with red-at-parent regression; MCP errors actionable; README
   auth reality + 13-tool list; QA addenda), ef9033f (P-012 consult trio filed: domain + oracle
@@ -751,3 +756,31 @@
   deployment admin 403 in demo mode, /metrics 403 and /docs 404 in production
   mode, credentials byte-identical after restart and down/up (state volume).
 - Next: independent QA/red-team per FIX_PROMPT D, then the checkpoint D decision.
+
+### 2026-10-17 20:55 IST | Phase D verification | STATUS: done
+- Independent verification of 42777f7 landed: docs/qa/P-003.md (README-literal
+  compose from a fresh clone, 10 adversarial cases; PASS with caveats),
+  docs/qa/P-028.md (three clean-clone gate runs, quickstart B1-B3, tampered-lock
+  probe caught; PASS with L-1/L-2), docs/qa/redteam-P-003.md (tenant isolation,
+  auth ordering, injection, DoS/limits, envelope; PASS, no bypass).
+- Follow-ups committed: 6740b3a P-021 (a rejected body and an authored rejection
+  were indistinguishable and unlogged; validation failures now log correlation id +
+  field path + type, authored 422s log their static reason and detail keys, never
+  values; the reported live write-path blocker reproduced as a non-JSON body/unknown
+  field vs 200 with Content-Type: application/json, scratch/repro422.py);
+  6b69869 P-011 (crash driver now inherits FALKOR_PORT; red at 6380 then green);
+  2806ecc P-003 (runtime prints "module 42201"); 1b16ca1 P-028 (uv lock --check
+  after frozen sync on setup/quickstart/quickstart-windows/Dockerfile).
+- Accepted limitations recorded: docs/KNOWN_ISSUES.md #22 (repaired diagnosability),
+  #23 (422-before-auth ordering, keep-as-is), #24 (anonymous MCP initialize/
+  tools-list/health). 422 resolution and evidence on the handoff board.
+- Root make check on the final tree: 809 passed, 2 skipped, 4 deselected,
+  1 xfailed in 165.02s, exit 0; Ruff, tracked secret scan (QA reports staged) and
+  check_numbers PASS. Log: scratch/make-check-phase-d-verification.log.
+- Other sessions on top of the implementation: 6411ac0 render.yaml, 8d97343
+  injected-PORT binding, 4d9c507 live Render deployment record (deployment and
+  automated-testing account remain human-owned; no hosted CI or macOS claim).
+  The GRAPH.COPY fork transient on the shared DB is recorded in the P-028 report
+  as environment-induced; the route's typed 503 mapping is by design.
+- Next: FIX_PROMPT Phase E (verify P-006; P-022, P-023 and the oracle battery —
+  apply docs/consults/008-p012-reinstate/oracle.md corrections first).
