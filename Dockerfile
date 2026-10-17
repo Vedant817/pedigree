@@ -15,5 +15,5 @@ USER 10001:10001
 EXPOSE 8000
 VOLUME ["/data"]
 HEALTHCHECK --interval=10s --timeout=4s --start-period=15s --retries=6 \
-    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz',timeout=3)"]
+    CMD ["sh", "-c", "python -c \"import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:'+os.environ.get('PORT','8000')+'/readyz',timeout=3)\""]
 ENTRYPOINT ["bash", "scripts/entrypoint.sh"]
