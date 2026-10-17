@@ -57,6 +57,23 @@ Consequence for the deployment step: build from the **`Dockerfile`** and set the
 environment on the service, using the FalkorDB image the Compose file already pins. The
 compose file remains the local development and demo path.
 
+### 1.1b Live deployment (current state)
+
+A public deployment exists: **https://pedigree-api.onrender.com**, backed by the private
+`pedigree-db` service. `render.yaml` is the declarative source of truth.
+
+Verified against the public URL: `/readyz` → `200 {"ready":true}`, `/healthz` → `200`,
+`/` → `200`, and every protected route → `401` without a credential.
+
+**The web service runs on Render's free plan, which sleeps when idle.** An idle
+deployment answers `502` until a request wakes it. A cold start can exceed a short client
+timeout, so a suite that assumes an instantly-warm endpoint may report a false failure.
+Move `pedigree-api` to a paid plan before relying on the live URL for automated runs.
+
+A tenant credential for authenticated scenarios cannot be provisioned yet:
+`POST /admin/tenants` returns `422 invalid_argument`. See the handoff board for the
+reproduction and what has already been ruled out.
+
 ### 1.1a Verified production rehearsal
 
 A full production-mode boot was rehearsed on an isolated stack (own network, own database,
@@ -292,7 +309,7 @@ tests pass* **off** until the suite is stable, then turn it on.
 | Two-service deployment topology | defined (`docker-compose.yml`, `Dockerfile`) |
 | Public HTTPS deployment | **not done** — needs a host account and a persistent volume |
 | Preview deployment per PR | **not done** — depends on the above |
-| TestSprite account / project / suite | **not done** — needs a TestSprite account |
+| TestSprite account / project / suite | **not done** — needs a TestSprite account; suite authoring is additionally blocked by the `422` recorded in the handoff board |
 | GitHub App installed | **not done** — needs repository-owner authorisation |
 | Evidence PR with a TestSprite result | **not done** — depends on all of the above |
 
