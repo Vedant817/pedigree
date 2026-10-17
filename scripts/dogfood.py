@@ -27,9 +27,8 @@ tree `561b7e2`; see docs/qa/P-010.md and the report this tool writes):
 - P-016 (S16/S17): fixed in tree at `6340a5c` + `561b7e2` (MCP stdio `initialize` + tool calls
   work; `GET /mcp` is served from the API process). The rows below therefore expect PASS with the
   P-016 citation and a "flip back if it regresses" note; if the fix regresses they FAIL and exit 1.
-- P-022 (S14): no pedigree metric is registered anywhere in `src/`, so `/metrics` today exposes
-  only `python_gc_*` / `python_info`. S14 asserts the target state (200 + a "pedigree" series) and
-  is EXPECTED-FAIL until P-022 lands.
+- P-022 (S14): landed in commit `2ac660c` (`/metrics` is admin-protected and exposes
+  `pedigree_*` series after a revoke); S14 now expects PASS.
 - S11 forged `Content-Length`: h11 rejects a non-numeric content-length at the protocol level
   before BodySizeMiddleware runs, so the observed 400 comes from uvicorn ("Invalid HTTP request
   received."). Both layers agree on 400, so the row asserts the status only.
@@ -158,9 +157,9 @@ EXPECTATIONS: dict[str, Expectation] = {
         "(disabled in production by rule; not reproduced here).",
     ),
     "S14": Expectation(
-        "expected-fail", "P-022, P-029",
-        "metrics content after a revoke: 200 + a 'pedigree' series; today 200 but only python_gc_*/"
-        "python_info (no pedigree metric is registered). Row sends X-Admin-Token (target state).",
+        "pass", "P-022, P-029",
+        "metrics content after a revoke: 200 + a 'pedigree' series (landed in P-022). "
+        "Row sends X-Admin-Token (deployment-admin authentication).",
     ),
     "S15": Expectation(
         "pass", "P-025",
