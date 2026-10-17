@@ -24,8 +24,9 @@
   the corrected sentences in `7615eef`. The developer-experience review of
   `3e94e17` passed. The 20-second GIF is not in the repo. G2 drafts are
   `docs/WALKTHROUGH.md` (S1 six-node example), `docs/DEMO_SCRIPT.md`, and
-  `docs/BLOG.md`. They are drafts, not a recording, and they do not have their
-  own QA report. Feature freeze Sun 2026-10-18 15:00 IST. Do not push, tag,
+  `docs/BLOG.md` in `36159b5`. They are drafts, not a recording. An independent
+  correctness review of that commit passed. There is no separate devex review
+  of the drafts, and no `docs/qa` file was written for them. Feature freeze Sun 2026-10-18 15:00 IST. Do not push, tag,
   publish, or fill human-voice disclosure fields. The realistic-seed tests
   passed (unit plus integration, 12 passed with the existing demo-seed file).
   `make check` on `3e94e17`: 867 passed, 2 skipped, 6 deselected, 1 xfailed
