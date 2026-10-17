@@ -1,18 +1,29 @@
 # CURRENT STATE (overwritten after every feature / checkpoint)
 
-- **Phase:** Phase D implementation and verification closed, Sat 2026-10-17 20:55 IST.
-  Commits 064e095 (P-028 lock/CI) and 42777f7 (P-003/P-004 non-root compose runtime +
-  owned no-Docker quickstart), ADR-014/consult013, then the verification closure:
-  6740b3a (P-021 diagnosable 422s), 6b69869 (P-011 port fix), 2806ecc (P-003 operator
-  text), 1b16ca1 (P-028 lock check on all install paths), e0e976b (QA reports).
-  Full `make check` on the final tree: 809 passed, 2 skipped, 4 deselected,
-  1 xfailed (165.02s); Ruff, tracked secrets (QA reports staged) and numbers PASS.
-  Verification: docs/qa/P-003.md (PASS with caveats), docs/qa/P-028.md (PASS),
-  docs/qa/redteam-P-003.md (PASS).
-- **Next:** FIX_PROMPT Phase E: P-006 honest eval (evals/ numbers + statistician
-  sign-off), P-022 trace/metrics/logs, P-023 isolation suite, and the P-012 reinstate
-  fix + oracle battery (apply `docs/consults/008-p012-reinstate/oracle.md` corrections
-  first). Checkpoint D is pushed (`phase-D` tag at 6f44232).
+- **Phase:** Phase E in progress, Sat 2026-10-17. Checkpoint D pushed
+  (`phase-D` tag at `6f44232`); Phase E work lands on `main` ahead of origin (push/tag
+  at the next checkpoint decision).
+  Landed this session:
+    - P-022 (observability): trace in revoke/blame/impact/gate responses + MCP;
+      `/metrics` families `pedigree_query_seconds`, `pedigree_revocations_total`,
+      `pedigree_gate_decisions_total`, `pedigree_nodes`; JSON access log; collapsible
+      UI trace strip. Commits `2ac660c` + idempotency fix `ba41f70`. QA:
+      `docs/qa/P-022.md` (PASS with caveats: browser strip not visually verified).
+    - P-006 (honest eval): `make eval` reproduces (exit 0, 70 allowed values in
+      `check_numbers`); statistician sign-off flipped to SIGNED in the addendum of
+      `docs/qa/eval-signoff.md`. Commit `aa898db`.
+    - P-012 reinstate oracle battery: evidence recorded in `docs/qa/P-012.md`
+      (step-0 PASS, unit 12 passed, property 300/0 failing, mutation red/green).
+      Commits `6cf053a` … `838e2e1`, evidence commit `0f05982`.
+    - P-023 spec filed (`docs/fixes/P-023.md`, commit `59e6143`); implementation
+      (tests/isolation/) in progress.
+    - Doc drift from the P-022 QA pass fixed: `docs/02-ARCHITECTURE.md` metrics list,
+      `AUDIT.md` P-022 status, `docs/01-IDEA.md` trace scope. Commit `f4bc2eb`.
+  Full `make check` baseline at the Phase D close-out: 809 passed, 2 skipped,
+  4 deselected, 1 xfailed (165.02s). Re-run pending after the P-023 suite lands.
+- **Next:** finish P-023 (isolation suite); then FIX_PROMPT F (P-017 capture,
+  P-027 demo), G (README, walkthrough, disclosure, hygiene), H (final gate). Feature
+  freeze Sun 2026-10-18 15:00 IST.
 - **Residuals:** ACL service wiring, installed runtime capture and stronger F-08
   eviction-proof lineage remain open. Private disclosure contact is human-owned.
   No hosted CI/deployment or native macOS acceptance is claimed; the Render

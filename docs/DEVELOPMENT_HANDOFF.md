@@ -7,10 +7,12 @@ Governing engineering rules live in `AGENTS.md` (canonical). If this file and
 `AGENTS.md` disagree, `AGENTS.md` wins.
 
 - **Last updated:** 2026-10-17
-- **Updated by:** feature-development session (Phase D verification closure)
-- **Product milestone:** Phase D implementation and verification closed; next is the
-  FIX_PROMPT Phase E feature set (see `docs/PROGRESS.md` `CURRENT STATE` for the
-  authoritative live state)
+- **Updated by:** feature-development session (Phase E: P-022 landed + QA, P-006 signed, P-012 evidence, P-023 spec in progress)
+- **Product milestone:** Phase E in progress. P-022 (observability) landed and QA-recorded
+  (docs/qa/P-022.md, PASS with caveats), P-006 eval signed (docs/qa/eval-signoff.md
+  addendum), P-012 evidence recorded (docs/qa/P-012.md), P-023 isolation suite spec filed
+  (docs/fixes/P-023.md). P-023 implementation in progress. See `docs/PROGRESS.md`
+  `CURRENT STATE` for the authoritative live state.
 
 ## 1. Product
 
