@@ -185,7 +185,7 @@ Also report exact descendant counts for the top-k by BFS (`Q_DESCENDANTS`) becau
 
 ## 7. Interfaces
 ### 7.1 MCP server (name `pedigree`; Streamable HTTP at `/mcp`; also stdio for local)
-Tools (tenant comes from the bearer token / env, **never** from a tool argument). OpenCode shows them as `pedigree_<tool>`; Claude Code as `mcp__pedigree__<tool>`. All arguments are validated (pydantic) with the limits in 8.2. All responses are JSON text with `ok`, `trace` (`[{op,ms,rows}]`).
+Tools (tenant comes from the bearer token / env, **never** from a tool argument). OpenCode shows them as `pedigree_<tool>`; Claude Code as `mcp__pedigree__<tool>`. All arguments are validated (pydantic) with the limits in 8.2. All responses are JSON text with `ok` (and, for `revoke`/`blame`/`impact`/`check_action`, `trace`: `[{op,ms,rows}]`); other tools return `ok` only.
 | Tool | Input (JSON schema, abbreviated) | Output |
 |---|---|---|
 | `record_source` | `{kind: enum, uri?: str<=512, title?: str<=160, content_hash?: hex64, integrity?: enum, conf?: str[]<=8}` | `{source_id}` |

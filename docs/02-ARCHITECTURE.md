@@ -95,7 +95,7 @@ Strategy:
 
 ## 5. Observability
 - JSON logs (stdlib `logging` + custom formatter): `ts, level, request_id, tenant, route, status, ms, tool, rows, op` - never tokens or text bodies.
-- `GET /metrics` (admin token): `pedigree_requests_total{route,status}`, `pedigree_request_seconds{route}`, `pedigree_query_seconds{op}` (histogram), `pedigree_gate_decisions_total{decision}`, `pedigree_revocations_total{state}`, `pedigree_nodes{tenant}` (gauge, top-N), `pedigree_rate_limited_total`.
+- `GET /metrics` (admin token): `pedigree_query_seconds{op}` (histogram), `pedigree_gate_decisions_total{decision}`, `pedigree_revocations_total{status}`, `pedigree_nodes{tenant,status}` (gauge, refreshed when a tenant report is served — not a scrape-time full scan, see `docs/fixes/P-022.md`). Protected by the admin token.
 - Per-request **trace** (`[{op, ms, rows}]`) returned in API/MCP responses (and rendered in the UI strip) - mirrors the organizer's recommended "tool/args/ms/rows" trace.
 - Slow-query log (> 250 ms) with `op` name (not params). FalkorDB side: `GRAPH.SLOWLOG`, `GRAPH.MEMORY USAGE` in the `/v1/stats` admin view.
 - `/healthz` (process up), `/readyz` (DB ping + `CALL db.indexes()` operational for the registry graph).
