@@ -261,15 +261,15 @@ UNWIND $ids AS i MATCH (n:Node {id:i}) WHERE n.status IN ['ok','preserved']
 SET n.status = 'quarantined' RETURN count(n) AS n
 ```
 
-`compute_final` is Python, not a Cypher procedure. In topological order over the closure, a node with no revoked or tainted parent becomes `ok`. A node that still has one is `preserved` when a healthy `CORROBORATED_BY` source exists, and `tainted` otherwise. A parent that itself became `preserved` is not a bad parent, which is why the order matters. `Q_PARENTS_OF` and `Q_SUPPORT_OF` are the reads. `Q_WRITE_FINAL` writes the result in chunks, and a short verify loop repeats until no member is still quarantined. The work is linear in the closure's nodes and edges, plus one write per member.
+`compute_final` is Python, not a Cypher procedure. In topological order over the closure, a parent is bad when it is revoked, tainted, or still quarantined. A node with no bad parent becomes `ok`. A node that still has one is `preserved` when a healthy `CORROBORATED_BY` source exists, and `tainted` otherwise. A parent that itself became `preserved` is not a bad parent, which is why the order matters. `Q_PARENTS_OF` and `Q_SUPPORT_OF` are the reads. `Q_WRITE_FINAL` writes the result in chunks, and a short verify loop repeats until no member is still quarantined. The work is linear in the closure's nodes and edges, plus one write per member.
 
-Blame. The product does not call Cypher `shortestPath`. The stored explanation is the `taint_parent` chain (`Q_TAINT_PARENT`), one indexed read per hop, bounded by `max_depth`. The ancestor set is `algo.BFS` on `DERIVED_FROM`. `bfs_paths` then returns the shortest hop path in that parent map, also depth-bounded.
+Blame. The product does not call Cypher `shortestPath`. The stored explanation is the `taint_parent` chain (`Q_TAINT_PARENT`): one indexed read per hop, stopping when the next parent is missing or the chain repeats. That walk does not consult `max_depth`. The ancestor set is `algo.BFS` on `DERIVED_FROM`, and `bfs_paths` returns the shortest hop path in that parent map, bounded by `max_depth`.
 
 ```cypher
 MATCH (n:Node {id:$id}) RETURN n.taint_parent
 ```
 
-Gate. `check_action` classifies the command locally, then reads the named `relied_on` nodes with `Q_GATE_NODES`. An empty `relied_on` plus a session id still fills that list from `Q_READ_WINDOW` (ADR-007). A bad node on that list yields `reverify` rather than a silent allow. If the list is still empty, the decision is `allow` with reason `warning:no_lineage`; effect and risk stay whatever the classifier returned. High-risk nodes also walk ancestors up to the depth limit. The decision itself does not traverse the tenant.
+Gate. `check_action` classifies the command locally, then reads the named `relied_on` nodes with `Q_GATE_NODES`. An empty `relied_on` plus a session id still fills that list from `Q_READ_WINDOW` (ADR-007). A node on that list that is revoked, tainted, quarantined, or `preserved` without trusted support is `block` when the classified risk is medium or high, and `warn` at low risk. That `warn` becomes `reverify` only when the list came from the read window. An explicit `relied_on` at low risk stays `warn`. If the list is still empty, the decision is `allow` with reason `warning:no_lineage`; effect and risk stay whatever the classifier returned. When the effect is irreversible or the risk is high, the gate also runs `algo.BFS` over ancestors (`Q_ANCESTORS`), bounded by the depth limit.
 
 `docs/WALKTHROUGH.md` explains each of these with the product question it answers and a runnable
 command against a seeded tenant.
