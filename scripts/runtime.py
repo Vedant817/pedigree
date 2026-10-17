@@ -83,11 +83,11 @@ def wait_db(timeout: float = 30, process=None) -> None:
             raise RuntimeError('owned database process exited before readiness')
         if db.ping():
             if db.module_version() != 42201:
-                raise RuntimeError('database must run FalkorDB module42201')
+                raise RuntimeError('database must run FalkorDB module 42201')
             for name, expected in LIMITS.items():
                 if config_value(db, name) != expected:
                     raise RuntimeError(f'database required limit {name} differs')
-            print('[runtime] database module42201 and mandatory limits verified')
+            print('[runtime] database module 42201 and mandatory limits verified')
             return
         time.sleep(.25)
     raise RuntimeError('database readiness deadline exceeded')
