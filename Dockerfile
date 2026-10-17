@@ -7,6 +7,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
 RUN uv sync --frozen --no-dev --no-editable \
+    && uv lock --check \
     && groupadd --gid 10001 pedigree && useradd --uid 10001 --gid pedigree --no-create-home pedigree \
     && mkdir -p /data/credentials && chown -R pedigree:pedigree /data && chmod 700 /data /data/credentials
 COPY scripts/entrypoint.sh scripts/seed_demo.py scripts/runtime.py ./scripts/

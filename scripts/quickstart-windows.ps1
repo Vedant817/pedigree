@@ -10,6 +10,8 @@ foreach ($taskPort in @($taskDbPort, $taskApiPort)) {
 }
 uv sync --frozen --extra dev
 if ($LASTEXITCODE -ne 0) { throw 'Locked installation failed' }
+uv lock --check
+if ($LASTEXITCODE -ne 0) { throw 'Lockfile does not match pyproject.toml; run uv lock' }
 $taskPython = Join-Path $taskRoot '.venv/Scripts/python.exe'
 $taskData = if ($env:DATA_DIR) { [System.IO.Path]::GetFullPath($env:DATA_DIR) } else { Join-Path $taskRoot 'data/windows' }
 New-Item -ItemType Directory -Force -Path (Join-Path $taskData 'db') | Out-Null

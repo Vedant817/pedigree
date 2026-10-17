@@ -31,6 +31,7 @@ help:
 
 setup:
 	uv sync --frozen --extra dev
+	uv lock --check
 
 quickstart:
 	bash scripts/quickstart.sh

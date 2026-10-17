@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 command -v uv >/dev/null || python3 -m pip install uv==0.12.22
 uv sync --frozen --extra dev --extra localdb
+uv lock --check
 export PATH="$ROOT/.venv/bin:$PATH"
 bash scripts/fetch-falkordb.sh
 exec python scripts/runtime.py quickstart
