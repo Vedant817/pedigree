@@ -22,6 +22,14 @@
     return result;
   }
   function fail(error) { if (error.name !== 'AbortError') notice(error.message || 'Request failed. Try again.', true); }
+  function showTrace(result) {
+    const entries = result && Array.isArray(result.trace) ? result.trace : [];
+    if (!entries.length) { $('trace').replaceChildren(text('p','No database operations recorded for the last action.','empty')); return; }
+    const total = entries.reduce((sum, entry) => sum + entry.ms, 0);
+    const list = document.createElement('ol');
+    for (const entry of entries) list.append(text('li',`${entry.op} · ${entry.ms} ms · ${entry.rows} row${entry.rows === 1 ? '' : 's'}`));
+    $('trace').replaceChildren(text('p',`${entries.length} op${entries.length === 1 ? '' : 's'} · ${total.toFixed(2)} ms total`,'eyebrow'), list);
+  }
   function invalidatePreview() {
     preview = null; $('preview-result').replaceChildren(); $('confirm').hidden = true; $('cancel').hidden = true;
   }
@@ -37,6 +45,7 @@
     $('node-count').textContent = '—'; $('selection').replaceChildren(text('p','Select a node to inspect its evidence.','empty'));
     $('selected-status').textContent = 'No selection'; $('evidence').replaceChildren(); $('gate-result').replaceChildren();
     $('affected').replaceChildren(text('li','Inspect impact to see affected actions.','empty'));
+    $('trace').replaceChildren(text('p','Trace roots, see impact, preview a revocation or check an action to see its database operations here.','empty'));
     $('graph-empty').hidden = false; $('token').value = ''; $('connection').textContent = 'Disconnected';
     $('connection').className = 'connection'; $('disconnect').hidden = true; controls();
   }
@@ -126,6 +135,7 @@
       } else { contents.push(text('p',`${result.counts.n_total} downstream nodes`)); effects(result.actions); }
       if (result.truncated) contents.push(text('p','Depth limit reached. Additional lineage exists.'));
       $('evidence').replaceChildren(...contents);
+      showTrace(result);
     } catch(error) {fail(error);}
   });
   $('preview').addEventListener('click',async()=>{
@@ -140,6 +150,7 @@
       $('preview-result').replaceChildren(text('p',`Would taint ${counts.would_taint || 0} · preserve ${counts.would_preserve || 0} · restore healthy ${counts.would_keep_ok || 0}`),
         text('p',`Selected root: ${current.id}. Preview has made no changes.`));
       effects(result.actions || impact.actions); $('confirm').hidden = false; $('cancel').hidden = false;
+      showTrace(result);
     } catch(error) {invalidatePreview();fail(error);} finally {controls();}
   });
   $('confirm').addEventListener('click',async()=>{
@@ -147,7 +158,8 @@
     const current = preview; confirming = true; $('confirm').disabled = true;
     try {
       const result = await api('/v1/revoke',{root_id:current.id,reason:current.reason,dry_run:false});
-      invalidatePreview(); await refresh(); effects(result.actions); notice('Revocation recorded. Graph refreshed from persisted state.');
+      invalidatePreview(); await refresh(); effects(result.actions); showTrace(result);
+      notice('Revocation recorded. Graph refreshed from persisted state.');
     } catch(error) {invalidatePreview();fail(error);} finally {confirming = false;$('confirm').disabled = false;}
   });
   $('gate-form').addEventListener('submit',async event=>{
@@ -157,6 +169,7 @@
       const result = await api('/v1/gate',{action:{tool:'Bash',summary:$('command').value},relied_on:[node]});
       if (selected?.id !== node) return;
       $('gate-result').replaceChildren(text('h3',result.decision), ...result.reasons.map(r=>text('p',`${r.code}: ${r.detail}${r.path.length ? ' · ' + r.path.join(' → ') : ''}`)));
+      showTrace(result);
     } catch(error) {fail(error);} finally {controls();}
   });
 })();

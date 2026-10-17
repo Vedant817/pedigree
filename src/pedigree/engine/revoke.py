@@ -16,6 +16,7 @@ from ..config import LIMITS, REVOCABLE, validate_tenant
 from ..db import queries as Q
 from ..db.client import Db, Trace, chunks
 from ..errors import InvalidArgument, NotFoundInGraph, PedigreeError, TooLarge
+from ..observability import count_revocation
 from .compute import compute_final
 from .ingest import new_id, node_exists, now_ms
 from .quota import quota_write
@@ -151,7 +152,9 @@ def revoke(
                         "reason": reason,
                         "ms": round((time.perf_counter() - t0) * 1000, 1),
                     })
+                    count_revocation("resumed")
                     return resumed_row
+            count_revocation("idempotent")
             return {
                 "idempotent": True,
                 "root_id": root_id,
@@ -169,6 +172,7 @@ def revoke(
         out = _finish(db, gname, rid, statuses, final, trace)
         out.update({"idempotent": False, "root_id": root_id, "kind": kind, "reason": reason})
         out["ms"] = round((time.perf_counter() - t0) * 1000, 1)
+        count_revocation("done")
         return out
 
 

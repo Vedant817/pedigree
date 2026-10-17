@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import threading
+import time
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -22,6 +23,7 @@ from ..diagnostics import (
 )
 from ..errors import PedigreeError
 from ..http_boundary import BodySizeMiddleware
+from ..observability import access_record
 from ..rate_limit import RateLimiter
 from . import routes
 from .registry import TenantRegistry
@@ -69,11 +71,14 @@ class CorrelationMiddleware:
         cid = correlation_id()
         scope.setdefault("state", {})["correlation_id"] = cid
         started = finished = False
+        status_code = 500
+        t0 = time.perf_counter()
 
         async def correlated_send(message):
-            nonlocal started, finished
+            nonlocal started, finished, status_code
             if message["type"] == "http.response.start":
                 started = True
+                status_code = message["status"]
                 message = {**message, "headers": [
                     (name, value) for name, value in message.get("headers", ())
                     if name.lower() != b"x-correlation-id"
@@ -93,6 +98,20 @@ class CorrelationMiddleware:
                 # a second response or rethrow a secret-bearing cause to the server.
                 with contextlib.suppress(Exception):
                     await correlated_send({"type": "http.response.body", "body": b"", "more_body": False})
+        finally:
+            # P-022: one JSON access line per request; route template, never a query
+            # string or header, and tenant/op only once the request was admitted.
+            state = scope.get("state") or {}
+            route = scope.get("route")
+            access_record(
+                request_id=cid,
+                method=scope.get("method", ""),
+                path=getattr(route, "path", None) or scope.get("path", ""),
+                status=status_code,
+                ms=(time.perf_counter() - t0) * 1000.0,
+                tenant=state.get("tenant_id"),
+                op=state.get("op"),
+            )
 
 
 class RootDispatcher:

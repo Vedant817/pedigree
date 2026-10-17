@@ -49,6 +49,7 @@ def authenticate(request: Request):
 
 def admit(request: Request, operation: str, *, dry_run: bool = False,
           record: bool = False) -> None:
+    request.state.op = operation  # P-022: the access log reports the admitted operation
     request.app.state.limiter.admit(request.state.tenant_id, operation,
                                    dry_run=dry_run, record=record)
     ensure_schema(request.app.state.db, request.state.graph_name)

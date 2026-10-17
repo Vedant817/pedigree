@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI, Query, Request
 
 from ...config import LIMITS, SOURCE_KINDS, graph_name
+from ...db.client import Trace
 from ...engine.audit import audit_sources
 from ...engine.blame import blame as run_blame
 from ...engine.blame import impact as run_impact
@@ -11,6 +12,7 @@ from ...engine.quota import QuotaPolicy, admission
 from ...engine.revoke import reinstate, report, revoke
 from ...engine.whatif import whatif
 from ...errors import InvalidArgument, PedigreeError
+from ...observability import update_nodes
 from ...validation import Id
 from .. import auth
 from ..schemas import (
@@ -139,8 +141,11 @@ def register(app: FastAPI, db, registry, settings) -> None:
         tenant, gname = tenant_and_db(request)
         auth.require_operator(request)
         auth.admit(request, "revoke", dry_run=payload.dry_run)
+        trace = Trace()
         out = revoke(db, gname, tenant, root_id=payload.root_id, reason=payload.reason,
-                    dry_run=payload.dry_run, kind=payload.kind, quota=QuotaPolicy(tenant, registry.get_record(tenant).node_cap))
+                    dry_run=payload.dry_run, kind=payload.kind, quota=QuotaPolicy(tenant, registry.get_record(tenant).node_cap),
+                    trace=trace)
+        out["trace"] = trace.as_list()
         return out
 
     @app.post("/v1/whatif")
@@ -161,14 +166,18 @@ def register(app: FastAPI, db, registry, settings) -> None:
     def get_blame(node_id: Id, max_depth: int = Query(default=12, ge=1, le=LIMITS["depth_max"]), request: Request = None):
         tenant, gname = tenant_and_db(request)
         auth.admit(request, "read")
-        result = run_blame(db, gname, node_id, max_depth=max_depth)
+        trace = Trace()
+        result = run_blame(db, gname, node_id, max_depth=max_depth, trace=trace)
+        result["trace"] = trace.as_list()
         return result
 
     @app.get("/v1/impact/{node_id}")
     def get_impact(node_id: Id, max_depth: int = Query(default=12, ge=1, le=LIMITS["depth_max"]), request: Request = None):
         tenant, gname = tenant_and_db(request)
         auth.admit(request, "read")
-        result = run_impact(db, gname, node_id, max_depth=max_depth)
+        trace = Trace()
+        result = run_impact(db, gname, node_id, max_depth=max_depth, trace=trace)
+        result["trace"] = trace.as_list()
         return result
 
     @app.get("/v1/audit/sources")
@@ -181,7 +190,9 @@ def register(app: FastAPI, db, registry, settings) -> None:
     def graph_summary(request: Request):
         tenant, gname = tenant_and_db(request)
         auth.admit(request, "read")
-        return report(db, gname)
+        out = report(db, gname)
+        update_nodes(tenant, out.get("by_status"))
+        return out
 
     @app.get("/v1/stats")
     def stats(request: Request):
@@ -189,4 +200,5 @@ def register(app: FastAPI, db, registry, settings) -> None:
         auth.admit(request, "read")
         from ...engine.revoke import report as reporting
         out = reporting(db, gname)
+        update_nodes(tenant, out.get("by_status"))
         return out

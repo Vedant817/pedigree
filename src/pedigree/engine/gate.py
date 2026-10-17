@@ -12,6 +12,7 @@ from ..config import EFFECTS, LIMITS, RISKS, get_settings, graph_name, validate_
 from ..db import queries as Q
 from ..db.client import chunks
 from ..errors import InvalidArgument
+from ..observability import count_gate
 from .blame import _norm_depth, bfs_paths
 from .ingest import _validate_conf, _validate_ids, read_window, record_action
 from .quota import quota_write
@@ -206,6 +207,7 @@ def check_action(db, gname, action, *, relied_on=None, session_id=None, policy_p
     result = {"decision": decision, "reasons": reasons, "checked": len(ids),
               "hook": hook_output(decision, "; ".join(r["detail"] for r in reasons)),
               "would_verify": would_verify, "effect": effect, "risk": risk}
+    count_gate(decision)
     if record:
         missing = [nid for nid in ids if nid not in details]
         if missing:

@@ -15,7 +15,7 @@ from starlette.responses import JSONResponse
 from .api.auth import authorize_source
 from .api.registry import TenantRegistry
 from .config import LIMITS, SOURCE_KINDS, get_settings, graph_name
-from .db.client import Db
+from .db.client import Db, Trace
 from .db.schema import ensure_schema
 from .diagnostics import error_payload, unexpected_error
 from .engine.audit import audit_sources
@@ -28,6 +28,7 @@ from .engine.revoke import reinstate, report, revoke
 from .engine.whatif import whatif
 from .errors import InvalidArgument, PedigreeError
 from .http_boundary import BodySizeMiddleware
+from .observability import update_nodes
 from .rate_limit import RateLimiter
 from .validation import validate_tool_arguments
 
@@ -39,6 +40,15 @@ def _call(fn, *a, **kw):
         return {"ok": False, "error": error_payload(exc)}
     except Exception as exc:
         return {"ok": False, "error": unexpected_error(exc, "mcp_engine")}
+
+
+def _traced(fn):
+    """P-022: run `fn(trace)` and attach the ops of the action to a dict result."""
+    trace = Trace()
+    out = fn(trace)
+    if isinstance(out, dict):
+        out["trace"] = trace.as_list()
+    return out
 
 
 def _validate_rpc(message):
@@ -340,11 +350,12 @@ class PedigreeMCPServer:
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             self._admit(tid, gname, "gate", record=record)
-            return _call(lambda: check_action(
+            return _call(lambda: _traced(lambda trace: check_action(
                 self.db, gname, {"tool": tool, "summary": summary, "effect": effect,
                                  "risk": risk, "audience": audience},
                 relied_on=relied_on, session_id=session_id, max_depth=max_depth,
-                policy_path=self.settings.pedigree_policy_file, record=record, tenant=tid, quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap)))
+                policy_path=self.settings.pedigree_policy_file, record=record, tenant=tid,
+                quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap), trace=trace)))
 
         @srv.tool()
         def pedigree_revoke(tenant_id: str | None = None, token: str | None = None,
@@ -356,8 +367,9 @@ class PedigreeMCPServer:
             if principal.role != "operator":
                 return _forbidden()
             self._admit(tid, gname, "revoke", dry_run=dry_run)
-            return _call(lambda: revoke(self.db, gname, tid, root_id=root_id, reason=reason,
-                                       dry_run=dry_run, kind=kind, quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap)))
+            return _call(lambda: _traced(lambda trace: revoke(
+                self.db, gname, tid, root_id=root_id, reason=reason, dry_run=dry_run, kind=kind,
+                quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap), trace=trace)))
 
         @srv.tool()
         def pedigree_reinstate(tenant_id: str | None = None, token: str | None = None,
@@ -377,7 +389,8 @@ class PedigreeMCPServer:
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             self._admit(tid, gname, "read")
-            return _call(lambda: run_blame(self.db, gname, node_id, max_depth=max_depth))
+            return _call(lambda: _traced(lambda trace: run_blame(
+                self.db, gname, node_id, max_depth=max_depth, trace=trace)))
 
         @srv.tool()
         def pedigree_impact(tenant_id: str | None = None, token: str | None = None,
@@ -386,7 +399,8 @@ class PedigreeMCPServer:
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             self._admit(tid, gname, "read")
-            return _call(lambda: run_impact(self.db, gname, node_id, max_depth=max_depth))
+            return _call(lambda: _traced(lambda trace: run_impact(
+                self.db, gname, node_id, max_depth=max_depth, trace=trace)))
 
         @srv.tool()
         def pedigree_whatif(tenant_id: str | None = None, token: str | None = None,
@@ -412,7 +426,10 @@ class PedigreeMCPServer:
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             self._admit(tid, gname, "read")
-            return _call(lambda: report(self.db, gname))
+            out = _call(lambda: report(self.db, gname))
+            if isinstance(out, dict) and isinstance(out.get("result"), dict):
+                update_nodes(tid, out["result"].get("by_status"))
+            return out
 
     def run(self, transport: str = "stdio", host: str = "127.0.0.1", port: int = 8011):
         if transport == "stdio":

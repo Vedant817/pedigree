@@ -19,6 +19,7 @@ from falkordb import FalkorDB
 
 from ..config import LIMITS, Settings, get_settings
 from ..errors import Conflict, Forbidden, PedigreeError, QueryTimeout, Unavailable
+from ..observability import observe_query
 
 CHUNK = LIMITS["chunk"]
 
@@ -249,6 +250,7 @@ class Db:
             raise map_db_error(exc) from exc
         ms = (time.perf_counter() - t0) * 1000.0
         rows = len(res.result_set) if res.result_set else 0
+        observe_query(op, ms)
         if trace is not None:
             trace.add(op, ms, rows)
         return res
