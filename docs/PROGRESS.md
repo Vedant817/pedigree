@@ -1,17 +1,16 @@
 # CURRENT STATE (overwritten after every feature / checkpoint)
 
-- **Phase:** Phase C closure, Sat 2026-10-17 06:53 IST. P-014 quotas,
-  P-015 stored roles, P-020 indexed live auth/separate rate admission, P-021 strict
-  inputs/safe errors, P-029 hygiene and P-036 trust policy have independent QA and
-  red-team evidence. Final `make check`: 787 passed, 2 skipped, 3 deselected,
-  1 xfailed in 193.28s; Ruff, tracked secrets and numbers PASS. Independent final
-  security suite: 414 passed, 1 skipped, 1 xfailed in 125.30s; ownership sentinel
-  unchanged. Dogfood: 22 PASS, one expected P-022 metrics failure, no failures,
-  stale expectations or skips. Fresh-clone and Phase-C tag/push still pending.
-- **Next:** scoped P-020/P-036 commits; exact-commit fresh-clone check and history
-  scan before checkpoint C; Phase D setup/lock/CI (consult 013 in progress).
+- **Phase:** Phase D implementation, Sat 2026-10-17 19:28 IST. Commits 064e095
+  (P-028 lock/CI) and 42777f7 (P-003/P-004 non-root compose runtime + owned
+  no-Docker quickstart), plus the Phase D decision record ADR-014/consult013.
+  Full `make check`: 804 passed, 2 skipped, 4 deselected, 1 xfailed; Ruff,
+  tracked secrets and numbers PASS.
+- **Next:** independent Linux QA (README-literal compose from a fresh clone;
+  python:3.12 container quickstart and clean-clone check) and red-team on
+  credential/admin/network boundaries; then the checkpoint-D tag/push decision.
 - **Residuals:** ACL service wiring, installed runtime capture and stronger F-08
-  eviction-proof lineage are not closed. Private disclosure contact is human-owned.
+  eviction-proof lineage remain open. Private disclosure contact is human-owned.
+  No hosted CI/deployment or native macOS acceptance is claimed.
 - **Last implementation commits:** 1243744/031f86a/83d7b73 (P-016 QA follow-up: stdio default-tenant
   token bypass fixed - red-team F-1 with red-at-parent regression; MCP errors actionable; README
   auth reality + 13-tool list; QA addenda), ef9033f (P-012 consult trio filed: domain + oracle
@@ -716,3 +715,39 @@
 - Dogfood report scratch/dogfood/20261016T204057Z.md: 22 PASS, 0 FAIL,
   1 EXPECTED-FAIL (P-022 metrics), 0 STALE, 0 SKIP; owned scopes cleaned.
 - Next: clean-clone and history gates before the Phase C checkpoint push.
+
+### 2026-10-17 06:58 IST | Phase C checkpoint | STATUS: done
+- Commits: bde0e33 P-020; 1b565ca P-036 and final Phase C evidence.
+- Fresh local clone at exact1b565ca with new Python3.12.15 venv and manifest install:
+  make check exit0: 787 passed, 2 skipped, 3 deselected, 1 xfailed in193.36s;
+  Ruff, tracked secrets and check_numbers PASS. Log retained in the clone named
+  pedigree-phase-c-5416af552cbf49e4b02897110cbda50a under the OS temp directory.
+- scripts/secret_scan.py --history PASS. origin/main was an ancestor; no rewrite.
+- git push origin 1b565ca:refs/heads/main refs/tags/phase-C exited0:
+  83de9da..1b565ca main; new annotated phase-C. No visibility change or public
+  deployment. Earlier phase-A/B tags were not fabricated retroactively.
+- Phase D consult013 unanimous split API/DB decision; implementation/QA in progress.
+
+### 2026-10-17 19:28 IST | Phase D implementation | STATUS: in progress
+- Commits: 064e095 P-028 (uv.lock, frozen setup/quickstart/CI installs, ci.yml
+  with the pinned 4.22.1 DB and bounded perf sentinel); 42777f7 P-003/P-004
+  (non-root python:3.12-slim API + separate pinned DB Compose service, README
+  Compose quickstart and no-Docker Linux/Windows paths, demo admin denial,
+  /readyz module gate, owned runtime scripts).
+- Root make check at 42777f7: 804 passed, 2 skipped, 4 deselected, 1 xfailed in
+  244.80s, exit 0; Ruff, secret scan and check_numbers PASS.
+- Red-at-parent: tests/integration/test_p003_runtime.py against 1b565ca in a
+  detached worktree failed 5/6 (demo admin denial, both seed-boot paths, two
+  /readyz cases); all green on the working tree.
+- First harsh-user Compose pass (docker compose up --build --wait) surfaced three
+  real defects, fixed with regression tests in the same commits: GRAPH.CONFIG
+  replies were parsed nested-only in scripts/runtime.py (the flat reply crashed
+  wait-db); demo fixtures were resolved only via __file__ parents (absent for the
+  non-editable container install; now PEDIGREE_SCENARIOS_DIR -> cwd -> source
+  tree); an existing demo tenant without its credential file failed with a bare
+  exception type (now an actionable credential-free SeedError; fail-closed kept).
+- Verified on the running stack: compose --wait exit 0, /readyz 200, UI / 200,
+  container uid 10001, README-literal credential copy, operator token accepted,
+  deployment admin 403 in demo mode, /metrics 403 and /docs 404 in production
+  mode, credentials byte-identical after restart and down/up (state volume).
+- Next: independent QA/red-team per FIX_PROMPT D, then the checkpoint D decision.
