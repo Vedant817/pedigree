@@ -9,9 +9,10 @@
   1 xfailed (165.02s); Ruff, tracked secrets (QA reports staged) and numbers PASS.
   Verification: docs/qa/P-003.md (PASS with caveats), docs/qa/P-028.md (PASS),
   docs/qa/redteam-P-003.md (PASS).
-- **Next:** FIX_PROMPT Phase E (verify P-006; P-022, P-023 and the oracle battery —
-  apply `docs/consults/008-p012-reinstate/oracle.md` corrections first). Checkpoint D
-  tag/push awaits the user's go.
+- **Next:** FIX_PROMPT Phase E: P-006 honest eval (evals/ numbers + statistician
+  sign-off), P-022 trace/metrics/logs, P-023 isolation suite, and the P-012 reinstate
+  fix + oracle battery (apply `docs/consults/008-p012-reinstate/oracle.md` corrections
+  first). Checkpoint D is pushed (`phase-D` tag at 6f44232).
 - **Residuals:** ACL service wiring, installed runtime capture and stronger F-08
   eviction-proof lineage remain open. Private disclosure contact is human-owned.
   No hosted CI/deployment or native macOS acceptance is claimed; the Render
@@ -784,3 +785,12 @@
   as environment-induced; the route's typed 503 mapping is by design.
 - Next: FIX_PROMPT Phase E (verify P-006; P-022, P-023 and the oracle battery —
   apply docs/consults/008-p012-reinstate/oracle.md corrections first).
+
+### 2026-10-17 21:04 IST | Phase D checkpoint | STATUS: done
+- git push origin main refs/tags/phase-D exited 0: 4d9c507..6f44232 main; new
+  annotated phase-D tag at 6f44232. No visibility change, no force-push, no history
+  rewrite (origin/main was verified to be an ancestor before the push).
+- Cleanup: throwaway QA FalkorDB (port 6380) removed; %TEMP%\p003-qa-clone with
+  credential copies removed per the P-003 report; p003qa volumes left as recorded.
+- Next: FIX_PROMPT Phase E (P-006 eval numbers, P-022 trace/metrics, P-023 isolation
+  suite; P-012 reinstate fix + oracle battery with the consult-008 corrections first).
