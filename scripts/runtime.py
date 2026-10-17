@@ -5,6 +5,7 @@ import hashlib
 import importlib.util
 import os
 import platform
+import shutil
 import signal
 import socket
 import subprocess
@@ -106,12 +107,24 @@ def owned_data(path: Path):
         yield
 
 
+def module_dependencies(module: Path) -> list[str]:
+    """Missing shared libraries for the pinned module (empty when ldd is unavailable)."""
+    if shutil.which('ldd') is None:
+        return []
+    result = subprocess.run(['ldd', str(module)], capture_output=True, text=True, check=False)
+    return sorted({line.split()[0] for line in (result.stdout or '').splitlines() if 'not found' in line})
+
+
 def run_db() -> None:
     if platform.system() != 'Linux':
         raise RuntimeError('no-Docker runtime is verified only on Linux; Windows uses Docker')
     port = int(os.environ.get('FALKOR_PORT', os.environ.get('PORT', '6379')))
     free_port(port)
     module = fetch()
+    missing = module_dependencies(module)
+    if missing:
+        raise RuntimeError(f'pinned module needs missing system libraries: {", ".join(missing)}; '
+                           'on Debian/Ubuntu install libgomp1 (Fedora: libgomp)')
     server = redis_server()
     data = Path(os.environ.get('DATA_DIR', str(ROOT / 'data/local'))).resolve()
     with owned_data(data):
@@ -185,8 +198,8 @@ def main() -> int:
         else:
             raise RuntimeError('unknown runtime command')
         return 0
-    except Exception as exc:  # noqa: BLE001 - never echo credentials from causes
-        print(f'[runtime] failed ({type(exc).__name__}); verify ports, module, limits and private credential path', file=sys.stderr)
+    except Exception as exc:  # noqa: BLE001 - authored messages never contain credentials
+        print(f'[runtime] failed ({type(exc).__name__}): {exc}', file=sys.stderr)
         return 1
 
 

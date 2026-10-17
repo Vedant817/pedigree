@@ -113,3 +113,39 @@ def test_config_value_rejects_mismatched_or_malformed_replies(reply):
     db = SimpleNamespace(client=SimpleNamespace(connection=_Connection(reply)))
     with pytest.raises(RuntimeError):
         module.config_value(db, 'TIMEOUT_MAX')
+
+
+def _ldd(stdout):
+    return SimpleNamespace(stdout=stdout, stderr='', returncode=1)
+
+
+def test_module_dependencies_reports_missing_libraries(monkeypatch, tmp_path):
+    module = runtime_module()
+    monkeypatch.setattr(module.shutil, 'which', lambda name: '/usr/bin/ldd')
+    monkeypatch.setattr(module.subprocess, 'run', lambda *args, **kwargs: _ldd(
+        '\tlinux-vdso.so.1 (0x00007fff)\n'
+        '\tlibgomp.so.1 => not found\n'
+        '\tlibc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f)\n'))
+    assert module.module_dependencies(tmp_path / 'module.so') == ['libgomp.so.1']
+
+
+def test_module_dependencies_absent_ldd_or_clean_output(monkeypatch, tmp_path):
+    module = runtime_module()
+    monkeypatch.setattr(module.shutil, 'which', lambda name: None)
+    assert module.module_dependencies(tmp_path / 'module.so') == []
+    monkeypatch.setattr(module.shutil, 'which', lambda name: '/usr/bin/ldd')
+    monkeypatch.setattr(module.subprocess, 'run', lambda *args, **kwargs: _ldd(
+        '\tlibc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f)\n'))
+    assert module.module_dependencies(tmp_path / 'module.so') == []
+
+
+def test_runtime_failure_prints_the_authored_message(monkeypatch, capsys):
+    module = runtime_module()
+    monkeypatch.setattr(module.sys, 'argv', ['runtime.py', 'db'])
+
+    def boom():
+        raise RuntimeError('pinned module needs missing system libraries: libgomp.so.1')
+
+    monkeypatch.setattr(module, 'run_db', boom)
+    assert module.main() == 1
+    assert 'libgomp.so.1' in capsys.readouterr().err

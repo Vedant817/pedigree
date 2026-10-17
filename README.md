@@ -67,8 +67,12 @@ Seeding errors stop startup. Readiness is at `http://localhost:8000/readyz`.
 ### Setup without Docker on Linux
 
 Use Python `3.12` or newer, Git, curl and a Linux distribution compatible with the
-locked local database wheel. The quickstart installs the locked environment,
-fetches the pinned module, seeds and serves in the foreground:
+locked local database wheel. The pinned module also needs the OpenMP runtime; where
+the distribution does not ship it, install it first:
+`sudo apt-get install -y libgomp1` (Debian/Ubuntu) or `sudo dnf install libgomp`
+(Fedora). The quickstart preflights the module's libraries and names any that are
+missing. It installs the locked environment, fetches the pinned module, seeds and
+serves in the foreground:
 
 ```bash
 make quickstart
