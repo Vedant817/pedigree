@@ -417,3 +417,46 @@ deployment-admin HTTP routes; a local operator demo is not a public read-only
 deployment. Optional public hosting is deferred. Consult013 domain/architect/DevEx
 were unanimous; glibc compatibility and volume ownership require actual runtime QA.
 See docs/consults/013-phase-d-runtime/decision.md for acceptance and reversibility.
+
+## ADR-015 | 2026-10-17 | Reinstate recomputes under the remaining roots; corroboration is lazy; "healthy" means status ok
+
+**Context.** P-012's `reinstate` blanket-reset a root's descendants before re-reading the
+revoked-root set, so a descendant that was itself revoked was erased from R and came back
+`ok` (`A→B→Cc`; revoke A, revoke B, reinstate A gave `B=ok`). The fix landed in `7045e39`
+but left the specification inconsistent with it: `docs/01` §6.3 and F-03 described the
+buggy blanket reset, and the oracle review (`docs/consults/008-p012-reinstate/oracle.md`,
+verdict **NOT YET**) refuses to accept an oracle written from text that describes the bug.
+Two more points were under-specified: when corroboration takes effect, and what "healthy
+support" means.
+
+**Decision.** (1) `reinstate(r)` = `R := R \ {r}`, then recompute the whole status map from
+structure under the remaining root set `R`, with `R ∪ {r}` as the discovery seed set; nodes
+in `R` are never reset (a revoked root wins even as a descendant), and only `r`'s
+`revoked_at`/`reason` markers are cleared. (2) `corroborate` stays **lazy**: it adds the
+edge and changes no status; support is effective as of the last recompute (the next
+revoke/reinstate). (3) A memory is `preserved` iff it has a bad parent and a
+`CORROBORATED_BY` source whose **status is `ok`**; `by` (agent/human/scanner) and
+`integrity` do not enter the status recurrence. (4) The invariant for the P-012 class is
+I-a (`revoked_at IS NOT NULL AND status <> 'revoked'` == 0) plus the existing I-b/I-c —
+**not** the literal "no node is ok/preserved while having a revoked ancestor lacking
+trusted support" prose: `preserved` with a revoked ancestor is the feature, a transitive
+ancestor walk is redundant once I-a/I-b/I-c hold on a DAG, and a row-based check
+false-positives on a legitimately reinstated root (`Revocation` rows are history).
+
+**Alternatives.** Making `corroborate` recompute (stronger but changes a public
+behaviour; needs its own acceptance criteria and cost analysis). A row-based invariant
+(rejected: verified false positive on the reinstated root, 2 rows for A). Deleting the
+reinstated root's `Revocation` row (would erase audit history; `domain.md` §4.3 says
+rows are history). Implementing the literal ancestor-walk invariant (rejected as above).
+
+**Consequences.** The docs, the from-scratch oracle (`tests/oracle.py::global_fixpoint`,
+which reads only `nodes`/`parents`/`support`/`R`), the op-comparison driver
+(`tests/integration/test_reinstate_oracle.py`) and the invariant check now state the same
+contract, so a red battery means a real divergence rather than a doc/oracle mismatch. No
+engine change is implied by this ADR beyond `7045e39`; `corroborate` latency is unchanged.
+
+**Evidence.** `docs/fixes/P-012.md` (acceptance criteria restating the review's §7);
+`docs/qa/P-012.md` (raw 300-example run, mutation red/green, wall time);
+`tests/unit/test_p012_oracle.py` (hand cases, drift guard against `evals.oracle` on its
+valid domain, import meta-test); `tests/integration/test_p012_invariant.py` (I-a
+negative test); `tests/integration/test_reinstate_oracle.py` (DB property battery).

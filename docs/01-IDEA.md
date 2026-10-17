@@ -109,6 +109,11 @@ A child created under a quarantined/tainted/revoked parent is **born quarantined
 ```cypher
 MATCH (m:Memory {id:$m}), (s:Source {id:$s}) MERGE (m)-[r:CORROBORATED_BY]->(s) SET r.by=$by RETURN m.id, s.id
 ```
+Corroboration is **lazy**: the write adds the edge only and does not touch any `status`. A newly
+corroborated memory stays `tainted` until the next recompute (the next `revoke`/`reinstate`), which
+re-reads the support edges and re-derives the map; support is therefore effective as of the last
+recompute. Making `corroborate` recompute is a separate behavioural change, not implied here
+(ADR-015).
 Session read window: `MATCH (se:Session {id:$sess}), (n:Node {id:$n}) CREATE (se)-[:READ {at:timestamp()}]->(n)`; read-window lookup for actions: last K (default 50) distinct READ targets, `ORDER BY r.at DESC LIMIT $k`.
 
 ### 6.2 Impact preview (read-only) and discovery
@@ -122,7 +127,7 @@ MATCH (r:Node {id:$id}) CALL algo.BFS(r, $depth, 'DERIVED_FROM') YIELD nodes UNW
 
 ### 6.3 Revoke: barrier -> fixpoint -> support-preserving final status -> verify (the core algorithm)
 Semantics. Let R be the set of revoked roots (Sources or Memories). Let C = descendants of R via FEEDS. For m in C processed in topological order:
-`bad(m)` = any DERIVED_FROM parent that is in R or finally `tainted`. If `bad(m)` is empty -> `ok`. Else if m has a **healthy** CORROBORATED_BY source (status `ok`) -> `preserved` (retrievable, flagged with the supporting source). Else -> `tainted` with `taint_parent` = one bad parent. Note a node whose only bad parent became `preserved` is simply `ok`.
+`bad(m)` = any DERIVED_FROM parent that is in R or finally `tainted`. If `bad(m)` is empty -> `ok`. Else if m has a **healthy** CORROBORATED_BY source -> `preserved` (retrievable, flagged with the supporting source); a **healthy** source here means a `CORROBORATED_BY` source whose **status is `ok`** — the edge's `by` (agent/human/scanner) and the source's `integrity` do not enter the status recurrence. Else -> `tainted` with `taint_parent` = one bad parent. Note a node whose only bad parent became `preserved` is simply `ok`.
 Steps (per tenant, under an in-process per-tenant lock; **idempotent and crash-recoverable**):
 1. **Barrier (one atomic query):**
 ```cypher
@@ -138,7 +143,16 @@ CREATE (:Node:Revocation {id:$rid, tenant:$tenant, root_id:$id, reason:$why, kin
 6. **Verify loop:** re-discover; if any member is still `quarantined` (a node created mid-flight) repeat 3-5 (max 5).
 7. **Finish:** set `Revocation.state='done'` with counts; return affected actions (`MATCH (a:Action {id:i}) WHERE a.status='tainted'`), **irreversible ones first**, plus `affected_artifacts` (files/commits). On startup `resume_incomplete()` re-runs steps 2-7 for `Revocation {state:'running'}`.
 **Dry run** = steps 2(discover only), 3, 4 with **no writes** -> returns the same counts (`would_taint`, `would_preserve`, `would_keep_ok`).
-**Reinstate(root):** BFS descendants of root *before* flipping; set root `ok`; reset those descendants to `ok`; then re-run steps 2-7 for the remaining revoked roots (idempotent).
+**Reinstate(root):** `R := R \ {root}` (the root is no longer a revoked root), then recompute the
+**whole** map from structure with `R` as the root set and `R ∪ {root}` as the discovery seed set:
+nodes in `R` keep `revoked` (a revoked root is never reset — a root that is also a descendant of
+the reinstated one stays revoked), every node in `desc(R)` is re-derived under the remaining roots,
+and nodes outside that descendant union are `ok`. Only the reinstated root's `revoked_at`/`reason`
+markers are cleared; `Revocation` rows are history and stay. Idempotent: a root that is not
+currently revoked is a no-op. (Corrected 2026-10-17 by P-012: the earlier "reset those descendants
+to `ok`; then re-run steps 2–7 for the remaining revoked roots" wording described the blanket-reset
+bug — it erased a self-revoked descendant from `R` before the re-resolve, which is the defect fixed
+in `7045e39`. See ADR-015.)
 **Verified behaviour [V]:** `12_pedigree_core.py` asserts: tainted/preserved/ok mix, idempotent re-revoke, blame chain via `taint_parent`, race (child inserted between discovery and quarantine ends `tainted`), late child born `quarantined`. Cascade cost ~8 us/node [V scale bench]; chunk size 2000 keeps each write ~16 ms.
 
 ### 6.4 Blame
