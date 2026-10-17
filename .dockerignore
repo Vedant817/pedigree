@@ -1,5 +1,7 @@
 # Keep the build context small and reproducible: the image installs the package itself.
 .env
+.env.*
+.opencode
 .git
 .github
 .venv

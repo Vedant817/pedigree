@@ -15,6 +15,29 @@ from pedigree.engine.revoke import revoke
 from pedigree.errors import InvalidArgument
 
 
+def test_scenario_dir_env_override(tmp_path, monkeypatch):
+    scenario_dir = tmp_path / "fixtures"
+    scenario_dir.mkdir()
+    (scenario_dir / "S1.json").write_text('{"id": "S1"}', encoding="utf-8")
+    monkeypatch.setenv("PEDIGREE_SCENARIOS_DIR", str(scenario_dir))
+    assert load_scenarios() == [{"id": "S1"}]
+
+
+def test_scenario_dir_finds_container_working_directory(tmp_path, monkeypatch):
+    monkeypatch.delenv("PEDIGREE_SCENARIOS_DIR", raising=False)
+    nested = tmp_path / "demo" / "scenarios"
+    nested.mkdir(parents=True)
+    (nested / "S1.json").write_text('{"id": "S1"}', encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    assert load_scenarios() == [{"id": "S1"}]
+
+
+def test_scenario_dir_falls_back_to_source_tree(tmp_path, monkeypatch):
+    monkeypatch.delenv("PEDIGREE_SCENARIOS_DIR", raising=False)
+    monkeypatch.chdir(tmp_path)
+    assert load_scenarios()  # the checkout/editable-install candidate still resolves
+
+
 def test_seed_is_repeatable_without_touching_unrelated_data(fresh_graph):
     db, tenant, gname = fresh_graph
     record_source(db, gname, tenant, kind="file", id="unrelated", uri="private.txt")

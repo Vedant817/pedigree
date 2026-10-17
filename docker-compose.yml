@@ -1,27 +1,34 @@
-# Local single-container compose (F-16): build the image and run the whole product
-# (FalkorDB 4.22.1 + REST/MCP/UI service) with the demo tenant seeded on boot.
-#
-#   PEDIGREE_ADMIN_TOKEN=choose-a-token docker compose up --build
-#   curl -s localhost:8000/readyz
-#   curl -s localhost:8000/healthz
-#
-# The credential the demo seeder writes is printed by the seed step (kept in the container's
-# filesystem, never in this file). Auth/token env is the deployment's own configuration.
-
 services:
+  db:
+    image: falkordb/falkordb:v4.22.1
+    environment:
+      BROWSER: "0"
+      REDIS_ARGS: "--appendonly yes --save 900 1"
+      FALKORDB_ARGS: "TIMEOUT_MAX 60000 TIMEOUT_DEFAULT 20000 QUERY_MEM_CAPACITY 1073741824"
+    volumes:
+      - pedigree-dbdata:/var/lib/falkordb/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli PING | grep -q PONG && redis-cli MODULE LIST | grep -q 42201"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
   pedigree:
     build: .
     image: pedigree:local
     ports:
-      - "8000:8000"   # REST API + MCP mount + static UI
-      - "6379:6379"   # FalkorDB (loopback mapping; leave unpublished in production)
+      - "127.0.0.1:${PEDIGREE_PORT:-8000}:8000"
     environment:
+      PEDIGREE_ENV: production
       PEDIGREE_SEED_DEMO: "1"
-      PEDIGREE_ADMIN_TOKEN: ${PEDIGREE_ADMIN_TOKEN:?set PEDIGREE_ADMIN_TOKEN}
-      FALKOR_HOST: 127.0.0.1
+      PEDIGREE_DEMO_TENANT: ${PEDIGREE_DEMO_TENANT:-demo}
+      PEDIGREE_CREDENTIALS_DIR: /data/credentials
+      FALKOR_HOST: db
       FALKOR_PORT: "6379"
     volumes:
-      - pedigree-data:/data
-
+      - pedigree-state:/data
+    depends_on:
+      db:
+        condition: service_healthy
 volumes:
-  pedigree-data:
+  pedigree-dbdata:
+  pedigree-state:

@@ -3,11 +3,14 @@ import hmac
 from fastapi import FastAPI, Request
 
 from ...config import graph_name
+from ...errors import Forbidden
 from .. import auth
 from ..schemas import ResumeRequest, TenantCreate
 
 
 def _require_admin(request: Request, settings) -> None:
+    if settings.pedigree_seed_demo:
+        raise Forbidden("deployment administration is disabled in demo mode")
     auth.check_peer(request)
     expected = (settings.pedigree_admin_token or "").strip().encode("utf-8")
     header = request.headers.get("x-admin-token", "").strip().encode("utf-8")

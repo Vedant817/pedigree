@@ -82,6 +82,7 @@ class Settings(BaseSettings):
     pedigree_admin_token: str = ""
     pedigree_env: str = "dev"  # dev|test|local are lenient; anything else refuses empty/default admin tokens
     pedigree_public_docs: bool = False
+    pedigree_seed_demo: bool = False
     pedigree_secret: str = ""
     pedigree_node_cap: int = 200_000
     pedigree_store_text: bool = False
@@ -118,6 +119,10 @@ def admin_token_problem(settings: Settings) -> str | None:
     Non-dev environments refuse an empty or known-default token; dev/test/local accept
     anything so a local checkout works without ceremony.
     """
+    if settings.pedigree_seed_demo:
+        # Demo mode disables deployment-admin routes instead of provisioning an
+        # unnecessary shared deployment credential.
+        return None
     token = (settings.pedigree_admin_token or "").strip()
     env = (settings.pedigree_env or "dev").strip().lower()
     if env in DEV_ENVS:

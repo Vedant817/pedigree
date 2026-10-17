@@ -12,4 +12,6 @@ def register(app: FastAPI, db) -> None:
     def readyz() -> dict:
         if not db.ping():
             raise Unavailable("db not reachable")
+        if db.module_version() != 42201:
+            raise Unavailable("required database module unavailable")
         return {"ready": True}

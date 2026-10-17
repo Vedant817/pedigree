@@ -42,23 +42,59 @@ per-tenant graph namespace, `GRAPH.COPY` for an isolated what-if, and the
 per-graph ACL mechanism. SQLite can also implement logical isolation; this comparison measures
 traversal primitives, not isolation architectures. The service ACL credential wiring remains open.
 
-## Quick start (local, mandatory path)
+## Quick start (local Docker Compose)
+
+Prerequisites: Git and Docker Compose. The API binds to loopback; the database
+stays inside the Compose network. No model provider or API key is needed.
 
 ```bash
-git clone <repo-url> && cd pedigree
-make setup          # .venv + the package (Python 3.11+)
-make start-db       # FalkorDB v4.22.1 - Docker image, or the pinned .so without Docker on Linux
-make db-status      # reachable + module version check
-make test-quick     # the fast test suite against a REAL FalkorDB (no mocks of graph logic)
-make demo           # seeds synthetic scenarios S1+S8 into tenant `demo`; writes a private
-                    #   credential file and prints its path (the token lives inside)
-.venv/Scripts/python.exe -m pedigree.cli serve     # Windows
-.venv/bin/python -m pedigree.cli serve             # Linux/macOS
+git clone https://github.com/Vedant817/pedigree.git && cd pedigree
+docker compose up --build --wait
+mkdir -p scratch && docker compose cp pedigree:/data/credentials/demo-demo.json scratch/demo-demo.json
 ```
 
-Then open the printed local URL, paste the operator token from the credential file `make demo` wrote
-(path printed, inside that file), and the workspace loads the seeded lineage. Previewing a
-revocation changes nothing until you confirm it.
+Open `http://localhost:8000` in a browser. Read `operator_token` from the private local
+`scratch/demo-demo.json` file and paste it into the workspace. Keep that file out
+of Git and agent configuration. Previewing a revocation changes nothing until you
+confirm it. The local demo has operator powers; deployment-admin HTTP routes are
+disabled in demo mode. This is not a public read-only deployment.
+
+Compose preserves the graph and credential volumes across `docker compose down`
+and later startup. Do not delete volumes to repair a credential problem: restore
+the original private file, or select a new dedicated `PEDIGREE_DEMO_TENANT`.
+Seeding errors stop startup. Readiness is at `http://localhost:8000/readyz`.
+
+### Setup without Docker on Linux
+
+Use Python `3.12` or newer, Git, curl and a Linux distribution compatible with the
+locked local database wheel. The quickstart installs the locked environment,
+fetches the pinned module, seeds and serves in the foreground:
+
+```bash
+make quickstart
+# without make:
+bash scripts/quickstart.sh
+```
+
+The default DB/API ports must be free. Set `FALKOR_PORT`, `PEDIGREE_PORT` and
+`DATA_DIR` for a separate local instance. Ctrl-C stops only the processes started
+by this quickstart. Credentials live under `DATA_DIR/credentials`; their path is
+printed without their contents. Native macOS acceptance has not been run.
+
+### Windows PowerShell
+
+Compose is the primary path; use PowerShell to copy the private credential file:
+
+```powershell
+docker compose up --build --wait
+New-Item -ItemType Directory -Force scratch | Out-Null
+docker compose cp pedigree:/data/credentials/demo-demo.json scratch/demo-demo.json
+```
+
+For development with a Windows Python environment and a Docker DB, use
+`make quickstart-windows`. Python `3.12` and the pinned uv tool are required;
+see the command output for the private credentials path. POSIX file modes do not
+establish Windows ACL privacy.
 
 Docs: [full setup](#setup) · [data model](#graph-data-model) ·
 [Cypher inventory](#the-cypher-the-product-depends-on) ·
@@ -338,20 +374,21 @@ Aligned manually with `docs/03-EVAL-AND-DEMO.md` section 7; that document is the
 
 ## Deploy
 
-Local single container (verified: builds, boots FalkorDB v4.22.1 with the pinned module, seeds the
-demo tenant, serves `/healthz`, `/readyz`, the workspace and the gate):
+The API image uses `python:3.12-slim`, a non-root user and the factory Uvicorn
+entrypoint with proxy-header rewriting disabled. Compose runs the pinned FalkorDB
+service separately with persistence and bounded query settings. The API image
+connects to an external DB through `FALKOR_HOST` and `FALKOR_PORT`; it does not
+start a bundled DB. Dependency installation uses the committed `uv.lock`.
 
-```bash
-PEDIGREE_ADMIN_TOKEN=choose-a-token docker compose up --build
-# or: docker build -t pedigree . && docker run --rm -p 8000:8000 \
-#      -e PEDIGREE_SEED_DEMO=1 -e PEDIGREE_ADMIN_TOKEN=choose-a-token pedigree
-curl -s localhost:8000/readyz
-```
+For a non-demo deployment, configure a strong `PEDIGREE_ADMIN_TOKEN`, disable demo
+mode explicitly and provide the DB connection configuration. Keep DB credentials
+and tenant operator credentials outside Git and agents. Establish an explicit
+trusted proxy boundary before changing peer handling; see [SECURITY.md](SECURITY.md).
+No hosted URL, public demo or production deployment is claimed.
 
-Render (single web service, same image): create the service from this repository, set
-`PEDIGREE_ADMIN_TOKEN` and `PEDIGREE_SEED_DEMO=1`, keep the default port. The Render account
-itself is a human step and has not been created yet, so the hosted URL is not claimed here - the
-local path above is the tested one.
+[CI workflow](.github/workflows/ci.yml) runs the locked check and clean-clone gates.
+Local execution and hosted CI results are separate evidence; adding the workflow
+does not establish a successful hosted run.
 
 ## Tracks entered
 

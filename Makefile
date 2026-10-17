@@ -12,6 +12,8 @@ endif
 help:
 	@echo "Pedigree targets:"
 	@echo "  make setup       create .venv and install the package + dev deps"
+	@echo "  make quickstart  Linux no-Docker: locked install, pinned DB module, seed, serve"
+	@echo "  make quickstart-windows  Windows: locked install + owned Docker DB, seed, serve"
 	@echo "  make start-db    start FalkorDB v4.22.1 (Docker image, or pinned .so on Linux)"
 	@echo "  make stop-db     stop the local FalkorDB"
 	@echo "  make db-status   show DB reachability and module version"
@@ -29,6 +31,12 @@ help:
 
 setup:
 	uv sync --frozen --extra dev
+
+quickstart:
+	bash scripts/quickstart.sh
+
+quickstart-windows:
+	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/quickstart-windows.ps1
 
 start-db:
 	$(PY) -m pedigree.cli db start

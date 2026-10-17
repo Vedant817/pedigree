@@ -405,3 +405,15 @@ must establish an explicit trusted peer boundary.
 
 **Evidence.** docs/consults/012-p020-auth-rates/{domain,architect,specialist,decision}.md;
 real 42201 indexed plans, nullable-slot and ambiguity probes; implementation/review pending.
+
+## ADR-014 | 2026-10-17 | Separate deployment processes and freeze setup dependencies
+
+Phase D chooses a non-root python:3.12-slim API plus a separate pinned FalkorDB
+Compose service. Frozen uv installs, private persistent demo credentials and
+fail-closed seed/startup replace root/dev installs and detached shell DB ownership.
+No-Docker Linux setup owns its process/data/port and verifies module42201; native
+macOS and hosted CI are not claimed from source inspection. Demo mode disables
+deployment-admin HTTP routes; a local operator demo is not a public read-only
+deployment. Optional public hosting is deferred. Consult013 domain/architect/DevEx
+were unanimous; glibc compatibility and volume ownership require actual runtime QA.
+See docs/consults/013-phase-d-runtime/decision.md for acceptance and reversibility.

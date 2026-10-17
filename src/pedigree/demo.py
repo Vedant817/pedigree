@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from .config import default_integrity, graph_name, validate_tenant
@@ -10,10 +11,22 @@ from .db.schema import check_invariants, ensure_schema
 from .engine.ingest import record_action, record_source, remember, sha256_text
 from .errors import Conflict
 
-SCENARIOS = Path(__file__).resolve().parents[2] / "demo" / "scenarios"
+
+def scenarios_dir() -> Path:
+    """Locate demo fixtures for checkouts, editable installs and the container image."""
+    override = os.environ.get("PEDIGREE_SCENARIOS_DIR")
+    if override:
+        return Path(override)
+    candidates = [Path.cwd() / "demo" / "scenarios",
+                  Path(__file__).resolve().parents[2] / "demo" / "scenarios"]
+    for candidate in candidates:
+        if candidate.is_dir() and any(candidate.glob("S*.json")):
+            return candidate
+    return candidates[-1]
 
 
-def load_scenarios(path: Path = SCENARIOS) -> list[dict]:
+def load_scenarios(path: Path | None = None) -> list[dict]:
+    path = path or scenarios_dir()
     return [json.loads(file.read_text(encoding="utf-8")) for file in sorted(path.glob("S*.json"))]
 
 
