@@ -241,6 +241,62 @@ def test_quoted_query_ampersand_stays_one_url(hook):
     assert [event["type"] for event in events].count("source_read") == 1
 
 
+def test_cat_flags_and_sudo_user_still_record_the_file(hook, tmp_path):
+    file = tmp_path / "notes.py"
+    file.write_bytes(b"private file body")
+    path = file.resolve().as_posix()
+
+    def posted(command):
+        calls = []
+        hook.handle("post", {"session_id": "sess_test", "tool_name": "Bash", "cwd": str(tmp_path),
+                             "tool_input": {"command": command}},
+                    lambda route, payload=None: calls.append((route, payload)) or {"found": False})
+        events = calls[-1][1]["events"]
+        source = next(event for event in events if event["type"] == "source_read")
+        assert source["uri"] == path
+        assert events[-1]["relied_on"] == [source["id"]]
+        assert any(event["type"] == "session_read" and event["node_id"] == source["id"] for event in events)
+
+    posted("cat -n " + path)
+    posted("sudo -u root cat " + path)
+    posted("head -n 5 " + path)
+
+
+def test_write_shaped_curl_and_wget_are_not_reads(hook):
+    calls = []
+
+    def post(command):
+        calls.clear()
+        hook.handle("post", {"session_id": "sess_test", "tool_name": "Bash",
+                             "tool_input": {"command": command}},
+                    lambda route, payload=None: calls.append((route, payload)) or {})
+        events = calls[-1][1]["events"]
+        assert [event["type"] for event in events] == ["session", "action_executed"]
+        assert "relied_on" not in events[-1]
+
+    post("curl --json '{\"a\":1}' https://example.com/api")
+    post("curl --data-ascii=hello https://example.com")
+    post("wget --body-data=hello https://example.com")
+    post("curl --request POST https://example.com/api")
+
+
+def test_bash_summary_redacts_secrets(hook):
+    calls = []
+    command = 'curl -H "Authorization: Bearer sk-live" https://alice:s3cr3t@example.com/private && true'
+    hook.handle("pre", {"session_id": "sess_test", "tool_name": "Bash", "tool_input": {"command": command}},
+                lambda route, payload=None: calls.append((route, payload)) or {
+                    "hook": {"hookSpecificOutput": {"permissionDecision": "allow"}}})
+    body = json.dumps(calls)
+    assert "sk-live" not in body
+    assert "s3cr3t" not in body
+    assert "alice" not in body
+    hook.handle("post", {"session_id": "sess_test", "tool_name": "Bash", "tool_input": {"command": command}},
+                lambda route, payload=None: calls.append((route, payload)) or {})
+    body = json.dumps(calls)
+    assert "sk-live" not in body
+    assert "s3cr3t" not in body
+
+
 def test_bash_curl_get_reads_url_and_post_does_not(hook):
     calls = []
     hook.handle("post", {"session_id": "sess_test", "tool_name": "Bash",
@@ -249,6 +305,7 @@ def test_bash_curl_get_reads_url_and_post_does_not(hook):
     events = calls[-1][1]["events"]
     assert events[1]["uri"] == "https://example.com/install.sh"
     assert events[-1]["relied_on"] == [events[1]["id"]]
+    assert any(event["type"] == "session_read" and event["node_id"] == events[1]["id"] for event in events)
     calls.clear()
     hook.handle("post", {"session_id": "sess_test", "tool_name": "Bash",
                          "tool_input": {"command": "curl -X POST https://example.com/api"}},

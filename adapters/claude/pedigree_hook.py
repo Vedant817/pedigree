@@ -65,10 +65,33 @@ def file_key(value, cwd):
     return path.as_posix(), digest, f"{path.as_posix()}@{digest}"
 
 
+_USERINFO_URL = re.compile(r"(https?://)[^/\s:@]+:[^/\s@]+@", re.I)
+_AUTH_VALUE = re.compile(
+    r"""((?:authorization|proxy-authorization)\s*[:=]\s*)(?:bearer\s+\S+|"[^"]*"|'[^']*'|\S+)""",
+    re.I,
+)
+_HEADER_VALUE = re.compile(
+    r"""((?:cookie|x-api-key)\s*[:=]\s*)(?:"[^"]*"|'[^']*'|\S+)""",
+    re.I,
+)
+_CREDENTIAL_FLAG = re.compile(
+    r"""((?:--user|--password|-u)(?:=|\s+))(?:"[^"]*"|'[^']*'|\S+)""",
+    re.I,
+)
+
+
+def redact_command(command):
+    """Drop URL userinfo and credential header or flag values before anything is sent."""
+    text = _USERINFO_URL.sub(r"\1", command or "")
+    text = _AUTH_VALUE.sub(r"\1[redacted]", text)
+    text = _HEADER_VALUE.sub(r"\1[redacted]", text)
+    return _CREDENTIAL_FLAG.sub(r"\1[redacted]", text)
+
+
 def summary(tool, args):
     # Never include Write.content, Edit replacement text, prompt, tool output, or URL userinfo.
     if tool == "Bash":
-        return str(args.get("command", ""))[:300]
+        return redact_command(str(args.get("command", "")))[:300]
     name = str(tool).lower()
     if name == "websearch":
         return "WebSearch"
@@ -124,35 +147,167 @@ def split_shell_segments(command):
     parts.append("".join(buf))
     return parts
 _READ_COMMANDS = frozenset({"cat", "head", "curl", "wget"})
-_FLAG_WITH_VALUE = frozenset({
-    "-n", "--lines", "-c", "--bytes", "-o", "--output", "-H", "--header", "-A", "--user-agent",
-    "-e", "--referer", "-u", "--user", "-m", "--max-time", "--connect-timeout", "-w", "--write-out",
-    "-d", "--data", "--data-raw", "--data-binary", "--data-urlencode", "-F", "--form",
-    "-X", "--request", "--method", "--post-data", "--post-file",
+# Value-taking flags are per command. cat -n/-A/-e do not consume the path.
+_VALUE_FLAGS = {
+    "head": frozenset({"-n", "--lines", "-c", "--bytes"}),
+    "curl": frozenset({
+        "-c", "-o", "--output", "-H", "--header", "-A", "--user-agent",
+        "-e", "--referer", "-u", "--user", "-m", "--max-time", "--connect-timeout", "-w", "--write-out",
+        "-d", "--data", "--data-raw", "--data-binary", "--data-urlencode", "--data-ascii",
+        "-F", "--form", "--form-string", "-X", "--request", "--method", "--post-data", "--post-file",
+        "--json", "-T", "--upload-file",
+    }),
+    "wget": frozenset({
+        "-O", "--output-document", "-o", "--output-file", "-P", "--directory-prefix",
+        "-e", "--execute", "--post-data", "--post-file", "--body-data", "--body-file",
+    }),
+}
+_WRITE_FLAGS = frozenset({
+    "-d", "--data", "--data-raw", "--data-binary", "--data-urlencode", "--data-ascii",
+    "-F", "--form", "--form-string", "--post-data", "--post-file",
+    "--json", "-T", "--upload-file", "--body-data", "--body-file",
 })
+_SUDO_VALUE = frozenset({
+    "-u", "-g", "-h", "-p", "-C", "-r", "-t", "-U",
+    "--user", "--group", "--host", "--prompt", "--close-from", "--role", "--type", "--other-user",
+})
+_ENV_VALUE = frozenset({"-u", "--unset", "-C", "--chdir", "-S", "--split-string"})
+_SHELLS = frozenset({"bash", "sh", "dash", "zsh", "ksh"})
 _URI_LIMIT = 512
+_WALK_LIMIT = 3
 
 
 def _basename(token):
-    return token.replace("\\", "/").rsplit("/", 1)[-1].lower()
+    name = token.replace("\\", "/").rsplit("/", 1)[-1].lower()
+    return name[:-4] if name.endswith(".exe") else name
+
+
+def _prepare_command(command):
+    """Expand $'…' and turn bare backslashes into slashes so shlex keeps Windows paths."""
+    text = command or ""
+    out = []
+    i = 0
+    quote = None
+    while i < len(text):
+        ch = text[i]
+        if quote == "'":
+            out.append(ch)
+            if ch == "'":
+                quote = None
+            i += 1
+            continue
+        if quote == '"':
+            if ch == "\\" and i + 1 < len(text):
+                out.append(ch)
+                out.append(text[i + 1])
+                i += 2
+                continue
+            out.append(ch)
+            if ch == '"':
+                quote = None
+            i += 1
+            continue
+        if text.startswith("$'", i):
+            j = i + 2
+            body = []
+            while j < len(text) and text[j] != "'":
+                if text[j] == "\\" and j + 1 < len(text):
+                    body.append(text[j + 1])
+                    j += 2
+                    continue
+                body.append(text[j])
+                j += 1
+            if j < len(text) and text[j] == "'":
+                inner = "".join(body).replace("'", "'\\''")
+                out.append("'")
+                out.append(inner)
+                out.append("'")
+                i = j + 1
+                continue
+        if ch in {"'", '"'}:
+            quote = ch
+            out.append(ch)
+            i += 1
+            continue
+        out.append("/" if ch == "\\" else ch)
+        i += 1
+    return "".join(out)
+
+
+def _peel(tokens, depth, walk):
+    """Yield argv lists after sudo, env, command, exec, eval, and shell -c."""
+    if not tokens or depth > _WALK_LIMIT:
+        return
+    name = _basename(tokens[0])
+    args = tokens[1:]
+    if name == "sudo":
+        index = 0
+        while index < len(args) and args[index].startswith("-"):
+            base = args[index].split("=", 1)[0]
+            index += 2 if base in _SUDO_VALUE and "=" not in args[index] else 1
+        yield from _peel(args[index:], depth + 1, walk)
+        return
+    if name == "env":
+        index = 0
+        while index < len(args) and (args[index].startswith("-") or _ENV_ASSIGN.match(args[index])):
+            base = args[index].split("=", 1)[0]
+            index += 2 if base in _ENV_VALUE and "=" not in args[index] else 1
+        yield from _peel(args[index:], depth + 1, walk)
+        return
+    if name == "command":
+        index = 0
+        while index < len(args) and args[index] in {"-p", "-v", "-V"}:
+            index += 1
+        yield from _peel(args[index:], depth + 1, walk)
+        return
+    if name == "exec":
+        index = 0
+        while index < len(args) and args[index].startswith("-"):
+            index += 2 if args[index] in {"-a", "-c"} and "=" not in args[index] else 1
+        yield from _peel(args[index:], depth + 1, walk)
+        return
+    if name == "eval" and args:
+        walk(" ".join(args), depth + 1)
+        return
+    if name in _SHELLS:
+        script = None
+        index = 0
+        while index < len(args):
+            if args[index] == "-c" and index + 1 < len(args):
+                script = args[index + 1]
+                break
+            if args[index].startswith("-c") and len(args[index]) > 2 and not args[index].startswith("--"):
+                script = args[index][2:]
+                break
+            index += 1
+        if script is not None:
+            walk(script, depth + 1)
+            return
+    yield tokens
 
 
 def command_segments(command):
     """Tokenise a bash command. Unparseable segments are omitted, not guessed."""
-    segments = []
-    for part in split_shell_segments(command):
-        if not part.strip():
-            continue
-        try:
-            tokens = shlex.split(part, posix=True)
-        except ValueError:
-            continue
-        index = 0
-        while index < len(tokens) and _ENV_ASSIGN.match(tokens[index]):
-            index += 1
-        if index < len(tokens):
-            segments.append(tokens[index:])
-    return segments
+    found = []
+
+    def walk(text, depth):
+        if depth > _WALK_LIMIT:
+            return
+        for part in split_shell_segments(_prepare_command(text)):
+            if not part.strip():
+                continue
+            try:
+                tokens = shlex.split(part, posix=True)
+            except ValueError:
+                continue
+            index = 0
+            while index < len(tokens) and _ENV_ASSIGN.match(tokens[index]):
+                index += 1
+            if index < len(tokens):
+                found.extend(_peel(tokens[index:], depth, walk))
+
+    walk(command, 0)
+    return found
 
 
 def _segment_writes(name, args):
@@ -162,10 +317,10 @@ def _segment_writes(name, args):
     while index < len(args):
         arg = args[index]
         base = arg.split("=", 1)[0]
-        if base in {"-d", "--data", "--data-raw", "--data-binary", "--data-urlencode", "-F", "--form",
-                    "--post-data", "--post-file"}:
+        if base in _WRITE_FLAGS:
             return True
-        if base in {"-X", "--request", "--method"} or (arg.upper().startswith("-X") and len(arg) > 2):
+        if base in {"-X", "--request", "--method"} or (
+                arg.upper().startswith("-X") and len(arg) > 2 and not arg.startswith("--")):
             if "=" in arg:
                 value = arg.split("=", 1)[1]
             elif arg.upper().startswith("-X") and len(arg) > 2 and not arg.startswith("--"):
@@ -180,14 +335,21 @@ def _segment_writes(name, args):
     return False
 
 
-def _read_operands(args):
+def _read_operands(name, args):
     found = []
+    flags = _VALUE_FLAGS.get(name, frozenset())
     index = 0
     while index < len(args):
         arg = args[index]
         base = arg.split("=", 1)[0]
+        if arg in {">", ">>", ">&"}:
+            index += 2
+            continue
+        if arg.startswith((">", "1>", "2>")):
+            index += 1
+            continue
         if arg == "-" or arg.startswith("-"):
-            index += 2 if base in _FLAG_WITH_VALUE and "=" not in arg else 1
+            index += 2 if base in flags and "=" not in arg else 1
             continue
         if arg.startswith(("http://", "https://")):
             found.append(("url", arg))
@@ -203,16 +365,9 @@ def bash_read_targets(command):
     for tokens in command_segments(command):
         name = _basename(tokens[0])
         args = tokens[1:]
-        if name == "sudo" and args:
-            while args and args[0].startswith("-"):
-                args = args[1:]
-            if not args:
-                continue
-            name = _basename(args[0])
-            args = args[1:]
         if name not in _READ_COMMANDS or _segment_writes(name, args):
             continue
-        targets.extend(_read_operands(args))
+        targets.extend(_read_operands(name, args))
     return targets
 
 
@@ -243,15 +398,7 @@ def web_source(tool, args):
 
 
 def segment_command(tokens):
-    name = _basename(tokens[0])
-    args = tokens[1:]
-    if name == "sudo":
-        while args and args[0].startswith("-"):
-            args = args[1:]
-        if not args:
-            return None
-        return _basename(args[0])
-    return name
+    return _basename(tokens[0]) if tokens else None
 
 
 def file_read_events(path, digest, key, send):

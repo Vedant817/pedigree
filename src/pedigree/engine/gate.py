@@ -96,32 +96,143 @@ def split_shell_segments(command: str):
 _NETWORK_COMMANDS = frozenset({"ssh", "scp", "sudo"})
 _IRREVERSIBLE_TEXT = re.compile(
     r"(?:git\s+push|(?:npm|cargo|docker)\s+(?:publish|push)|kubectl\s+apply|terraform\s+apply|"
-    r"\brm\s+[^\n]*-[^\n]*[rf]|curl\s+[^\n]*-X\s*(?:POST|PUT|DELETE|PATCH))",
+    r"\brm\s+[^\n]*-[^\n]*[rf]|"
+    r"curl\s+[^\n]*(?:-X\s*(?:POST|PUT|DELETE|PATCH)|--(?:request|method)\s*(?:POST|PUT|DELETE|PATCH)|"
+    r"--json\b|--data-ascii\b|--form-string\b)|"
+    r"wget\s+[^\n]*--(?:post-data|post-file|body-data|body-file)\b)",
     re.I,
 )
-_UNPARSED_COMMAND = re.compile(r"(?<![\w./])(?:ssh|scp|sudo)\b", re.I)
+# A backslash is a path separator, so `C:\ssh` inside an unparsed segment is not the ssh command.
+_UNPARSED_COMMAND = re.compile(r"(?<![\w./\\])(?:ssh|scp|sudo)(?:\.exe)?\b", re.I)
+_ENV_VALUE = frozenset({"-u", "--unset", "-C", "--chdir", "-S", "--split-string"})
+_SHELLS = frozenset({"bash", "sh", "dash", "zsh", "ksh"})
+_WALK_LIMIT = 3
 
 
 def _command_basename(token: str) -> str:
-    return token.replace("\\", "/").rsplit("/", 1)[-1].lower()
+    name = token.replace("\\", "/").rsplit("/", 1)[-1].lower()
+    return name[:-4] if name.endswith(".exe") else name
+
+
+def _prepare_command(command: str) -> str:
+    """Expand $'…' and turn bare backslashes into slashes. Kept in step with the Claude hook."""
+    text = command or ""
+    out: list[str] = []
+    i = 0
+    quote = None
+    while i < len(text):
+        ch = text[i]
+        if quote == "'":
+            out.append(ch)
+            if ch == "'":
+                quote = None
+            i += 1
+            continue
+        if quote == '"':
+            if ch == "\\" and i + 1 < len(text):
+                out.append(ch)
+                out.append(text[i + 1])
+                i += 2
+                continue
+            out.append(ch)
+            if ch == '"':
+                quote = None
+            i += 1
+            continue
+        if text.startswith("$'", i):
+            j = i + 2
+            body: list[str] = []
+            while j < len(text) and text[j] != "'":
+                if text[j] == "\\" and j + 1 < len(text):
+                    body.append(text[j + 1])
+                    j += 2
+                    continue
+                body.append(text[j])
+                j += 1
+            if j < len(text) and text[j] == "'":
+                inner = "".join(body).replace("'", "'\\''")
+                out.append("'")
+                out.append(inner)
+                out.append("'")
+                i = j + 1
+                continue
+        if ch in {"'", '"'}:
+            quote = ch
+            out.append(ch)
+            i += 1
+            continue
+        out.append("/" if ch == "\\" else ch)
+        i += 1
+    return "".join(out)
+
+
+def _peel(tokens: list[str], depth: int, walk):
+    if not tokens or depth > _WALK_LIMIT:
+        return
+    name = _command_basename(tokens[0])
+    args = tokens[1:]
+    # sudo stays the command: it is irreversible even when the inner command is not.
+    if name == "env":
+        index = 0
+        while index < len(args) and (args[index].startswith("-") or _ENV_ASSIGN.match(args[index])):
+            base = args[index].split("=", 1)[0]
+            index += 2 if base in _ENV_VALUE and "=" not in args[index] else 1
+        yield from _peel(args[index:], depth + 1, walk)
+        return
+    if name == "command":
+        index = 0
+        while index < len(args) and args[index] in {"-p", "-v", "-V"}:
+            index += 1
+        yield from _peel(args[index:], depth + 1, walk)
+        return
+    if name == "exec":
+        index = 0
+        while index < len(args) and args[index].startswith("-"):
+            index += 2 if args[index] in {"-a", "-c"} and "=" not in args[index] else 1
+        yield from _peel(args[index:], depth + 1, walk)
+        return
+    if name == "eval" and args:
+        walk(" ".join(args), depth + 1)
+        return
+    if name in _SHELLS:
+        script = None
+        index = 0
+        while index < len(args):
+            if args[index] == "-c" and index + 1 < len(args):
+                script = args[index + 1]
+                break
+            if args[index].startswith("-c") and len(args[index]) > 2 and not args[index].startswith("--"):
+                script = args[index][2:]
+                break
+            index += 1
+        if script is not None:
+            walk(script, depth + 1)
+            return
+    yield tokens
 
 
 def _command_segments(summary: str):
     """Return parsed command token lists and segments shlex could not tokenise."""
     parsed, unparsed = [], []
-    for segment in split_shell_segments(summary):
-        if not segment.strip():
-            continue
-        try:
-            tokens = shlex.split(segment, posix=True)
-        except ValueError:
-            unparsed.append(segment)
-            continue
-        index = 0
-        while index < len(tokens) and _ENV_ASSIGN.match(tokens[index]):
-            index += 1
-        if index < len(tokens):
-            parsed.append(tokens[index:])
+
+    def walk(text: str, depth: int):
+        if depth > _WALK_LIMIT:
+            return
+        for segment in split_shell_segments(_prepare_command(text)):
+            if not segment.strip():
+                continue
+            try:
+                tokens = shlex.split(segment, posix=True)
+            except ValueError:
+                unparsed.append(segment)
+                continue
+            index = 0
+            while index < len(tokens) and _ENV_ASSIGN.match(tokens[index]):
+                index += 1
+            if index < len(tokens):
+                parsed.extend(_peel(tokens[index:], depth, walk))
+
+    walk(summary or "", 0)
     return parsed, unparsed
 
 
@@ -144,7 +255,13 @@ def _segment_level(tokens: list[str]) -> str | None:
     if name == "rm" and re.search(r"(?:^|\s)-[^\s]*[rf]", rest, re.I):
         return "high"
     if name == "curl" and re.search(
-            r"(?:(?:-X|--request)\s*(?:POST|PUT|DELETE|PATCH)|-X(?:POST|PUT|DELETE|PATCH)\b)", rest, re.I):
+            r"(?:(?:-X|--request|--method)\s*(?:POST|PUT|DELETE|PATCH)|-X(?:POST|PUT|DELETE|PATCH)\b|"
+            r"--json\b|--data-ascii\b|--form-string\b|(?:^|\s)(?:-d|-F|-T)\b|--upload-file\b)",
+            rest, re.I):
+        return "high"
+    if name == "wget" and re.search(
+            r"--(?:post-data|post-file|body-data|body-file)\b|--method\s*(?:POST|PUT|DELETE|PATCH)",
+            rest, re.I):
         return "high"
     if name == "git" and re.search(r"\bcommit\b", rest, re.I):
         return "medium"

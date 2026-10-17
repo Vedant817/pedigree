@@ -17,7 +17,8 @@ gate's risk classification. `post` hashes regular
 files up to 8 MiB for Read/Write/Edit/MultiEdit; Read looks up the exact absolute
 `path@sha256` before creating a source. Writes record an Action with that key.
 File bodies, edit text, tool responses and raw prompts are never transmitted.
-Bash command summaries (up to 300 characters) are transmitted for classification.
+Bash command summaries (up to 300 characters) are transmitted for classification
+after URL userinfo and credential header or flag values are redacted.
 
 Network and malformed-input failures produce a generic stderr warning and exit 0;
 operator-token configuration is rejected as described above. There is no durable spool.
@@ -29,15 +30,20 @@ that Claude installed or executed this configuration.
 with no userinfo, plus a session READ. `WebSearch` records the same kind of
 source with uri `websearch:sha256:<digest>`; the query text is not sent.
 `Bash` commands `cat`, `head`, `curl`, and `wget` record READ edges for path
-or http(s) URL operands. Compound commands are split on `&&`, `||`, `;`, `|`,
+or http(s) URL operands. Flags that take a value are recognised per command, so
+`cat -n file` still records that file, and `sudo -u user cat file` records the
+file rather than the session window. `env`, `command`, `exec`, and `bash -c`
+are unwrapped the same way. Compound commands are split on `&&`, `||`, `;`, `|`,
 `&`, and newlines outside quotes, so a quoted query string stays one URL. A
-segment that cannot be parsed is not recorded as a read. A `curl`/`wget` write (`-X POST`, `-d`, `-F`, and the
-wget post flags) is an action and not a read. When a bash command does record
-reads, that action's `relied_on` is those nodes only, so an earlier unrelated
-read in the session is not a parent of this command. The pre-tool gate still
-sends the session id and no explicit `relied_on`, so ADR-007's read-window
-floor still applies to `git push` and any other command that does not name
-its own inputs. `ssh`, `scp`, and `sudo` are classified as command tokens:
+segment that cannot be parsed is not recorded as a read. A `curl`/`wget` write
+(`-X` or `--request` other than GET/HEAD, `-d`, `-F`, `--json`, `-T`, and the
+wget post or body flags) is an action and not a read. When a bash command does
+record reads, that action's `relied_on` is those nodes only, so an earlier
+unrelated read in the session is not a parent of this command. The pre-tool
+gate still sends the session id and no explicit `relied_on`, so ADR-007's
+read-window floor still applies to `git push` and any other command that does
+not name its own inputs. `ssh`, `scp`, and `sudo` are classified as command
+tokens, including `env ssh`, `bash -c "ssh …"`, and `ssh.exe`.
 `cat ~/.ssh/config` is not an ssh invocation.
 
 Limits: Glob/Grep results are not mapped to file reads. Shell writes, tool
@@ -53,9 +59,8 @@ Write ancestry and source hash persistence depend on the `/v1/events` mapping;
 the adapter cannot independently prove the server stored these fields/edges.
 Synthetic tests are explicitly not recorded Claude runtime payload fixtures.
 
-Source identity remains a capture limitation: artifact lookup currently searches
-Memory and Action, not Source. If no artifact matches, each Read creates a new
-random Source id. Rereading unchanged file content after revoking its prior Source
-can therefore create a fresh trusted file Source and bypass that prior Source's
-revocation. Stable source identity and lookup require an F-07/F-08 server/capture
-follow-up; this adapter does not claim revocation continuity for those reads.
+Artifact lookup searches Memory and Action, not Source. A Read that misses that
+lookup still posts `uri` and `content_hash`. The server merges that pair onto the
+existing Source and rewrites later ids in the same batch to it, so a reread of
+the same bytes does not fork a second node. An agent token cannot set
+`integrity=trusted`. A changed hash is a new Source, which is the ADR-008 rule.
