@@ -230,6 +230,17 @@ def test_bash_cat_links_only_the_file_it_read(hook, tmp_path):
     assert "private file body" not in json.dumps(calls)
 
 
+def test_quoted_query_ampersand_stays_one_url(hook):
+    calls = []
+    command = 'curl -fsSL "https://example.com/a?x=1&y=2"'
+    hook.handle("post", {"session_id": "sess_test", "tool_name": "Bash",
+                         "tool_input": {"command": command}},
+                lambda path, payload=None: calls.append((path, payload)) or {})
+    events = calls[-1][1]["events"]
+    assert events[1]["uri"] == "https://example.com/a?x=1&y=2"
+    assert [event["type"] for event in events].count("source_read") == 1
+
+
 def test_bash_curl_get_reads_url_and_post_does_not(hook):
     calls = []
     hook.handle("post", {"session_id": "sess_test", "tool_name": "Bash",

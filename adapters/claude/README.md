@@ -29,7 +29,9 @@ that Claude installed or executed this configuration.
 with no userinfo, plus a session READ. `WebSearch` records the same kind of
 source with uri `websearch:sha256:<digest>`; the query text is not sent.
 `Bash` commands `cat`, `head`, `curl`, and `wget` record READ edges for path
-or http(s) URL operands. A `curl`/`wget` write (`-X POST`, `-d`, `-F`, and the
+or http(s) URL operands. Compound commands are split on `&&`, `||`, `;`, `|`,
+`&`, and newlines outside quotes, so a quoted query string stays one URL. A
+segment that cannot be parsed is not recorded as a read. A `curl`/`wget` write (`-X POST`, `-d`, `-F`, and the
 wget post flags) is an action and not a read. When a bash command does record
 reads, that action's `relied_on` is those nodes only, so an earlier unrelated
 read in the session is not a parent of this command. The pre-tool gate still

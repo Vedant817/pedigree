@@ -78,8 +78,51 @@ def summary(tool, args):
     return str(args.get("file_path") or args.get("url") or args.get("uri") or tool)[:300]
 
 
-_SHELL_SPLIT = re.compile(r"&&|\|\||[;&|\n]")
 _ENV_ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+
+
+def split_shell_segments(command):
+    """Split on shell separators outside quotes. `&` inside a quoted URL stays put."""
+    parts, buf, quote = [], [], None
+    i, text = 0, command or ""
+    while i < len(text):
+        ch = text[i]
+        if quote == "'":
+            buf.append(ch)
+            if ch == "'":
+                quote = None
+            i += 1
+            continue
+        if quote == '"':
+            if ch == "\\" and i + 1 < len(text):
+                buf.append(ch)
+                buf.append(text[i + 1])
+                i += 2
+                continue
+            buf.append(ch)
+            if ch == '"':
+                quote = None
+            i += 1
+            continue
+        if ch in {"'", '"'}:
+            quote = ch
+            buf.append(ch)
+            i += 1
+            continue
+        if text.startswith("&&", i) or text.startswith("||", i):
+            parts.append("".join(buf))
+            buf = []
+            i += 2
+            continue
+        if ch in {";", "|", "&", "\n"}:
+            parts.append("".join(buf))
+            buf = []
+            i += 1
+            continue
+        buf.append(ch)
+        i += 1
+    parts.append("".join(buf))
+    return parts
 _READ_COMMANDS = frozenset({"cat", "head", "curl", "wget"})
 _FLAG_WITH_VALUE = frozenset({
     "-n", "--lines", "-c", "--bytes", "-o", "--output", "-H", "--header", "-A", "--user-agent",
@@ -97,7 +140,7 @@ def _basename(token):
 def command_segments(command):
     """Tokenise a bash command. Unparseable segments are omitted, not guessed."""
     segments = []
-    for part in _SHELL_SPLIT.split(command or ""):
+    for part in split_shell_segments(command):
         if not part.strip():
             continue
         try:

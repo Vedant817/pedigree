@@ -46,8 +46,51 @@ def load_policy(path=None) -> Policy:
         return Policy()
 
 
-_SHELL_SPLIT = re.compile(r"&&|\|\||[;&|\n]")
 _ENV_ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+
+
+def split_shell_segments(command: str):
+    """Split on shell separators outside quotes, matching the Claude hook."""
+    parts, buf, quote = [], [], None
+    i, text = 0, command or ""
+    while i < len(text):
+        ch = text[i]
+        if quote == "'":
+            buf.append(ch)
+            if ch == "'":
+                quote = None
+            i += 1
+            continue
+        if quote == '"':
+            if ch == "\\" and i + 1 < len(text):
+                buf.append(ch)
+                buf.append(text[i + 1])
+                i += 2
+                continue
+            buf.append(ch)
+            if ch == '"':
+                quote = None
+            i += 1
+            continue
+        if ch in {"'", '"'}:
+            quote = ch
+            buf.append(ch)
+            i += 1
+            continue
+        if text.startswith("&&", i) or text.startswith("||", i):
+            parts.append("".join(buf))
+            buf = []
+            i += 2
+            continue
+        if ch in {";", "|", "&", "\n"}:
+            parts.append("".join(buf))
+            buf = []
+            i += 1
+            continue
+        buf.append(ch)
+        i += 1
+    parts.append("".join(buf))
+    return parts
 # ssh/scp/sudo are matched as command tokens, not as path segments. `\bssh\b`
 # treats `cat ~/.ssh/config` as an ssh invocation because `.` is a boundary.
 _NETWORK_COMMANDS = frozenset({"ssh", "scp", "sudo"})
@@ -66,7 +109,7 @@ def _command_basename(token: str) -> str:
 def _command_segments(summary: str):
     """Return parsed command token lists and segments shlex could not tokenise."""
     parsed, unparsed = [], []
-    for segment in _SHELL_SPLIT.split(summary or ""):
+    for segment in split_shell_segments(summary):
         if not segment.strip():
             continue
         try:
