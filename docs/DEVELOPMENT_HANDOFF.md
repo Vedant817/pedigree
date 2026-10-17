@@ -184,8 +184,8 @@ host's secret store and outside version control.
 
 | Item | Verified? |
 |---|---|
-| Local gates green on `main` | yes — `make check` passes (see `docs/PROGRESS.md` for the latest counts) |
-| Application serves a real build | yes — verified 2026-10-17, section 4 |
+| Local gates green on `main` | reported green by the feature session — see `docs/PROGRESS.md`. **Not re-run during the automated-testing pass**: that change was documentation-only, and the full suite shares the database with work in flight. |
+| Application serves a real build | yes — independently verified 2026-10-17 by this pass, section 4 |
 | Preview deployment per PR | **no** — blocked by B2 |
 | Third-party suite executed against a deployment | **no** — blocked by B3 |
 | GitHub App connected and trigger active | **no** — blocked by B4 |
