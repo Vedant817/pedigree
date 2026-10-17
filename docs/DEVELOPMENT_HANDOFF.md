@@ -7,13 +7,13 @@ Governing engineering rules live in `AGENTS.md` (canonical). If this file and
 `AGENTS.md` disagree, `AGENTS.md` wins.
 
 - **Last updated:** 2026-10-17
-- **Updated by:** feature-development session (Phase E: P-022 landed + QA, P-006 signed, P-012 evidence, P-023 spec in progress)
-- **Product milestone:** Phase E in progress. P-022 (observability) landed and QA-recorded
-  (docs/qa/P-022.md, PASS with caveats), P-006 eval signed (docs/qa/eval-signoff.md
-  addendum), P-012 evidence recorded (docs/qa/P-012.md), P-023 isolation suite spec filed
-  (docs/fixes/P-023.md) and implemented (tests/isolation/, 6 tests), G3 AI disclosure
-  fact sheet added (docs/AI_DISCLOSURE.md). P-023 independent QA closure verdict pending.
-  See `docs/PROGRESS.md` `CURRENT STATE` for the authoritative live state.
+- **Updated by:** feature-development session (Phase F: P-017 capture landed, QA follow-up fixed, full `make check` green)
+- **Product milestone:** Phase F in progress. P-017 synthetic web and shell-read capture
+  is on `main` through `097309d`. Devex QA on the first capture commit passed;
+  correctness and red-team failed that commit, and the code bugs they named are
+  fixed in `097309d` without a new QA report yet. P-023 independent QA closure is
+  still open. Installed Claude capture, disclosure voice, video, and publish stay
+  human-only. See `docs/PROGRESS.md` `CURRENT STATE` for the authoritative live state.
 
 ## 1. Product
 

@@ -1,31 +1,24 @@
 # CURRENT STATE (overwritten after every feature / checkpoint)
 
-- **Phase:** Phase E in progress, Sat 2026-10-17. Checkpoint D pushed
-  (`phase-D` tag at `6f44232`); Phase E work lands on `main` ahead of origin (push/tag
-  at the next checkpoint decision).
-  Landed this session:
-    - P-022 (observability): trace in revoke/blame/impact/gate responses + MCP;
-      `/metrics` families `pedigree_query_seconds`, `pedigree_revocations_total`,
-      `pedigree_gate_decisions_total`, `pedigree_nodes`; JSON access log; collapsible
-      UI trace strip. Commits `2ac660c` + idempotency fix `ba41f70`. QA:
-      `docs/qa/P-022.md` (PASS with caveats: browser strip not visually verified).
-    - P-006 (honest eval): `make eval` reproduces (exit 0, 70 allowed values in
-      `check_numbers`); statistician sign-off flipped to SIGNED in the addendum of
-      `docs/qa/eval-signoff.md`. Commit `aa898db`.
-    - P-012 reinstate oracle battery: evidence recorded in `docs/qa/P-012.md`
-      (step-0 PASS, unit 12 passed, property 300/0 failing, mutation red/green).
-      Commits `6cf053a` … `838e2e1`, evidence commit `0f05982`.
-    - P-023 spec filed (`docs/fixes/P-023.md`, commit `59e6143`); implementation
-      (tests/isolation/) in progress.
-    - Doc drift from the P-022 QA pass fixed: `docs/02-ARCHITECTURE.md` metrics list,
-      `AUDIT.md` P-022 status, `docs/01-IDEA.md` trace scope. Commit `f4bc2eb`.
-    - G3 AI disclosure fact sheet added (`docs/AI_DISCLOSURE.md`, commit `a4916f7`);
-      human-voice fields left as clearly-marked placeholders (human-only).
-  Full `make check` baseline at the Phase D close-out: 809 passed, 2 skipped,
-  4 deselected, 1 xfailed (165.02s). Re-run pending after the P-023 suite lands.
-- **Next:** finish P-023 (isolation suite); then FIX_PROMPT F (P-017 capture,
-  P-027 demo), G (README, walkthrough, disclosure, hygiene), H (final gate). Feature
-  freeze Sun 2026-10-18 15:00 IST.
+- **Phase:** Phase F in progress, Sat 2026-10-17. `main` is ahead of `origin/main`.
+  Push and tags stay a human checkpoint (`AGENTS.md`).
+  Landed and still true from Phase E: P-022 QA recorded (`docs/qa/P-022.md`, PASS
+  with caveats), P-006 eval signed, P-012 evidence recorded, P-023 isolation suite
+  implemented (`tests/isolation/`, independent QA closure still open), G3 fact sheet
+  (`docs/AI_DISCLOSURE.md`, human-voice fields still placeholders).
+  P-017 capture landed in `d9fed01`, `19751bc`, `144d620`, and `097309d`: synthetic
+  WebFetch/WebSearch and bash `cat`/`head`/`curl`/`wget` reads, command-token
+  classifier, flagged-read and wrapper fixes, secret redaction in bash summaries.
+  ADR-007's empty-`relied_on` read-window floor is unchanged. Installed Claude
+  sessions remain human-only. Independent QA on `d9fed01` returned devex PASS and
+  correctness/red-team FAIL; the FAIL items that were code bugs are fixed in
+  `097309d`. That commit does not yet have its own QA report, so P-017 is not
+  marked QA-closed.
+  `make check` on `097309d`: 860 passed, 2 skipped, 6 deselected, 1 xfailed
+  (262.82s); secret scan PASS; `check_numbers` PASS (2 files, 70 allowed values).
+- **Next:** P-027 synthetic realistic demo, then Phase G (README, walkthrough,
+  demo script, blog draft, hygiene) and Phase H. Feature freeze Sun 2026-10-18
+  15:00 IST. Do not push, tag, publish, or fill human-voice disclosure fields.
 - **Residuals:** ACL service wiring, installed runtime capture and stronger F-08
   eviction-proof lineage remain open. Private disclosure contact is human-owned.
   No hosted CI/deployment or native macOS acceptance is claimed; the Render
