@@ -64,9 +64,14 @@ def replay(scenario: dict, client: TestClient, headers: dict) -> dict:
     # a fixture revokes its root only when it declares what the revoke should produce; a
     # gate-only scenario (S6) must be evaluated with its lineage intact
     if scenario.get("expected_after_revoke"):
-        revoke = client.post("/v1/revoke", headers=headers,
-                             json={"root_id": scenario["root_id"], "reason": "synthetic scenario"})
+        body = {"root_id": scenario["root_id"], "reason": "synthetic scenario",
+                "kind": scenario.get("revoke_kind", "revoke")}
+        revoke = client.post("/v1/revoke", headers=headers, json=body)
         assert revoke.status_code == 200, revoke.text
+        revisit = scenario.get("expected_revisit")
+        if revisit is not None:
+            listed = sorted(action["id"] for action in revoke.json().get("actions", []))
+            assert listed == sorted(revisit), listed
     else:
         revoke = None
     result = {"created": created, "revoke": revoke.json() if revoke is not None else None}

@@ -1,9 +1,15 @@
 # CURRENT STATE (overwritten after every feature / checkpoint)
 
 - **Phase:** Phase G started Sun 2026-10-18 (G1 README checker on `3e94e17`).
-  `main` is ahead of `origin/main`. Phase F capture and the realistic seed remain as below.
-  Tags stay a human checkpoint (`AGENTS.md`). This tree is being pushed
-  because the operator asked to push and check CI.
+  Before this checkpoint, pushed `main` was `7acab83`. GitHub Actions run 39104897341 on that commit
+  succeeded. The durable `pedigree-db` volume still exits 139 inside
+  `GraphContext_GetSchemaByID` and was not deleted. S7 and the list badges
+  were checked on a separate empty FalkorDB on port 6380: 36 passed in 6.45s
+  (`test_demo_seed.py`, `test_e3_scenarios.py`, `test_ui_boundary.py`).
+  F-19 and F-21 stay at `qa` until an independent review. The authored demo
+  tenant on the old volume was not reseeded. The screen recording is still
+  not in the repo. Phase F capture and the realistic seed remain as below.
+  Tags stay a human checkpoint (`AGENTS.md`).
   Landed and still true from Phase E: P-022 QA recorded (`docs/qa/P-022.md`, PASS
   with caveats), P-006 eval signed, P-012 evidence recorded, P-023 isolation suite
   implemented (`tests/isolation/`, independent QA closure still open), G3 fact sheet
@@ -49,6 +55,7 @@
   39104550119 on that push failed `test_opencode_adapter_node_suite`: the
   Windows-shaped fixture paths are literal filenames on Linux. The follow-up
   substitutes the platform path and keeps the backslash traversal case on Windows.
+  That follow-up is `7acab83`. Run 39104897341 succeeded.
 - **Residuals:** ACL service wiring, installed runtime capture and stronger F-08
   eviction-proof lineage remain open. Private disclosure contact is human-owned.
   No hosted CI/deployment or native macOS acceptance is claimed; the Render

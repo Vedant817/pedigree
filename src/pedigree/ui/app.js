@@ -58,8 +58,10 @@
       const button = text('button','', 'node-button' + (selected?.id === node.id ? ' active' : ''));
       button.type = 'button'; button.setAttribute('aria-pressed',String(selected?.id === node.id));
       button.dataset.nodeId = node.id;
-      button.append(text('i','',`dot ${node.status}`), document.createTextNode(node.title || node.id),
-        text('small', `${node.type} · ${node.status}${node.tool ? ' · ' + node.tool : ''}`));
+      button.append(text('i','',`dot ${node.status}`), document.createTextNode(node.title || node.id));
+      if (node.status === 'preserved') button.append(text('span','Preserved','badge'));
+      if (node.status === 'tainted') button.append(text('span','Tainted','badge wave'));
+      button.append(text('small', `${node.type} · ${node.status}${node.tool ? ' · ' + node.tool : ''}`));
       button.addEventListener('click', () => select(node.id)); fragment.append(button);
     }
     if (!matches.length) fragment.append(text('p',nodes.length ? 'No nodes match your search.' : 'No recorded nodes. Run capture or seed the dedicated demo tenant.','empty'));

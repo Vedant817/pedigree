@@ -107,6 +107,8 @@ def test_ui_source_uses_text_rendering_and_memory_only_token():
     path_style = source[source.index("selector:'.on-path'"):]
     path_style = path_style[:path_style.index("]") + 1]
     assert "background-color" not in path_style
+    assert "text('span','Preserved','badge')" in source
+    assert "text('span','Tainted','badge wave')" in source
     assert "redirect:'error'" in source and "cache:'no-store'" in source
     assert "epoch++" in source and "started !== epoch" in source
     assert "same(preview,snapshot())" in source

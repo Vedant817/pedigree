@@ -27,8 +27,8 @@ its evidence must retain local/runtime/deployment limitations. Planned extension
 | F-16 | P1 | Local deployment: Dockerfile (Ubuntu 24.04 single container), compose, seed-on-boot; Render open | done | container verified end-to-end (build + boot + seed + API + revoke) | `docs/qa/F-16.md` PASS; Render is a human step |
 | F-17 | P2 | What-if (`GRAPH.COPY`); checkpoint/restore remains unbuilt | done | tests/integration/test_whatif.py, tests/security/test_whatif_audit_review.py | docs/qa/F-17.md PASS; redteam-F-17.md PASS for local subset; per-process cap |
 | F-18 | P2 | `audit_sources` (PageRank + descendant counts); WCC unbuilt | done | tests/integration/test_audit.py, tests/security/test_whatif_audit_review.py | docs/qa/F-18.md PASS; redteam-F-18.md PASS for local subset |
-| F-19 | P2 | `supersede` (decision rot) + scenario S7 | todo | - | - |
+| F-19 | P2 | `supersede` (decision rot) + scenario S7 | qa | tests/integration/test_demo_seed.py (S1, S7, S8), tests/evals/test_e3_scenarios.py | `docs/qa/F-19.md` local checks succeeded; independent review not run |
 | F-20 | P2 | Eval publication/signoff and remaining real-session experiments | implementing | tests/evals/* | local E3 S1/S6/S8, E4/E4b measured; scoped statistician signoff PASS; E3b/E6 NOT MEASURED |
-| F-21 | P2 | UI polish: path highlight, trace strip, taint animation, preserved badges | todo | - | - |
+| F-21 | P2 | UI polish: path highlight, trace strip, taint animation, preserved badges | qa | tests/security/test_ui_boundary.py; browser check of list badges on a throwaway tenant | `docs/qa/F-21.md` local checks succeeded; independent review not run |
 | F-22 | P2 | Hook spool/replay when the server is down | todo | - | - |
 | F-23 | P3 | README, blog, demo video assets, AI disclosure, submission pack | implementing | - | drafts exist; human review, video and final publication pending |

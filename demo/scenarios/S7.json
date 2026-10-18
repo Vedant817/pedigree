@@ -1,0 +1,21 @@
+{
+  "id": "S7",
+  "synthetic": true,
+  "title": "A superseded policy still names the actions that must be revisited",
+  "root_id": "demo_s7_policy",
+  "revoke_kind": "supersede",
+  "nodes": [
+    {"type": "source", "id": "demo_s7_policy", "kind": "file", "uri": "synthetic/decisions/old-policy.md", "title": "Synthetic stale policy"},
+    {"type": "memory", "id": "demo_s7_recommendation", "text": "Synthetic recommendation still citing the stale policy", "derived_from": ["demo_s7_policy"]},
+    {"type": "action", "id": "demo_s7_apply", "tool": "Edit", "summary": "Synthetic edit that applied the stale recommendation", "relied_on": ["demo_s7_recommendation"], "effect": "reversible", "risk": "low", "artifacts": ["synthetic/applied.md"]},
+    {"type": "action", "id": "demo_s7_ship", "tool": "git push", "summary": "Synthetic publish of the stale decision; no git command was executed", "relied_on": ["demo_s7_apply"], "effect": "irreversible", "risk": "high", "artifacts": ["https://synthetic.invalid/decision"]}
+  ],
+  "expected_after_revoke": {
+    "demo_s7_policy": "revoked",
+    "demo_s7_recommendation": "tainted",
+    "demo_s7_apply": "tainted",
+    "demo_s7_ship": "tainted"
+  },
+  "expected_irreversible": ["demo_s7_ship"],
+  "expected_revisit": ["demo_s7_apply", "demo_s7_ship"]
+}

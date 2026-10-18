@@ -51,14 +51,18 @@ def test_seed_is_repeatable_without_touching_unrelated_data(fresh_graph):
     assert check_invariants(db, gname, expected_tenant=tenant) == []
 
 
-@pytest.mark.parametrize("scenario_id", ["S1", "S8"])
+@pytest.mark.parametrize("scenario_id", ["S1", "S7", "S8"])
 def test_scenario_manifest_matches_real_revoke(fresh_graph, scenario_id):
     db, tenant, gname = fresh_graph
     seed_scenarios(db, tenant)
     scenario = next(s for s in load_scenarios() if s["id"] == scenario_id)
-    result = revoke(db, gname, tenant, root_id=scenario["root_id"], reason="synthetic demo")
+    result = revoke(db, gname, tenant, root_id=scenario["root_id"], reason="synthetic demo",
+                    kind=scenario.get("revoke_kind", "revoke"))
+    assert result["kind"] == scenario.get("revoke_kind", "revoke")
     assert get_node_statuses(db, gname, list(scenario["expected_after_revoke"])) == scenario["expected_after_revoke"]
     assert sorted(a["id"] for a in result["irreversible"]) == scenario["expected_irreversible"]
+    if scenario.get("expected_revisit") is not None:
+        assert sorted(a["id"] for a in result["actions"]) == sorted(scenario["expected_revisit"])
     if scenario_id == "S1":
         explanation = blame(db, gname, "demo_s1_push")
         root = next(root for root in explanation["roots"] if root["id"] == scenario["root_id"])
