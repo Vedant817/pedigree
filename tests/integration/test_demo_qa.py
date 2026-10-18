@@ -108,7 +108,7 @@ def test_qa_cli_credential_not_in_output_and_ignored(fresh_graph):
         original = credential_path.read_bytes()
         token = json.loads(original)["token"]
         assert token not in first.stdout + first.stderr
-        assert '"created": 14' in first.stdout
+        assert '"created": 18' in first.stdout
         second = subprocess.run(command, env=env, capture_output=True, text=True, timeout=20, check=True)
         assert token not in second.stdout + second.stderr
         assert '"created": 0' in second.stdout
@@ -116,7 +116,7 @@ def test_qa_cli_credential_not_in_output_and_ignored(fresh_graph):
         ignored = subprocess.run(["git", "check-ignore", str(credential_path)],
                                  cwd=repo, capture_output=True, text=True, check=True)
         assert ignored.returncode == 0
-        print("CLI seed: created=11 then 0; token absent stdout/stderr; credential unchanged; git check-ignore exit=0")
+        print("CLI seed: created=18 then 0; token absent stdout/stderr; credential unchanged; git check-ignore exit=0")
     finally:
         credential_path.unlink(missing_ok=True)
         db.query(registry.gname, "MATCH (t:Tenant {id:$id}) DELETE t", {"id": tenant})
