@@ -310,7 +310,7 @@ FalkorDB (v4.22.1, module 42201) with `PYTHONPATH=src`, `FALKOR_HOST=127.0.0.1`,
   tests/integration/test_api.py tests/integration/test_mcp.py
   tests/integration/test_whatif.py tests/integration/test_revoke_resume.py` — 32 passed
   in 9.98s (9/7/2/5/9 per file).
-- Checkpoint/failure recovery: `python -m pytest -q
+- Startup and checkpoint namespace/configuration validation (not restore acceptance): `python -m pytest -q
   tests/unit/test_startup_maintenance.py tests/unit/test_config.py
   tests/unit/test_production_launch.py` — 24 passed in 0.55s (startup repair waits on
   the tenant lifecycle lock; checkpoint graph-name validation; `:ck:` ACL allowance).
@@ -319,16 +319,10 @@ FalkorDB (v4.22.1, module 42201) with `PYTHONPATH=src`, `FALKOR_HOST=127.0.0.1`,
   guard: 12 passed in 4.77s.
 - Restore stays explicitly unbuilt and is not claimed (`KNOWN_ISSUES.md:49`,
   `FEATURES.md:28`, `BLOG-DRAFT.md:167`; `domain.md:7`: no current test proves restore).
-- Atomic in-place graph replacement is impossible on this build: `GRAPH.COPY src dst`
-  onto an existing `dst` fails `destination key already exists` and mutates neither
-  graph; `GRAPH.COPY src dst REPLACE` fails `wrong number of arguments`; `GRAPH.RENAME`
-  is unregistered (`COMMAND INFO` returns nil; the attempt raises
-  `unknown command 'GRAPH.RENAME'`). Copy-to-new succeeds. This grounds
-  `decision.md:12`: the offline staged-write journal with rollback is the only
-  replacement path.
+- Correction from independent review: `GRAPH.COPY` does not overwrite and `GRAPH.RENAME` is absent, but privileged Redis `RENAME` does replace graph keys. See `tests/security/test_release_independent.py::test_admin_redis_rename_replaces_existing_graph`. A rename primitive alone does not establish crash-safe restore, persistence or reader/writer coordination. Offline recovery implementation and acceptance remain separate gates.
 - Worktree gates at `4a463c4`: Ruff `All checks passed!`; secret scan
   `[secret-scan] PASS: no credential shapes found in tracked files`; `check_numbers`
   `[check-numbers] PASS: 4 file(s) checked against 70 allowed values`; `check_readme`
   `[check-readme] PASS: 11 headings, docs/*.md links, numbers`.
-- Remaining release work: independent review of this evidence is open; Render preview
+- Remaining release work: independent review found a WCC metadata-input defect (fixed in the release branch), inaccurate rename wording (corrected here), and incomplete restore acceptance; recovery verification and Render preview
   verification stays user-owned.

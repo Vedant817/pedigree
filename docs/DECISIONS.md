@@ -474,3 +474,41 @@ Memory and Action lineage via static `algo.WCC` over DERIVED_FROM/CORROBORATED_B
 Session/history metadata is excluded, limits report truncation, component IDs are
 snapshot-local, and the existing token-derived tenancy contract is unchanged.
 Evidence: consult014, production-launch acceptance tests, real-DB component tests.
+
+## ADR-017 | 2026-10-18 | Tenant database identities at service admission
+
+After live bearer resolution, REST, MCP and tenant recovery obtain the same tenant-
+scoped Db identity. The registry and narrowly filtered maintenance enumeration retain
+privileged access. Exact main, what-if and checkpoint graph families and the exact
+quota mutex key are permitted; registry/foreign keys, graph enumeration and ACL
+administration are denied. Database passwords derive from a dedicated deployment
+secret, never bearer credentials. Provisioning failure returns unavailable without
+administrator fallback. Disabling ACL is explicitly reduced API-only isolation.
+Evidence: consult014, tests/security/test_tenant_db_service.py, independent release
+ACL/script/copy attacks in tests/security/test_release_independent.py.
+
+## ADR-018 | 2026-10-18 | Durable capture delivery and fresh offline gates
+
+The optional events delivery_id binds an immutable normalized envelope to a tenant-
+graph receipt. A receipt cursor and atomic Action fingerprint resume interrupted
+steps without duplicating actions. Receipt metadata consumes quota and accompanies
+graph checkpoints. The local hook persists sanitized envelopes before networking,
+scopes storage to endpoint plus credential fingerprint, serializes bounded replay,
+and never stores the bearer. Pending capture or service/storage failure denies a
+pre-tool action; a past gate decision is never replayed. An ambiguous database write
+retains the existing nonexpiring quota mutex until offline operator recovery.
+Evidence: docs/adr/F-22-durable-capture.md, tests/integration/test_capture_delivery.py
+and tests/unit/test_capture_spool.py. Installed Claude execution is separate proof.
+
+## ADR-019 | 2026-10-18 | Observed native OpenCode mutation capture
+
+Extend the installed-runtime-observed adapter from read to native write/edit/bash.
+All mutations are conservatively unknown/high for gating. Matched session/call/tool
+and argument identity, confined/revalidated file paths, intended-write digest checks
+and bounded post-state observations prevent fabricated exact-write claims. Capture
+transmits hashes/relative artifacts rather than bodies, diffs, commands or output.
+Malformed, missing or failed capture latches the session; nonzero Bash exit never
+produces successful-action evidence. Shell gating does not sandbox the shell or
+prove complete command provenance. Consult015 and docs/adr/F-08-native-capture.md
+record the observed contracts, dissent and installed proof. Restart state durability
+is a separate acceptance requirement, not inferred from an in-memory latch.

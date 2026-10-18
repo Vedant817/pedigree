@@ -1,118 +1,42 @@
 # CURRENT STATE (overwritten after every feature / checkpoint)
 
-- **Phase:** Phase G started Sun 2026-10-18 (G1 README checker on `3e94e17`).
-  Before this checkpoint, pushed `main` was `7acab83`. GitHub Actions run 39104897341 on that commit
-  succeeded. The durable `pedigree-db` volume still exits 139 inside
-  `GraphContext_GetSchemaByID` and was not deleted. S7 and the list badges
-  were checked on a separate empty FalkorDB on port 6380: 36 passed in 6.45s
-  (`test_demo_seed.py`, `test_e3_scenarios.py`, `test_ui_boundary.py`).
-  F-19 and F-21 stay at `qa` until an independent review. The authored demo
-  tenant on the old volume was not reseeded. The screen recording is still
-  not in the repo. Phase F capture and the realistic seed remain as below.
-  Tags stay a human checkpoint (`AGENTS.md`).
-  Landed and still true from Phase E: P-022 QA recorded (`docs/qa/P-022.md`, PASS
-  with caveats), P-006 eval signed, P-012 evidence recorded, P-023 isolation suite
-  implemented (`tests/isolation/`, independent QA closure still open), G3 fact sheet
-  (`docs/AI_DISCLOSURE.md`, human-voice fields still placeholders).
-  P-017 capture landed in `d9fed01`, `19751bc`, `144d620`, and `097309d`: synthetic
-  WebFetch/WebSearch and bash `cat`/`head`/`curl`/`wget` reads, command-token
-  classifier, flagged-read and wrapper fixes, secret redaction in bash summaries.
-  ADR-007's empty-`relied_on` read-window floor is unchanged. Installed Claude
-  sessions remain human-only. Independent QA on `d9fed01` returned devex PASS and
-  correctness/red-team FAIL; the FAIL items that were code bugs are fixed in
-  `097309d`. That commit does not yet have its own QA report, so P-017 is not
-  marked QA-closed.
-  `make check` on `097309d`: 860 passed, 2 skipped, 6 deselected, 1 xfailed
-  (262.82s); secret scan PASS; `check_numbers` PASS (2 files, 70 allowed values).
-- **Next:** Phase G hygiene, then Phase H. P-027 local demo login
-  (`PEDIGREE_DEMO_LOGIN=1`, agent credential only, loopback peers only) is in
-  this change. The screen recording is still not in the repo. The synthetic `demorealistic` seed and
-  blame-path highlight are. G1 landed in `3e94e17`, `b0c9971`, and `7615eef`.
-  An independent correctness review failed the first README wording and passed
-  the corrected sentences in `7615eef`. The developer-experience review of
-  `3e94e17` passed. The 20-second GIF is not in the repo. G2 drafts are
-  `docs/WALKTHROUGH.md` (S1 six-node example), `docs/DEMO_SCRIPT.md`, and
-  `docs/BLOG.md` in `36159b5`. They are drafts, not a recording. An independent
-  correctness review of that commit passed. There is no separate devex review
-  of the drafts, and no `docs/qa` file was written for them. Feature freeze was
-  written as Sun 2026-10-18 15:00 IST. Tags, publication, and human-voice
-  disclosure fields stay untouched. The realistic-seed tests
-  passed (unit plus integration, 12 passed with the existing demo-seed file).
-  `make check` on `3e94e17`: 867 passed, 2 skipped, 6 deselected, 1 xfailed
-  (313.34s); secret scan PASS; `check_numbers` PASS (2 files, 70 allowed
-  values); `check_readme` PASS. That suite run is older than `7615eef` and
-  older than the G2 drafts.
-  Architect review of `f5b8ed8`: security claims PASS. Plan and operator
-  mismatches fixed after that commit: README Cypher rows, disclosure CI and
-  Render claims, F-05/F-06 QA evidence, the F-07 and F-01 method notes, the
-  missing `fd948a0` reference, the source lookup command, the S8 gate wording,
-  and the workspace path outline. `make check` on that tree: 867 passed,
-  2 skipped, 6 deselected, 1 xfailed (259.78s); secret scan PASS;
-  `check_numbers` PASS (4 files, 70 allowed values); `check_readme` PASS.
-  `make check` on the local demo-login tree: 871 passed, 1 skipped,
-  6 deselected, 1 xfailed (277.62s); secret scan PASS; `check_numbers` PASS
-  (4 files, 70 allowed values); `check_readme` PASS. GitHub Actions run
-  39104550119 on that push failed `test_opencode_adapter_node_suite`: the
-  Windows-shaped fixture paths are literal filenames on Linux. The follow-up
-  substitutes the platform path and keeps the backslash traversal case on Windows.
-  That follow-up is `7acab83`. Run 39104897341 succeeded.
-- **Residuals:** ACL service wiring, installed runtime capture and stronger F-08
-  eviction-proof lineage remain open. Private disclosure contact is human-owned.
-  No hosted CI/deployment or native macOS acceptance is claimed; the Render
-  deployment and automated-testing account are human-owned.
-- **Last implementation commits:** 1243744/031f86a/83d7b73 (P-016 QA follow-up: stdio default-tenant
-  token bypass fixed - red-team F-1 with red-at-parent regression; MCP errors actionable; README
-  auth reality + 13-tool list; QA addenda), ef9033f (P-012 consult trio filed: domain + oracle
-  review + architect), 0e36767 (dogfood harness + `make dogfood`), 0e27023 (P-025 spec),
-  a2cb57b (P-013 spec), 44cf5bf (P-011 spec), 561b7e2 (P-016 fix + acceptance tests, QA-closed),
-  32ebaeb (P-010 anchor-lint closure rounds; QA-closed),
-  ccdd7cb (P-010 :Node(id) anchor fix, audit-fix program Phase A),
-  bb9511a (F-08 review fixes incl. round-2 closure, amended
-  in place), 8dd6509 (F-08 OpenCode read-only slice incl. review hardening),
-  f475979 (OpenCode ADR-009 record), a677d9f (what-if/audit containment), d7f7409 (test fixture
-  ownership).
-- **Environment:** Windows 11; Python 3.12.15; pinned FalkorDB module 42201 in Docker;
-  Node v24.13.1. Local core and synthetic demo require no model provider.
-- **Deadlines:** feature freeze Sun 2026-10-18 15:00 IST; target submit 21:00; hard stop 23:59.
-- **Previous checkpoint test state (not a current full-suite rerun):** make check: 406 passed, 1 skipped (optional ACL deployment secret absent),
-  3 deselected (perf; `make check-perf` 3 passed - EXPLAIN index plans, 20 000-node revoke
-  1 376 ms, 60 020-node gate 4.0 ms; P-010 QA re-measured 1 371.9 ms / 2.1-4.3 ms on its own
-  harness), 1 xfailed (strict read-window watchdog), Ruff, tracked secret scan and numbers
-  check PASS; `scripts/check_secrets.sh` PASS including git history.
-  **P-016 QA-closed:** acceptance trio green (stdio journey, `/mcp` mount, advertised
-  `http://127.0.0.1:8000/mcp` URL); qa-senior PASS (`docs/qa/P-016.md`, 20 adversarial cases,
-  zero graph leaks) plus devex (`docs/qa/devex-P-016.md`) and red-team
-  (`docs/qa/redteam-P-016.md`) reports; red-team F-1 (stdio ignored `PEDIGREE_MCP_TOKEN`) fixed
-  (`83d7b73`) with red-at-parent regression `tests/security/test_p016_stdio_token.py`;
-  F-2/F-3/F-5 -> P-015 scope, F-4 -> P-021.
-  **Dogfood harness live:** `make dogfood` (21 heavy-user scenarios + P-id expectation table):
-  PASS=12 FAIL=0 EXPECTED-FAIL=9 STALE=0 SKIP=1, exit 0; `--strict` exits 1 by design; S19
-  1 500-node revoke 156 ms server-side, invariants clean.
-  F-08 slice: builtin Node suite 38 passed; hook-replay integration (live API + real FalkorDB)
-  3 passed; security regressions 1 passed + 1 strict xfail; round-3 independent re-confirmation
-  PASS. Independent what-if/audit QA: 45 passed; test-fixture ownership QA: 11 passed. Full
-  serialized evaluation PASS; independent scoped F-14 statistical signoff PASS.
-- **Verified scope:** F-01..F-07, F-09..F-12, F-16 local container, F-17 what-if subset,
-  F-18 PageRank/exact reach. Checkpoint/restore and WCC remain unbuilt.
-  F-13/F-15 service ACL wiring remains open. E1/E2 synthetic semantics/capture model,
-  E3 authored S1/S6/S8, E4/E4b local measurements are distinct from real-session evidence.
-- **Capture:** OpenCode adapter implemented as an explicitly enabled read-only slice (ADR-009,
-  `adapters/opencode/`): native reads gated and captured as observed read views, every other tool
-  denied, failed capture latches the session. Review round hardened Windows path handling
-  (alternate-stream/drive-relative denial, native case canonicalization) and disclosed the bounded
-  latch memory, read-window and TOCTOU limits (adapter README). Its tests replay the genuine 1.19.0
-  payload; installed acceptance of the plugin file, write shapes and real coverage remain unmeasured.
-  Claude hook has API/subprocess proof, not installed-runtime proof.
-- **Data safety correction:** the old isolation fixture deleted all registry tenants. It now
-  deletes only its own successful creates and reports cleanup failures. Independent real-DB
-  sentinel survival passes. Earlier runs cannot establish that pre-existing data was preserved.
-- **Next 3 actions:**
-  1. P-020 indexed authentication and correct per-instance rate limits: decision/implementation.
-  2. Independent P-020 QA/red-team; P-036 trust documentation; final Phase-C gate.
-  3. P-021 validation/error containment and P-020 auth/rate limits; Phase-C checkpoint only
-     after independent security reports and clean-clone verification.
-- **Human pending:** video recording, walkthrough/architecture review, organizer track decision,
-  hosted account/submission. Git origin is configured; this continuation has not pushed.
+- **Date:** 2026-10-18 release completion, continued after provider interruptions.
+- **Integration branch:** `release/production-completion-20261018`; latest committed
+  checkpoint `2947c30`. Original main stays at `fbf6538`; its unrelated untracked
+  testing files are preserved.
+- **Implemented here:** empty authenticated production Compose, durable hosting
+  declarations, service-selected tenant database ACLs for REST/MCP/admin recovery,
+  lifecycle/startup serialization, bounded weak-component audit, production UI
+  capability visibility, and durable Claude capture with resumable graph receipts.
+- **Review artifacts:** draft PR #1 (production foundation) and draft PR #2
+  (durable capture), both on the repository. Neither is merged or release-approved.
+- **Verified source checkpoint:** recorded integrated quick suite on this branch:
+  910 passed, 1 skipped, 6 deselected, 1 xfailed. Current final gate is being rerun.
+  New focused harness checks: 2 passed. Harsh-user harness after selected-DB fix:
+  PASS=23 FAIL=0 EXPECTED-FAIL=0 STALE=0 SKIP=0. Full-history secret scan passed.
+- **Real runtime:** separate authenticated production containers on loopback8110;
+  fresh boot had zero tenants. Actual repository configuration inspection produced
+  persisted lineage; revoke/gate/reinstate, what-if nonmutation, cross-tenant denial,
+  unknown-ID refusal and API+DB restart survival passed. The running image predates
+  later source changes and must be rebuilt after final integration.
+- **In flight:** preserved unfinished checkpoint/restore and installed OpenCode
+  read/write/edit/bash changes are being completed in isolated delegated worktrees.
+  Independent release security review is running. Do not edit the original abandoned
+  worktrees or include their unfinished changes without validation.
+- **External gates:** hosted CI exposed a flaky stdio test channel-teardown setup;
+  the bounded request/response fix is under final verification. GitGuardian flags a
+  Compose environment-variable interpolation as Generic Password (no credential is
+  present); account-side false-positive review remains pending. Local TestSprite
+  reports passed runs, but recorded assertions are incomplete; coverage is
+  inconclusive. No preview-triggered TestSprite approval is claimed.
+- **Next:** integrate reviewed recovery/native capture; run final check/perf and
+  rebuild/retest production persistence; update focused PRs and evidence.
+- **Human-owned:** user chose to handle Render billing/resource changes. Hosted
+  persistence, PR previews, submission, private security contact and personal
+  disclosure statements remain unverified. Claude account is unauthenticated;
+  installed OpenCode read capture was verified earlier with real persisted evidence.
+- **Data preservation:** crashed original `pedigree-dbdata` volume remains untouched.
+  All new test databases/production verification containers use separate storage.
 
 ---
 
