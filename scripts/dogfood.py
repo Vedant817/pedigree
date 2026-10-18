@@ -7,7 +7,7 @@ Usage
     python scripts/dogfood.py --strict               # expected-failures count as failures
 
 Default (spawn) mode starts `uvicorn pedigree.api.app:create_app --factory` with a *fresh*
-environment (every PEDIGREE_*/FALKOR_* variable dropped) and a random `PEDIGREE_ADMIN_TOKEN`,
+environment (unrelated Pedigree settings dropped, selected DB retained) and a random `PEDIGREE_ADMIN_TOKEN`,
 waits for `/readyz`, runs the scenario table below, kills the server, cleans up every tenant
 graph and registry row it created, writes `scratch/dogfood/<timestamp>.md` (scratch/ is
 gitignored) and prints a summary table. Exit code 0 iff every scenario matches its expectation
@@ -807,9 +807,19 @@ def s15_import_without_db(ctx: Ctx, res: ScenarioResult) -> None:
               f"rc={proc.returncode} stderr: {frag(tail, 150)}")
 
 
-def _mcp_env(ctx: Ctx, tenant: Tenant) -> dict[str, str]:
+def child_environment() -> dict[str, str]:
+    """Sanitize capture/auth settings while retaining the parent's selected DB."""
     env = {k: v for k, v in os.environ.items()
            if not k.upper().startswith(("PEDIGREE_", "FALKOR_"))}
+    selected = Settings()
+    env.update({"FALKOR_HOST": selected.falkor_host, "FALKOR_PORT": str(selected.falkor_port),
+                "FALKOR_USERNAME": selected.falkor_username or "",
+                "FALKOR_PASSWORD": selected.falkor_password or ""})
+    return env
+
+
+def _mcp_env(ctx: Ctx, tenant: Tenant) -> dict[str, str]:
+    env = child_environment()
     env.update({
         "PEDIGREE_MCP_TENANT": tenant.id,
         "PEDIGREE_MCP_TOKEN": tenant.token,
@@ -1501,8 +1511,7 @@ def main(argv: list[str] | None = None) -> int:
         port = pick_port()
         base = f"http://127.0.0.1:{port}"
         admin_token = "ped_admin_" + secrets.token_urlsafe(24)
-        env = {k: v for k, v in os.environ.items()
-               if not k.upper().startswith(("PEDIGREE_", "FALKOR_"))}
+        env = child_environment()
         env.update({"PEDIGREE_ADMIN_TOKEN": admin_token, "PYTHONUTF8": "1",
                     "PYTHONIOENCODING": "utf-8"})
         log_handle = log_path.open("w", encoding="utf-8")

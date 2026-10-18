@@ -4,6 +4,7 @@ import hashlib
 import http.client
 import json
 import logging
+import queue
 import socket
 import subprocess
 import sys
@@ -262,13 +263,47 @@ def test_review_actual_stdio_sdk_does_not_reflect_malformed_arguments():
         {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {
             "name": "pedigree_health", "arguments": {"unexpected": canary}}},
     ]
-    process = subprocess.run([sys.executable, "-m", "pedigree.cli", "mcp", "--transport", "stdio"],
-                             input="".join(json.dumps(item) + "\n" for item in messages),
-                             capture_output=True, text=True, timeout=20)
-    assert process.returncode == 0
-    assert canary not in process.stdout and canary not in process.stderr
-    responses = [json.loads(line) for line in process.stdout.splitlines() if line.strip()]
-    reply = next(item for item in responses if item.get("id") == 2)
+    process = subprocess.Popen([sys.executable, "-m", "pedigree.cli", "mcp", "--transport", "stdio"],
+                               stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE, text=True)
+    lines, incoming = [], queue.Queue()
+
+    def read_output():
+        for line in process.stdout:
+            lines.append(line)
+            incoming.put(line)
+
+    reader = threading.Thread(target=read_output, daemon=True)
+    reader.start()
+
+    def response(request_id):
+        deadline = time.monotonic() + 20
+        while True:
+            item = json.loads(incoming.get(timeout=max(.01, deadline - time.monotonic())))
+            if item.get("id") == request_id:
+                return item
+            assert time.monotonic() < deadline, "MCP response deadline exceeded"
+
+    try:
+        # Keep the channel open through the actual response. EOF is connection
+        # teardown in the installed SDK and can cancel in-flight requests.
+        process.stdin.write(json.dumps(messages[0]) + "\n")
+        process.stdin.flush()
+        response(1)
+        process.stdin.write("".join(json.dumps(item) + "\n" for item in messages[1:]))
+        process.stdin.flush()
+        reply = response(2)
+        process.stdin.close()
+        process.wait(timeout=10)
+        reader.join(timeout=2)
+        assert process.returncode == 0
+        assert not reader.is_alive()
+        assert canary not in "".join(lines) and canary not in process.stderr.read()
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=5)
+        reader.join(timeout=2)
     rendered = json.dumps(reply)
     assert "invalid_argument" in rendered and "unexpected" not in rendered
 
