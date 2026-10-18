@@ -1,28 +1,29 @@
-# Pedigree OpenCode adapter (F-08 observed read-only slice)
+# Pedigree OpenCode adapter
 
 Explicitly enabled capture/gating adapter for [OpenCode](https://opencode.ai/).
-While enabled it gates and captures the native `read` tool as an *observed read
-view* and denies every other tool before execution. Scope, limits and exclusions:
+While enabled it gates and captures the observed native `read`, `write`, `edit`
+and `bash` forms. Reads are *observed read views*; writes/edits are verified file
+artifact actions; successful Bash output is an untrusted hash-only source.
+Unsupported tools and ambiguous forms are denied. Scope, limits and exclusions:
 [`docs/features/F-08-opencode.md`](../../docs/features/F-08-opencode.md) and
 ADR-009 in [`docs/DECISIONS.md`](../../docs/DECISIONS.md).
 
-**Honesty boundary.** Verified: the genuine installed-runtime hook payload
-(OpenCode 1.19.0, `docs/consults/opencode-recheck-2026-10-16-shape.json`) maps
-field-exactly (allowlisted wire keys; the capture digest is recomputed
-independently in tests) to the documented REST contract, and adapter behaviour
-is covered by the builtin Node suites plus a hook-replay integration test
-against a real API and FalkorDB. **Not verified:** acceptance of this plugin
-file by an installed OpenCode session, write/edit/shell payload shapes (the
-provider blocked the write probe), and coverage in real work. Hook-replay tests
-are not installed-runtime proof. F-08 remains *implementing*.
+**Evidence boundary.** Native read/write/edit/Bash success shapes and failed
+Bash/edit behavior were observed in installed OpenCode 1.19.3 using beam-free.
+The structural evidence contains no content or credentials:
+`docs/consults/opencode-1.19.3-tool-shapes.json`. Node tests and live API/FalkorDB
+hook replay verify mapping, provenance, privacy and failures. Installed plugin
+acceptance and its exact limits are recorded separately in
+`docs/qa/opencode-native-local.md`; replay is never counted as installed proof.
 
 ## Install
 
-1. Copy both files into the project's plugin directory, side by side:
-   `.opencode/plugins/pedigree.js` and `.opencode/plugins/pedigree-core.js`
-   (the entry imports `./pedigree-core.js`). The runtime loads local project
-   plugins from that directory (OpenCode plugin docs; the 2026-10-16 recheck
-   loaded a project plugin from there).
+1. Copy both files side by side into `.opencode/pedigree/`:
+   `pedigree.js` and `pedigree-core.js` (the entry imports `./pedigree-core.js`).
+   Register only the entry file's absolute path in the project's `opencode.json`
+   `plugin` array. This explicit entry registration was used in installed acceptance.
+   Keep the core outside the automatically scanned `.opencode/plugins/` directory:
+   it exports helpers, not plugin entry functions.
 2. No build step and no npm dependencies: plain Node ESM using builtins only
    (`node:crypto`, `node:fs`, `node:path`). Do not rename one file without the
    other.
@@ -44,8 +45,8 @@ are not installed-runtime proof. F-08 remains *implementing*.
 
 For every native `read` call the plugin:
 
-1. Denies the call unless the tool is `read` (every other tool — including
-   write, edit, shell and MCP tools — is denied before execution).
+1. Denies tools outside observed `read`, `write`, `edit`, `bash` forms. MCP,
+   delegation, patch and other native tools remain denied.
 2. Validates the path: inside the canonical project root, not a `..`/symlink
    escape, not a credential file (`.env*`, keys, `.ssh`, `.aws`, …). On Windows,
    drive-relative (`C:file`) and alternate-stream (`file:stream`, `id_rsa::$DATA`)
@@ -70,7 +71,7 @@ bytes:
 Never transmitted: file bodies, the tool's output wrapper, previews, titles,
 commands or args beyond the relative path, absolute paths, the operator token,
 exception details. Source nodes are forced `untrusted` by the server for agent
-tokens; the adapter never asserts trust, tenant, risk or dependencies.
+tokens; the adapter never asserts trust, tenant or dependencies.
 
 Failure semantics:
 
@@ -92,9 +93,8 @@ redirects are followed, and every request is bounded by the timeout above.
 
 Known limits (must not be over-read):
 
-- The runtime firing `tool.execute.after` only for completed reads is an
-  unverified assumption; if a failed read still fires it, the anomalous display
-  latches the session (fail-closed, but it surfaces as a capture gap).
+- Failed native edit was observed to omit the after hook. An unresolved mutation
+  denies later tools; malformed after metadata also latches the session.
 - Latch memory is bounded: after more than 64 tracked sessions churned, a
   session evicted from the tracking map is remembered as incomplete only within
   a 256-entry ring; beyond that, an old session ID that reappears after heavy
@@ -125,10 +125,10 @@ Builtin Node (no dependencies), from the repository root:
 ```bash
 node --test adapters/opencode/tests/fixture-mapping.test.js adapters/opencode/tests/hooks.test.js \
   adapters/opencode/tests/paths.test.js adapters/opencode/tests/privacy.test.js \
-  adapters/opencode/tests/bounds-config.test.js
+  adapters/opencode/tests/bounds-config.test.js adapters/opencode/tests/native-tools.test.js
 ```
 
-- `tests/unit/test_opencode_adapter_suite.py` runs the same suite (38 tests)
+- `tests/unit/test_opencode_adapter_suite.py` runs the same suite
   under pytest.
 - `tests/integration/test_opencode_plugin.py` starts a real local API and
   FalkorDB, then drives the genuine fixture through `tests/driver.js` with a
@@ -152,5 +152,41 @@ node --test adapters/opencode/tests/fixture-mapping.test.js adapters/opencode/te
 - `pedigree: session capture is incomplete` on stderr: the session hit a
   capture gap (see failure semantics). Restart the OpenCode session; inspect the
   Pedigree API logs/events for the session.
-- Everything is denied with `tool "…" is not supported`: that tool is not the
-  native `read`; this slice is read-only by design.
+- `tool "…" is not supported`: that tool is outside the observed native allowlist.
+
+## Native write, edit and Bash
+
+Write accepts only observed `filePath`/`content`; edit accepts only observed
+`filePath`/`oldString`/`newString`, with one exact old-string occurrence. Bash
+accepts only observed `command`. Unobserved options such as replace-all and
+alternate working-directory forms are denied rather than guessed.
+
+File mutations validate the nearest existing parent before creating files, and
+revalidate after execution, excluding credentials and escaping symlinks/junctions.
+Relative paths resolve against the runtime directory while identities and
+confinement remain scoped to the canonical worktree root. Windows normalized
+trailing-dot/space aliases and device names are denied before execution.
+Before the gate, write hashes intended UTF-8 content; edit safely reconstructs
+the intended single replacement and hashes it. After execution the actual bounded
+file hash and observed result path must match. The action stores a relative
+`file:v1/<project>/<path>` artifact and `artifact@sha256` version key. No Memory
+text is invented. Session read-window dependencies provide the action's lineage.
+
+All mutations use unknown effect/high risk. Bash summaries contain only the command
+digest, so the server cannot inspect/classify command text. High-risk operations
+following untrusted input may require re-verification even for benign commands.
+A Bash result needs matching arguments, matching reported output, exit zero and
+untruncated bounded output. Its action is recorded before its hash-only output
+Source enters the read window. Nonzero or missing exit never produces successful
+action evidence; it latches the session because no failed-attempt API exists.
+
+Commands, output, diagnostics, diffs and file bodies remain local. File/output
+bytes are bounded by the same display limit. Failed delivery latches the session;
+there are no automatic retries. Durable restart/ack state, arbitrary Bash file
+provenance, cross-session artifact links and unobserved tools remain unverified.
+Bash is not a filesystem sandbox; file-tool path confinement does not constrain
+paths an arbitrary shell command may access.
+
+The historical F-08 feature spec and ADR-009 describe the earlier read-only slice.
+The proposed extension and its review boundaries are in
+[`docs/adr/F-08-native-capture.md`](../../docs/adr/F-08-native-capture.md).

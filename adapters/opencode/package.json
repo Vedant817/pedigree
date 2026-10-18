@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Pedigree OpenCode read-only capture plugin (F-08 observed slice). No runtime dependencies.",
+  "description": "Pedigree OpenCode native tool capture plugin. No runtime dependencies.",
   "scripts": {
-    "test": "node --test tests/fixture-mapping.test.js tests/hooks.test.js tests/paths.test.js tests/privacy.test.js tests/bounds-config.test.js"
+    "test": "node --test tests/fixture-mapping.test.js tests/hooks.test.js tests/paths.test.js tests/privacy.test.js tests/bounds-config.test.js tests/native-tools.test.js"
   }
 }

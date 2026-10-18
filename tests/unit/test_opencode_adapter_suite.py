@@ -21,6 +21,7 @@ SUITES = [
     "paths.test.js",
     "privacy.test.js",
     "bounds-config.test.js",
+    "native-tools.test.js",
 ]
 
 NODE = shutil.which("node")

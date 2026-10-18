@@ -319,3 +319,42 @@ def test_case_variant_paths_converge_on_one_source(live_server, tmp_path):
     ).result_set
     assert duplicate == [[0]], "no case-variant duplicate Source may exist"
     assert read_window(server.db, server.graph, f"oc_{project_key}_{sid}") == [source_id]
+
+
+def test_observed_native_write_edit_bash_hooks_persist_lineage_and_real_artifact_hashes(live_server, tmp_path):
+    """Real API/FalkorDB proof; native execution is simulated in this replay driver."""
+    server = live_server
+    project = make_project(tmp_path)
+    credential = server.make_tenant(server.tenant)
+    raw_sid = "ses_native_integration"
+    sid = f"oc_{expected_project_key(project)}_{raw_sid}"
+    with httpx.Client(base_url=server.base, timeout=10) as client:
+        operator = {"Authorization": "Bearer " + credential["operator_token"]}
+        source = client.post("/v1/sources", headers=operator,
+                             json={"kind": "human", "uri": "owned-native-test", "integrity": "trusted"})
+        assert source.status_code == 200, source.text
+        source_id = source.json()["id"]
+        assert client.post("/v1/sessions", headers=operator,
+                           json={"session_id": sid, "runtime": "opencode"}).status_code == 200
+        assert client.post("/v1/sessions/read", headers=operator,
+                           json={"session_id": sid, "node_id": source_id}).status_code == 200
+    job = tmp_path / "native-job.json"
+    job.write_text(json.dumps({"project": str(project), "sessionID": raw_sid}))
+    environment = {**os.environ, "PEDIGREE_OPENCODE_ENABLED": "1",
+                   "PEDIGREE_OPENCODE_URL": server.base, "PEDIGREE_OPENCODE_TOKEN": credential["token"]}
+    process = subprocess.run([NODE, str(DRIVER.with_name("native-driver.js")), str(job)],
+                             cwd=REPO, env=environment, capture_output=True, text=True, timeout=30)
+    assert process.returncode == 0, process.stderr
+    results = json.loads(process.stdout)["results"]
+    assert results[:3] == [{"tool": tool, "ok": True, "captured": True} for tool in ("write", "edit", "bash")]
+    assert results[3] == {"tool": "write", "ok": False, "code": "gate_reverify"}
+    assert (project / "created.txt").read_text() == "owned after\n", "denied write must not execute"
+    actions = server.db.ro_query(server.graph,
+                                "MATCH(a:Action)-[:DERIVED_FROM]->(s:Source {id:$id}) RETURN a.tool,a.artifact_key",
+                                {"id": source_id}).result_set
+    assert {row[0] for row in actions} == {"write", "edit", "bash"}
+    digest = hashlib.sha256((project / "created.txt").read_bytes()).hexdigest()
+    assert any(tool == "edit" and key.endswith("@" + digest) for tool, key in actions)
+    output = server.db.ro_query(server.graph,
+                               "MATCH(s:Source {kind:'tool_output'}) RETURN s.content_hash,s.integrity").result_set
+    assert output == [[hashlib.sha256(b"owned\n").hexdigest(), "untrusted"]]

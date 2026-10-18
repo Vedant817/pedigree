@@ -1,12 +1,13 @@
 /**
- * Pedigree OpenCode capture core (F-08 observed read-only slice).
+ * Pedigree OpenCode capture core (F-08 observed native tools).
  *
  * Dependency-free ESM. Pure mappers plus an injected `fetchImpl`; `pedigree.js`
  * supplies the thin OpenCode hooks. Scope and limits: docs/features/F-08-opencode.md
  * and docs/DECISIONS.md ADR-009.
  *
  * Guarantees implemented here:
- * - Every tool other than the observed native `read` is denied before execution.
+ * - Only observed native read/write/edit/bash shapes are supported. Other tools
+ *   and unobserved argument forms are denied before execution.
  * - Reads are validated (project containment, credential exclusions, symlink
  *   escapes, Windows drive-relative/alternate-stream forms) and gated through
  *   POST /v1/gate; block/reverify/unknown decisions and gate outages deny the read.
@@ -17,8 +18,11 @@
  * - Failed/ambiguous capture latches the session incomplete, which denies all
  *   further operations for that session.
  *
- * Explicitly out of scope: write/edit/shell capture, approval UX, durable
- * replay/ack state across plugin restarts (F-22).
+ * - Mutations are conservatively gated as unknown/high. Verified successful
+ *   file results become hash-only artifacts/actions; successful Bash output is
+ *   an untrusted hash-only source. Nonzero/unknown outcomes latch the session.
+ * Explicitly out of scope: approval UX, durable replay/ack state across plugin
+ * restarts, arbitrary Bash filesystem provenance and cross-session write links.
  */
 
 import { createHash, randomBytes } from "node:crypto";
@@ -74,14 +78,19 @@ export function isDeniedWin32Form(candidate) {
   if (process.platform !== "win32") return false;
   if (/^[A-Za-z]:(?![\\/])/.test(candidate)) return true;
   const afterDrive = /^[A-Za-z]:/.test(candidate) ? candidate.slice(2) : candidate;
-  return afterDrive.includes(":");
+  if (afterDrive.includes(":")) return true;
+  // Win32 normalizes trailing dots/spaces and resolves device basenames.
+  // Reject aliases before a new credential path can bypass basename checks.
+  return afterDrive.split(/[\\/]/).some(segment =>
+    (segment !== "." && segment !== ".." && /[. ]$/.test(segment))
+    || /^(con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(?:\.|$)/i.test(segment));
 }
 
 /** Sanitized, fixed error texts. Never include content, absolute paths, tokens or exception details. */
 export const MESSAGES = Object.freeze({
   disabled: `${REPOINT}adapter is not enabled`,
   misconfigured: `${REPOINT}adapter configuration is invalid; an agent token is required; denying all tools (fail-closed)`,
-  unsupported: (tool) => `${REPOINT}tool "${tool}" is not supported by this read-only capture adapter and was denied`,
+  unsupported: (tool) => `${REPOINT}tool "${tool}" is not supported by this capture adapter and was denied`,
   malformed: `${REPOINT}tool hook payload is malformed; operation denied`,
   incomplete: `${REPOINT}session capture is incomplete; further operations are denied`,
   path_outside: `${REPOINT}read denied; path is outside the configured project`,
@@ -94,8 +103,22 @@ export const MESSAGES = Object.freeze({
   endpoint_unavailable: `${REPOINT}read denied; Pedigree endpoint is unavailable`,
 });
 
-/** The only tool observed and verified in this installed runtime (F-08 fixture). */
-const SUPPORTED_TOOLS = new Set(["read"]);
+/** Native shapes observed in installed OpenCode 1.19.3 (consult 015). */
+const SUPPORTED_TOOLS = new Set(["read", "write", "edit", "bash"]);
+const NATIVE_ARGUMENT_KEYS = Object.freeze({
+  write: ["filePath", "content"],
+  edit: ["filePath", "oldString", "newString"],
+  bash: ["command"],
+});
+
+function nativeFingerprint(tool, args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)
+      || Object.keys(args).some(key => !NATIVE_ARGUMENT_KEYS[tool].includes(key))) {
+    throw deny("malformed");
+  }
+  return tool === "bash" ? digestBytes(args.command)
+    : digestBytes(JSON.stringify(NATIVE_ARGUMENT_KEYS[tool].map(key => args[key])));
+}
 
 function deny(reason, tool) {
   const message = typeof MESSAGES[reason] === "function" ? MESSAGES[reason](tool) : MESSAGES[reason];
@@ -192,7 +215,19 @@ export function resolveWithinRoot(rootReal, candidate) {
   try {
     real = REALPATH(abs);
   } catch {
-    real = null; // does not exist yet: the read will fail on its own; textual check stands
+    // New files still need their nearest existing parent's canonical location.
+    // A textual child of an escaping junction must never become a permitted write.
+    let parent = path.dirname(abs);
+    while (parent !== path.dirname(parent)) {
+      try {
+        const parentReal = REALPATH(parent);
+        if (escapesRoot(path.relative(rootReal, parentReal))) return { denied: "path_outside" };
+        real = path.join(parentReal, path.relative(parent, abs));
+        break;
+      } catch {
+        parent = path.dirname(parent);
+      }
+    }
   }
   let rel = relText;
   if (real) {
@@ -202,6 +237,64 @@ export function resolveWithinRoot(rootReal, candidate) {
   }
   rel = rel === "" ? "." : rel.split(path.sep).join("/");
   return { rel };
+}
+
+function digestBytes(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function boundedFile(rootReal, rel) {
+  const abs = path.join(rootReal, ...rel.split("/"));
+  const fd = fs.openSync(abs, "r");
+  try {
+    const stat = fs.fstatSync(fd);
+    if (!stat.isFile() || stat.size > LIMITS.displayBytes) throw deny("malformed");
+    // Keep the allocation bounded even if another writer grows the file.
+    const buffer = Buffer.alloc(LIMITS.displayBytes + 1);
+    let length = 0;
+    while (length < buffer.length) {
+      const count = fs.readSync(fd, buffer, length, buffer.length - length, null);
+      if (count === 0) break;
+      length += count;
+    }
+    if (length > LIMITS.displayBytes) throw deny("malformed");
+    return buffer.subarray(0, length);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+function nativeArguments(tool, args, rootReal, resolvePath) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) throw deny("malformed");
+  if (tool === "bash") {
+    if (Object.keys(args).some(k => k !== "command") || typeof args.command !== "string"
+        || !args.command || Buffer.byteLength(args.command) > LIMITS.displayBytes) throw deny("malformed");
+    return { fingerprint: digestBytes(args.command), commandHash: digestBytes(args.command) };
+  }
+  const allowed = NATIVE_ARGUMENT_KEYS[tool];
+  if (Object.keys(args).some(k => !allowed.includes(k))) throw deny("malformed");
+  const resolved = resolvePath(args.filePath);
+  if (resolved.denied) throw deny(resolved.denied);
+  if (isCredentialPath(resolved.rel)) throw deny("path_credential");
+  let expected;
+  if (tool === "write") {
+    if (typeof args.content !== "string" || Buffer.byteLength(args.content) > LIMITS.displayBytes) throw deny("malformed");
+    expected = args.content;
+  } else {
+    if (typeof args.oldString !== "string" || !args.oldString || typeof args.newString !== "string"
+        || Buffer.byteLength(args.oldString) + Buffer.byteLength(args.newString) > LIMITS.displayBytes) throw deny("malformed");
+    const bytes = boundedFile(rootReal, resolved.rel);
+    const old = bytes.toString("utf8");
+    if (!Buffer.from(old).equals(bytes)) throw deny("malformed");
+    if (old.indexOf(args.oldString) < 0 || old.indexOf(args.oldString) !== old.lastIndexOf(args.oldString)) throw deny("malformed");
+    expected = old.replace(args.oldString, () => args.newString);
+    if (Buffer.byteLength(expected) > LIMITS.displayBytes) throw deny("malformed");
+  }
+  return {
+    rel: resolved.rel,
+    expectedHash: digestBytes(expected),
+    fingerprint: nativeFingerprint(tool, args),
+  };
 }
 
 /** Validate the observed after-hook display view. Only `file` displays with a
@@ -307,7 +400,7 @@ export async function requestJson({ fetchImpl, url, token, body, timeoutMs, resp
 
 // ---- core -------------------------------------------------------------------
 
-export function createCore({ config, projectRoot, fetchImpl, now = Date.now, log = () => {} }) {
+export function createCore({ config, projectRoot, workingDirectory, fetchImpl, now = Date.now, log = () => {} }) {
   const problems = [...(config.problems || [])];
   let rootReal = null;
   if (typeof projectRoot === "string" && projectRoot) {
@@ -318,12 +411,29 @@ export function createCore({ config, projectRoot, fetchImpl, now = Date.now, log
     }
   }
   if (!rootReal) problems.push("project");
+  let directoryReal = rootReal;
+  if (workingDirectory) {
+    try {
+      directoryReal = REALPATH(workingDirectory);
+      if (!rootReal || escapesRoot(path.relative(rootReal, directoryReal))) problems.push("directory");
+    } catch {
+      problems.push("directory");
+    }
+  }
   const projectKey = rootReal ? projectKeyFor(rootReal) : null;
   const base = config.baseUrl.replace(/\/+$/, "");
 
   const sessions = new Map();
   const evicted = new Set();
   const evictedOrder = [];
+
+  function resolvePath(candidate) {
+    if (typeof candidate !== "string" || !candidate || candidate.length > LIMITS.pathChars || candidate.includes("\0")) {
+      return {denied: "malformed"};
+    }
+    if (isDeniedWin32Form(candidate)) return {denied: "path_stream"};
+    return resolveWithinRoot(rootReal, path.resolve(directoryReal, candidate));
+  }
 
   function newSession(serverSid) {
     return {
@@ -424,14 +534,33 @@ export function createCore({ config, projectRoot, fetchImpl, now = Date.now, log
         throw deny("malformed");
       }
       if (session.incomplete) throw deny("incomplete");
-      const filePath = output && output.args ? output.args.filePath : undefined;
-      if (typeof filePath !== "string" || !filePath) {
-        latch(session, "malformed_path");
-        throw deny("malformed");
+      if (session.pending.size && (tool !== "read" || [...session.pending.values()].some(p=>p.tool !== "read"))) {
+        latch(session,"unresolved_native_call");
+        throw deny("incomplete");
       }
-      const resolved = resolveWithinRoot(rootReal, filePath);
-      if (resolved.denied) throw deny(resolved.denied);
-      if (isCredentialPath(resolved.rel)) throw deny("path_credential");
+      let prepared;
+      if (tool === "read") {
+        const filePath = output && output.args ? output.args.filePath : undefined;
+        if (typeof filePath !== "string" || !filePath) {
+          latch(session, "malformed_path");
+          throw deny("malformed");
+        }
+        prepared = resolvePath(filePath);
+        if (prepared.denied) throw deny(prepared.denied);
+        if (isCredentialPath(prepared.rel)) throw deny("path_credential");
+      } else {
+        try {
+          prepared = nativeArguments(tool, output?.args, rootReal, resolvePath);
+        } catch (error) {
+          // Filesystem failures must not expose absolute paths or OS diagnostics.
+          if (error instanceof PedigreeOpenCodeError) throw error;
+          throw deny("malformed");
+        }
+        if (tool !== "bash") {
+          const versionKey = `file:v1/${projectKey}/${prepared.rel}@${prepared.expectedHash}`;
+          if (versionKey.length > LIMITS.uri || /[\x00-\x1f]/.test(versionKey)) throw deny("malformed");
+        }
+      }
       if (session.pending.has(callID) || session.acked.has(callID)) {
         latch(session, "duplicate_call");
         throw deny("duplicate_call");
@@ -452,7 +581,9 @@ export function createCore({ config, projectRoot, fetchImpl, now = Date.now, log
       }
 
       const gated = await post("/v1/gate", {
-        action: { tool: "read", summary: summaryFor(resolved.rel), effect: "reversible", risk: "low" },
+        action: tool === "read"
+          ? { tool: "read", summary: summaryFor(prepared.rel), effect: "reversible", risk: "low" }
+          : { tool, summary: tool === "bash" ? `bash sha256:${prepared.commandHash}` : `${tool} ${prepared.rel}`.slice(0,LIMITS.summary), effect: "unknown", risk: "high" },
         session_id: session.serverSid,
         record: false,
       });
@@ -462,7 +593,7 @@ export function createCore({ config, projectRoot, fetchImpl, now = Date.now, log
       if (decision === "reverify") throw deny("gate_reverify");
       if (decision !== "allow" && decision !== "warn") throw deny("gate_unknown");
 
-      session.pending.set(callID, { rel: resolved.rel, at: now() });
+      session.pending.set(callID, { ...prepared, tool, decision, at: now() });
       return { decision };
     });
   }
@@ -490,13 +621,69 @@ export function createCore({ config, projectRoot, fetchImpl, now = Date.now, log
       }
       session.pending.delete(callID);
 
+      if (pending.tool !== tool) {
+        latch(session, "tool_mismatch");
+        return;
+      }
+      if (tool !== "read") {
+        let events;
+        try {
+          // Reconstructing an edit after execution is impossible; bind its original
+          // canonical arguments and compare the intended result digest instead.
+          const args = input.args;
+          const fingerprint = nativeFingerprint(tool, args);
+          if (fingerprint !== pending.fingerprint) throw deny("malformed");
+          const metadata = output?.metadata;
+          if (!metadata || metadata.truncated !== false) throw deny("malformed");
+          if (tool === "bash") {
+            if (!Number.isInteger(metadata.exit) || metadata.exit !== 0
+                || typeof metadata.output !== "string" || metadata.output !== output.output
+                || Buffer.byteLength(metadata.output) > LIMITS.displayBytes) throw deny("malformed");
+            const digest = digestBytes(metadata.output);
+            const sourceId = "src_oc_" + randomBytes(8).toString("hex");
+            events = [{type:"session"},
+              {type:"action_executed",tool,summary:`bash sha256:${pending.commandHash} exit=0`,decision:pending.decision,effect:"unknown",risk:"high"},
+              {type:"source_read",source_kind:"tool_output",id:sourceId,uri:`tooloutput:v1/${projectKey}/${digest}`,content_hash:digest},
+              {type:"session_read",node_id:sourceId}];
+          } else {
+            // Revalidate the actual requested path as well as the reported path.
+            // Metadata may use the former canonical target of a replaced symlink.
+            const requested = resolvePath(args.filePath);
+            if (requested.denied || requested.rel !== pending.rel || isCredentialPath(requested.rel)) throw deny("malformed");
+            const metadataPath = tool === "write" ? metadata.filepath : metadata.filediff?.file;
+            const resolved = resolvePath(metadataPath);
+            if (resolved.denied || resolved.rel !== pending.rel || isCredentialPath(resolved.rel)) throw deny("malformed");
+            if (tool === "write" && typeof metadata.exists !== "boolean") throw deny("malformed");
+            if (tool === "edit" && (!Number.isInteger(metadata.filediff.additions)
+                || !Number.isInteger(metadata.filediff.deletions))) throw deny("malformed");
+            const digest = digestBytes(boundedFile(rootReal, pending.rel));
+            if (digest !== pending.expectedHash) throw deny("malformed");
+            const artifact = `file:v1/${projectKey}/${pending.rel}`;
+            if (artifact.length > LIMITS.uri) throw deny("malformed");
+            events = [{type:"session"},{type:"action_executed",tool,
+              summary:`${tool} ${pending.rel} sha256:${digest}`.slice(0,LIMITS.summary),
+              artifacts:[artifact],artifact_key:`${artifact}@${digest}`,decision:pending.decision,effect:"unknown",risk:"high"}];
+          }
+        } catch {
+          latch(session,"invalid_native_result");
+          return;
+        }
+        const captured = await post("/v1/events", {runtime:"opencode",session_id:session.serverSid,events});
+        if (captured.ok && Array.isArray(captured.data?.created) && captured.data.created.length >= 1) {
+          ackAdd(session,callID);
+          return {captured:true};
+        }
+        latch(session,"capture_failed");
+        return {captured:false};
+      }
+
       const displayView = output && output.metadata ? output.metadata.display : undefined;
       const view = validateDisplay(displayView);
       if (view.denied) {
         latch(session, "invalid_display");
         return;
       }
-      const shown = resolveWithinRoot(rootReal, view.ok.path);
+      const shown = resolvePath(view.ok.path);
       if (shown.denied || shown.rel !== pending.rel) {
         latch(session, "path_mismatch");
         return;

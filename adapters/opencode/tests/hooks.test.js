@@ -122,7 +122,7 @@ test("every unsupported tool is denied before execution with zero network calls"
   t.after(() => removeProject(project));
   const { core, calls } = makeCore({ project });
   let executed = false;
-  for (const tool of ["write", "edit", "apply_patch", "bash", "mcp__pedigree__blame", "task"]) {
+  for (const tool of ["apply_patch", "mcp__pedigree__blame", "task"]) {
     const error = await expectThrow(
       (async () => {
         await core.beforeHook({ tool, sessionID: SID, callID: "call_x" }, { args: {} });
@@ -135,7 +135,7 @@ test("every unsupported tool is denied before execution with zero network calls"
   assert.equal(executed, false);
   assert.equal(calls.length, 0, "denials are local; nothing reaches the network");
   const snapshot = core.snapshot();
-  assert.equal(snapshot[Object.keys(snapshot)[0]].unsupported, 6);
+  assert.equal(snapshot[Object.keys(snapshot)[0]].unsupported, 3);
   assert.equal(snapshot[Object.keys(snapshot)[0]].incomplete, null, "a denied unsupported tool was not executed");
 });
 
@@ -143,7 +143,7 @@ test("an after hook for an unsupported tool is ignored", async (t) => {
   const project = makeProject();
   t.after(() => removeProject(project));
   const { core, calls } = makeCore({ project });
-  await core.afterHook({ tool: "write", sessionID: SID, callID: "call_w" }, { title: "x", output: "y", metadata: {} });
+  await core.afterHook({ tool: "apply_patch", sessionID: SID, callID: "call_w" }, { title: "x", output: "y", metadata: {} });
   assert.equal(calls.length, 0);
   assert.equal(core.snapshot()[Object.keys(core.snapshot())[0]].incomplete, null);
 });

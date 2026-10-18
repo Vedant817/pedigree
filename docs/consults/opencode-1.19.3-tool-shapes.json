@@ -1,0 +1,229 @@
+{
+  "exit": 0,
+  "tool_events": [
+    {
+      "phase": "loaded"
+    },
+    {
+      "phase": "before",
+      "input": {
+        "tool": "read",
+        "sessionID": "$SESSION_ID",
+        "callID": "$CALL_ID"
+      },
+      "output": {
+        "args": {
+          "filePath": {
+            "stringBytes": 104
+          }
+        }
+      }
+    },
+    {
+      "phase": "after",
+      "input": {
+        "tool": "read",
+        "sessionID": "$SESSION_ID",
+        "callID": "$CALL_ID",
+        "args": {
+          "filePath": {
+            "stringBytes": 104
+          }
+        }
+      },
+      "output": {
+        "title": {
+          "stringBytes": 89
+        },
+        "output": {
+          "stringBytes": 219
+        },
+        "metadata": {
+          "preview": {
+            "stringBytes": 28
+          },
+          "truncated": false,
+          "loaded": {
+            "length": 0,
+            "items": []
+          },
+          "display": {
+            "type": "file",
+            "path": {
+              "stringBytes": 104
+            },
+            "text": {
+              "stringBytes": 28
+            },
+            "lineStart": 1,
+            "lineEnd": 1,
+            "totalLines": 1,
+            "truncated": false
+          }
+        }
+      }
+    },
+    {
+      "phase": "before",
+      "input": {
+        "tool": "write",
+        "sessionID": "$SESSION_ID",
+        "callID": "$CALL_ID"
+      },
+      "output": {
+        "args": {
+          "content": {
+            "stringBytes": 11
+          },
+          "filePath": {
+            "stringBytes": 104
+          }
+        }
+      }
+    },
+    {
+      "phase": "after",
+      "input": {
+        "tool": "write",
+        "sessionID": "$SESSION_ID",
+        "callID": "$CALL_ID",
+        "args": {
+          "content": {
+            "stringBytes": 11
+          },
+          "filePath": {
+            "stringBytes": 104
+          }
+        }
+      },
+      "output": {
+        "title": {
+          "stringBytes": 89
+        },
+        "metadata": {
+          "diagnostics": {},
+          "filepath": {
+            "stringBytes": 104
+          },
+          "exists": false,
+          "truncated": false
+        },
+        "output": {
+          "stringBytes": 24
+        }
+      }
+    },
+    {
+      "phase": "before",
+      "input": {
+        "tool": "edit",
+        "sessionID": "$SESSION_ID",
+        "callID": "$CALL_ID"
+      },
+      "output": {
+        "args": {
+          "filePath": {
+            "stringBytes": 104
+          },
+          "newString": {
+            "stringBytes": 11
+          },
+          "oldString": {
+            "stringBytes": 10
+          }
+        }
+      }
+    },
+    {
+      "phase": "after",
+      "input": {
+        "tool": "edit",
+        "sessionID": "$SESSION_ID",
+        "callID": "$CALL_ID",
+        "args": {
+          "filePath": {
+            "stringBytes": 104
+          },
+          "newString": {
+            "stringBytes": 11
+          },
+          "oldString": {
+            "stringBytes": 10
+          }
+        }
+      },
+      "output": {
+        "metadata": {
+          "diagnostics": {},
+          "diff": {
+            "stringBytes": 439
+          },
+          "filediff": {
+            "file": {
+              "stringBytes": 104
+            },
+            "patch": {
+              "stringBytes": 439
+            },
+            "additions": 1,
+            "deletions": 1
+          },
+          "truncated": false
+        },
+        "title": {
+          "stringBytes": 89
+        },
+        "output": {
+          "stringBytes": 26
+        }
+      }
+    },
+    {
+      "phase": "before",
+      "input": {
+        "tool": "bash",
+        "sessionID": "$SESSION_ID",
+        "callID": "$CALL_ID"
+      },
+      "output": {
+        "args": {
+          "command": {
+            "stringBytes": 30
+          }
+        }
+      }
+    },
+    {
+      "phase": "after",
+      "input": {
+        "tool": "bash",
+        "sessionID": "$SESSION_ID",
+        "callID": "$CALL_ID",
+        "args": {
+          "command": {
+            "stringBytes": 30
+          }
+        }
+      },
+      "output": {
+        "title": {
+          "stringBytes": 30
+        },
+        "metadata": {
+          "output": {
+            "stringBytes": 27
+          },
+          "exit": 0,
+          "truncated": false
+        },
+        "output": {
+          "stringBytes": 27
+        }
+      }
+    }
+  ],
+  "redaction": "Only structural keys, numeric metadata and string byte lengths retained. No file contents, commands, output, paths, credentials or actual session/call identifiers.",
+  "model": "opencode/beam-free",
+  "date": "2026-10-18",
+  "runtime": "OpenCode 1.19.3"
+}
