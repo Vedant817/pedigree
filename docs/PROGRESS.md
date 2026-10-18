@@ -45,7 +45,10 @@
   `check_numbers` PASS (4 files, 70 allowed values); `check_readme` PASS.
   `make check` on the local demo-login tree: 871 passed, 1 skipped,
   6 deselected, 1 xfailed (277.62s); secret scan PASS; `check_numbers` PASS
-  (4 files, 70 allowed values); `check_readme` PASS.
+  (4 files, 70 allowed values); `check_readme` PASS. GitHub Actions run
+  39104550119 on that push failed `test_opencode_adapter_node_suite`: the
+  Windows-shaped fixture paths are literal filenames on Linux. The follow-up
+  substitutes the platform path and keeps the backslash traversal case on Windows.
 - **Residuals:** ACL service wiring, installed runtime capture and stronger F-08
   eviction-proof lineage remain open. Private disclosure contact is human-owned.
   No hosted CI/deployment or native macOS acceptance is claimed; the Render

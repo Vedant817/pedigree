@@ -45,7 +45,9 @@ test("traversal and outside-root reads are denied before any network call", asyn
   t.after(() => removeProject(project));
   const { core, calls } = makeCore({ project });
   const outside = path.join(project, "..", "outside.txt");
-  for (const candidate of [outside, "..\\..\\Windows\\system.ini", "/etc/passwd", "sub/../../escape.txt"]) {
+  // A backslash traversal is a path escape on Windows and a literal filename on POSIX.
+  const traversal = process.platform === "win32" ? "..\\..\\Windows\\system.ini" : "../escape.txt";
+  for (const candidate of [outside, traversal, "/etc/passwd", "sub/../../escape.txt"]) {
     const [bIn, bOut] = hookPair(project, "call_p", candidate);
     const error = await expectThrow(core.beforeHook(bIn, bOut));
     assert.equal(error.code, "path_outside", `denied: ${candidate}`);

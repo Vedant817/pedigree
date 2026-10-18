@@ -50,11 +50,17 @@ export function removeProject(dir) {
  * fixture's literal `\\` separators round-trip.
  */
 export function loadGenuineFixture({ project, sessionID = "ses_test_0001", callID = "call_test_0001" }) {
+  // The captured fixture uses Windows separators. Substitute the real dummy file
+  // with this platform's separator so Linux does not treat "\" as a filename.
+  const projectFile = JSON.stringify(path.join(project, "dummy.txt")).slice(1, -1);
+  const projectDir = JSON.stringify(project).slice(1, -1);
   const raw = fs
     .readFileSync(FIXTURE_PATH, "utf8")
     .replaceAll("$SESSION_ID", JSON.stringify(sessionID).slice(1, -1))
     .replaceAll("$CALL_ID", JSON.stringify(callID).slice(1, -1))
-    .replaceAll("$PROJECT", JSON.stringify(project).slice(1, -1));
+    .replaceAll("$PROJECT\\\\dummy.txt", projectFile)
+    .replaceAll("$PROJECT/dummy.txt", projectFile)
+    .replaceAll("$PROJECT", projectDir);
   return JSON.parse(raw);
 }
 
