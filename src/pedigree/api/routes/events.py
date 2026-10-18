@@ -26,6 +26,7 @@ def register(app: FastAPI, db, registry, settings) -> None:
     @app.post("/v1/events")
     def ingest_events(payload: EventsPayload, request: Request):
         auth.authenticate(request)
+        db = request.state.db
         tenant = request.state.tenant_id
         gname = request.state.graph_name
         if len(payload.events) > LIMITS["events_per_request"]:
@@ -126,6 +127,7 @@ def register(app: FastAPI, db, registry, settings) -> None:
     @app.get("/v1/artifacts/lookup")
     def artifact_lookup(key: str, request: Request):
         auth.authenticate(request)
+        db = request.state.db
         gname = request.state.graph_name
         auth.admit(request, "read")
         result = lookup_fn(db, gname, key)
@@ -137,6 +139,7 @@ def register(app: FastAPI, db, registry, settings) -> None:
     @app.get("/v1/invariants")
     def invariants(request: Request):
         auth.authenticate(request)
+        db = request.state.db
         gname = request.state.graph_name
         auth.admit(request, "read")
         return {"violations": check_invariants(db, gname, request.state.tenant_id)}

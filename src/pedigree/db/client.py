@@ -9,6 +9,9 @@ Design rules (docs/02 section 4):
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import secrets
 import threading
 import time
 from collections.abc import Iterable, Iterator, Sequence
@@ -17,11 +20,26 @@ from typing import Any
 
 from falkordb import FalkorDB
 
-from ..config import LIMITS, Settings, get_settings
+from ..config import CK_NAME_RE, DEV_ENVS, LIMITS, WI_TOKEN_RE, Settings, get_settings, graph_name
 from ..errors import Conflict, Forbidden, PedigreeError, QueryTimeout, Unavailable
 from ..observability import observe_query
 
 CHUNK = LIMITS["chunk"]
+_DEV_ACL_SECRET = secrets.token_urlsafe(48)
+
+
+def tenant_graph_allowed(tenant: str, gname: str) -> bool:
+    """Exact graph family, never a prefix of another tenant or a registry graph."""
+    base = graph_name(tenant)
+    if tenant == "registry":
+        return False
+    if gname == base:
+        return True
+    for namespace, pattern in ((":wi:", WI_TOKEN_RE), (":ck:", CK_NAME_RE)):
+        prefix = base + namespace
+        if gname.startswith(prefix) and pattern.fullmatch(gname[len(prefix):]):
+            return True
+    return False
 
 
 # --- error mapping ----------------------------------------------------------
@@ -131,9 +149,55 @@ class Db:
     again by `reset()`.
     """
 
-    def __init__(self, settings: Settings | None = None):
+    def __init__(self, settings: Settings | None = None, *, _tenant: str | None = None,
+                 _administrator: Db | None = None):
         self.settings = settings or get_settings()
         self._local = threading.local()
+        self._tenant = _tenant
+        self._administrator = _administrator
+        self._tenant_connections: dict[str, Db] = {}
+        self._tenant_lock = threading.Lock()
+
+    def _acl_secret(self) -> str:
+        secret = self.settings.pedigree_db_acl_secret
+        if not secret and self.settings.pedigree_env.lower() in DEV_ENVS:
+            return _DEV_ACL_SECRET
+        if len(secret) < 32:
+            raise Unavailable("tenant database ACL requires a deployment secret of at least 32 characters")
+        return secret
+
+    def for_tenant(self, tenant: str) -> Db:
+        """Provision an isolated connection after authentication, never admin fallback.
+
+        Provision on every admission so a database restart can discard ACL state
+        without leaving the running service permanently unable to authenticate.
+        The single ACL SETUSER command replaces the complete permission set.
+        """
+        graph_name(tenant)
+        if tenant == "registry" or (self._tenant is not None and tenant != self._tenant):
+            raise Forbidden("not permitted for this tenant")
+        if self._tenant is not None:
+            return self
+        if not self.settings.pedigree_db_acl:
+            return self
+        password = hmac.new(self._acl_secret().encode(), ("pedigree-db:" + tenant).encode(),
+                            hashlib.sha256).hexdigest()
+        with self._tenant_lock:
+            self.execute_admin(
+                "ACL", "SETUSER", "t_" + tenant, "reset", "on", ">" + password,
+                "~" + graph_name(tenant), "~" + graph_name(tenant) + ":wi:*",
+                "~" + graph_name(tenant) + ":ck:*",
+                "~pedigree:quota:mutex:" + graph_name(tenant),
+                "+info", "+ping", "+graph.query", "+graph.ro_query", "+graph.explain",
+                "+graph.delete", "+graph.copy", "+graph.constraint", "+get", "+set", "+eval", "+del",
+            )
+            scoped = self._tenant_connections.get(tenant)
+            if scoped is None:
+                settings = self.settings.model_copy(update={"falkor_username": "t_" + tenant,
+                                                           "falkor_password": password})
+                scoped = Db(settings, _tenant=tenant, _administrator=self)
+                self._tenant_connections[tenant] = scoped
+            return scoped
 
     @property
     def client(self) -> FalkorDB:
@@ -149,6 +213,8 @@ class Db:
         return client
 
     def select(self, gname: str):
+        if self._tenant is not None and not tenant_graph_allowed(self._tenant, gname):
+            raise Forbidden("not permitted for this tenant")
         return self.client.select_graph(gname)
 
     def reset(self) -> None:
@@ -189,6 +255,11 @@ class Db:
         return None
 
     def list_graphs(self) -> list[str]:
+        if self._tenant is not None:
+            # Maintenance enumeration is privileged; never expose other graph names
+            # or grant GRAPH.LIST to the scoped Redis identity.
+            return [g for g in self._administrator.list_graphs()
+                    if tenant_graph_allowed(self._tenant, g)]
         out = []
         for g in self.client.list_graphs():
             out.append(g.decode() if isinstance(g, bytes) else g)
@@ -257,6 +328,7 @@ class Db:
 
     def execute_admin(self, *args: Any):
         """Raw command on the admin connection (GRAPH.CONSTRAINT, MODULE LIST, ...)."""
+        self._check_admin_command(args)
         try:
             return self.client.connection.execute_command(*args)
         except DB_EXC as exc:
@@ -264,7 +336,17 @@ class Db:
 
     def admin_raw(self, *args: Any):
         """Unmapped raw command - for idempotent DDL where 'already exists' is expected."""
+        self._check_admin_command(args)
         return self.client.connection.execute_command(*args)
+
+    def _check_admin_command(self, args) -> None:
+        if self._tenant is None:
+            return
+        # Schema initialization uses precisely this keyed command. Everything else
+        # is either a tenant graph operation or deployment administration.
+        if (len(args) < 3 or str(args[0]).upper() != "GRAPH.CONSTRAINT"
+                or not tenant_graph_allowed(self._tenant, args[2])):
+            raise Forbidden("not permitted for this tenant")
 
     def try_query(self, gname: str, cypher: str, params: dict | None = None):
         """Unmapped query - only for idempotent DDL. Returns (ok, error_message)."""

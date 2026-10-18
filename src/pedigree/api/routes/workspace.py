@@ -10,6 +10,7 @@ def register(app, db):
     @app.get("/v1/graph/view")
     def graph_view(request: Request, response: Response, limit: int = Query(default=500, ge=1, le=1000)):
         auth.authenticate(request)
+        db = request.state.db
         auth.admit(request, "read")
         response.headers["Cache-Control"] = "no-store"
         graph = request.state.graph_name

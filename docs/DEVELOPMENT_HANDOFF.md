@@ -1,5 +1,7 @@
 # Development handoff
 
+- **Active work area:** tenant database ACL service wiring; branch `feat/tenant-db-acl-20261018`. Dedicated isolated test DB only; no checkpoint or spool edits.
+
 Shared status board for concurrent work on Pedigree. One fact per line, evidence over
 opinion. Update it when a milestone moves, not on every commit.
 

@@ -259,7 +259,9 @@ class PedigreeMCPServer:
 
     def _admit(self, tenant, gname, operation, **options):
         self.limiter.admit(tenant, operation, **options)
-        ensure_schema(self.db, gname)
+        db = self.db.for_tenant(tenant)
+        ensure_schema(db, gname)
+        return db
 
     def _register_tools(self):
         srv = self.server
@@ -282,8 +284,8 @@ class PedigreeMCPServer:
                 authorize_source(principal, kind, integrity)
                 if kind not in SOURCE_KINDS:
                     raise InvalidArgument("invalid source kind")
-                self._admit(tid, gname, "write")
-                r = record_source(self.db, gname, tid, quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap), kind=kind, uri=uri, title=title,
+                db = self._admit(tid, gname, "write")
+                r = record_source(db, gname, tid, quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap), kind=kind, uri=uri, title=title,
                                   integrity=integrity if principal.role == "operator" else "untrusted", conf=conf, id=id)
                 return {"id": r.id, "status": r.status, "low_integrity": r.low_integrity,
                         "warnings": r.warnings}
@@ -298,8 +300,8 @@ class PedigreeMCPServer:
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             def go():
-                self._admit(tid, gname, "write")
-                r = remember(self.db, gname, tid, quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap), text=text, mkind=mkind, derived_from=derived_from or [],
+                db = self._admit(tid, gname, "write")
+                r = remember(db, gname, tid, quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap), text=text, mkind=mkind, derived_from=derived_from or [],
                             corroborated_by=corroborated_by or [], artifact=artifact,
                             artifact_key=artifact_key, id=id)
                 return {"id": r.id, "status": r.status, "low_integrity": r.low_integrity,
@@ -316,8 +318,8 @@ class PedigreeMCPServer:
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             def go():
-                self._admit(tid, gname, "write")
-                r = record_action(self.db, gname, tid, quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap), tool=tool, summary=summary,
+                db = self._admit(tid, gname, "write")
+                r = record_action(db, gname, tid, quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap), tool=tool, summary=summary,
                                   relied_on=relied_on or [], decision=decision, effect=effect,
                                   risk=risk, artifacts=artifacts or [], id=id)
                 return {"id": r.id, "status": r.status, "low_integrity": r.low_integrity,
@@ -333,8 +335,8 @@ class PedigreeMCPServer:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             if by in ("human", "scanner") and principal.role != "operator":
                 return _forbidden()
-            self._admit(tid, gname, "write")
-            return _call(lambda: (corroborate(self.db, gname, memory_id, source_id, by=by, quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap)), {"ok": True})[1])
+            db = self._admit(tid, gname, "write")
+            return _call(lambda: (corroborate(db, gname, memory_id, source_id, by=by, quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap)), {"ok": True})[1])
 
         @srv.tool()
         def pedigree_check_action(token: str | None = None, tool: str = "", summary: str = "",
@@ -349,9 +351,9 @@ class PedigreeMCPServer:
             tid, gname, principal = self._resolve(token=token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
-            self._admit(tid, gname, "gate", record=record)
+            db = self._admit(tid, gname, "gate", record=record)
             return _call(lambda: _traced(lambda trace: check_action(
-                self.db, gname, {"tool": tool, "summary": summary, "effect": effect,
+                db, gname, {"tool": tool, "summary": summary, "effect": effect,
                                  "risk": risk, "audience": audience},
                 relied_on=relied_on, session_id=session_id, max_depth=max_depth,
                 policy_path=self.settings.pedigree_policy_file, record=record, tenant=tid,
@@ -366,9 +368,9 @@ class PedigreeMCPServer:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             if principal.role != "operator":
                 return _forbidden()
-            self._admit(tid, gname, "revoke", dry_run=dry_run)
+            db = self._admit(tid, gname, "revoke", dry_run=dry_run)
             return _call(lambda: _traced(lambda trace: revoke(
-                self.db, gname, tid, root_id=root_id, reason=reason, dry_run=dry_run, kind=kind,
+                db, gname, tid, root_id=root_id, reason=reason, dry_run=dry_run, kind=kind,
                 quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap), trace=trace)))
 
         @srv.tool()
@@ -379,8 +381,8 @@ class PedigreeMCPServer:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
             if principal.role != "operator":
                 return _forbidden()
-            self._admit(tid, gname, "reinstate", dry_run=dry_run)
-            return _call(lambda: reinstate(self.db, gname, tid, root_id=root_id, dry_run=dry_run, quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap)))
+            db = self._admit(tid, gname, "reinstate", dry_run=dry_run)
+            return _call(lambda: reinstate(db, gname, tid, root_id=root_id, dry_run=dry_run, quota=QuotaPolicy(tid, self.registry.get_record(tid).node_cap)))
 
         @srv.tool()
         def pedigree_blame(tenant_id: str | None = None, token: str | None = None,
@@ -388,9 +390,9 @@ class PedigreeMCPServer:
             tid, gname, principal = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
-            self._admit(tid, gname, "read")
+            db = self._admit(tid, gname, "read")
             return _call(lambda: _traced(lambda trace: run_blame(
-                self.db, gname, node_id, max_depth=max_depth, trace=trace)))
+                db, gname, node_id, max_depth=max_depth, trace=trace)))
 
         @srv.tool()
         def pedigree_impact(tenant_id: str | None = None, token: str | None = None,
@@ -398,9 +400,9 @@ class PedigreeMCPServer:
             tid, gname, principal = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
-            self._admit(tid, gname, "read")
+            db = self._admit(tid, gname, "read")
             return _call(lambda: _traced(lambda trace: run_impact(
-                self.db, gname, node_id, max_depth=max_depth, trace=trace)))
+                db, gname, node_id, max_depth=max_depth, trace=trace)))
 
         @srv.tool()
         def pedigree_whatif(tenant_id: str | None = None, token: str | None = None,
@@ -408,8 +410,8 @@ class PedigreeMCPServer:
             tid, gname, principal = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
-            self._admit(tid, gname, "whatif")
-            return _call(lambda: whatif(self.db, gname, tid, roots or [], reason="what-if"))
+            db = self._admit(tid, gname, "whatif")
+            return _call(lambda: whatif(db, gname, tid, roots or [], reason="what-if"))
 
         @srv.tool()
         def pedigree_audit_sources(tenant_id: str | None = None, token: str | None = None,
@@ -417,16 +419,16 @@ class PedigreeMCPServer:
             tid, gname, principal = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
-            self._admit(tid, gname, "read")
-            return _call(lambda: audit_sources(self.db, gname, limit=limit))
+            db = self._admit(tid, gname, "read")
+            return _call(lambda: audit_sources(db, gname, limit=limit))
 
         @srv.tool()
         def pedigree_report(tenant_id: str | None = None, token: str | None = None) -> dict:
             tid, gname, principal = self._resolve(tenant_id, token)
             if gname is None:
                 return {"ok": False, "error": {"code": "unauthorized", "message": _UNAUTHORIZED_MSG}}
-            self._admit(tid, gname, "read")
-            out = _call(lambda: report(self.db, gname))
+            db = self._admit(tid, gname, "read")
+            out = _call(lambda: report(db, gname))
             if isinstance(out, dict) and isinstance(out.get("result"), dict):
                 update_nodes(tid, out["result"].get("by_status"))
             return out

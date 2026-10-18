@@ -44,6 +44,7 @@ def authenticate(request: Request):
     request.state.tenant_id = tenant
     request.state.graph_name = graph_name(tenant)
     request.state.principal = principal
+    request.state.db = request.app.state.db.for_tenant(tenant)
     return tenant
 
 
@@ -52,7 +53,7 @@ def admit(request: Request, operation: str, *, dry_run: bool = False,
     request.state.op = operation  # P-022: the access log reports the admitted operation
     request.app.state.limiter.admit(request.state.tenant_id, operation,
                                    dry_run=dry_run, record=record)
-    ensure_schema(request.app.state.db, request.state.graph_name)
+    ensure_schema(request.state.db, request.state.graph_name)
 
 
 def require_operator(request: Request) -> None:

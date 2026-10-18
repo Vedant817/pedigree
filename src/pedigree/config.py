@@ -93,6 +93,7 @@ class Settings(BaseSettings):
     pedigree_public_url: str = "http://127.0.0.1:8000"
     pedigree_policy_file: str = "policy.yaml"
     pedigree_db_acl: bool = True
+    pedigree_db_acl_secret: str = Field(default="", repr=False, exclude=True)
     pedigree_db_mode: str = "auto"  # auto|docker|so  (how `pedigree db start` runs FalkorDB)
 
     llm_provider: str = ""

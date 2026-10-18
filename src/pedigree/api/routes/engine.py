@@ -40,11 +40,11 @@ def register(app: FastAPI, db, registry, settings) -> None:
     def tenant_and_db(request: Request):
         tenant = auth.authenticate(request)
         gname = graph_name(tenant)
-        return tenant, gname
+        return tenant, gname, request.state.db
 
     @app.post("/v1/sources")
     def create_source(payload: SourceCreate, request: Request):
-        tenant, gname = tenant_and_db(request)
+        tenant, gname, db = tenant_and_db(request)
         operator = operator_authorized(request, settings)
         auth.authorize_source(request.state.principal, payload.kind, payload.integrity)
         if payload.kind not in SOURCE_KINDS:
@@ -67,7 +67,7 @@ def register(app: FastAPI, db, registry, settings) -> None:
 
     @app.post("/v1/memories")
     def create_memory(payload: MemoryCreate, request: Request):
-        tenant, gname = tenant_and_db(request)
+        tenant, gname, db = tenant_and_db(request)
         auth.admit(request, "write")
         res = remember(
             db, gname, tenant, quota=QuotaPolicy(tenant, registry.get_record(tenant).node_cap),
@@ -89,7 +89,7 @@ def register(app: FastAPI, db, registry, settings) -> None:
 
     @app.post("/v1/actions")
     def create_action(payload: ActionCreate, request: Request):
-        tenant, gname = tenant_and_db(request)
+        tenant, gname, db = tenant_and_db(request)
         auth.admit(request, "write")
         res = record_action(
             db, gname, tenant, quota=QuotaPolicy(tenant, registry.get_record(tenant).node_cap),
@@ -111,7 +111,7 @@ def register(app: FastAPI, db, registry, settings) -> None:
 
     @app.post("/v1/corroborate")
     def do_corroborate(payload: CorroborateRequest, request: Request):
-        tenant, gname = tenant_and_db(request)
+        tenant, gname, db = tenant_and_db(request)
         if payload.by in ("human", "scanner") and not operator_authorized(request, settings):
             raise PedigreeError("trusted attestation needs the operator credential",
                                 code="forbidden")
@@ -121,14 +121,14 @@ def register(app: FastAPI, db, registry, settings) -> None:
 
     @app.post("/v1/sessions")
     def ensure(payload: EnsureSessionRequest, request: Request):
-        tenant, gname = tenant_and_db(request)
+        tenant, gname, db = tenant_and_db(request)
         auth.admit(request, "write")
         sid = ensure_session(db, gname, tenant, payload.session_id, runtime=payload.runtime, agent_id=payload.agent_id, quota=QuotaPolicy(tenant, registry.get_record(tenant).node_cap))
         return {"session_id": sid}
 
     @app.post("/v1/sessions/read")
     def sread(payload: SessionReadRequest, request: Request):
-        tenant, gname = tenant_and_db(request)
+        tenant, gname, db = tenant_and_db(request)
         auth.admit(request, "write")
         with admission(db, gname, QuotaPolicy(tenant, registry.get_record(tenant).node_cap)) as locked_db:
             if payload.ensure == "yes":
@@ -138,7 +138,7 @@ def register(app: FastAPI, db, registry, settings) -> None:
 
     @app.post("/v1/revoke")
     def do_revoke(payload: RevokeRequest, request: Request):
-        tenant, gname = tenant_and_db(request)
+        tenant, gname, db = tenant_and_db(request)
         auth.require_operator(request)
         auth.admit(request, "revoke", dry_run=payload.dry_run)
         trace = Trace()
@@ -150,13 +150,13 @@ def register(app: FastAPI, db, registry, settings) -> None:
 
     @app.post("/v1/whatif")
     def do_whatif(payload: WhatIfRequest, request: Request):
-        tenant, gname = tenant_and_db(request)
+        tenant, gname, db = tenant_and_db(request)
         auth.admit(request, "whatif")
         return whatif(db, gname, tenant, payload.roots, reason=payload.reason)
 
     @app.post("/v1/reinstate")
     def do_reinstate(payload: ReinstateRequest, request: Request):
-        tenant, gname = tenant_and_db(request)
+        tenant, gname, db = tenant_and_db(request)
         auth.require_operator(request)
         auth.admit(request, "reinstate", dry_run=payload.dry_run)
         out = reinstate(db, gname, tenant, root_id=payload.root_id, dry_run=payload.dry_run, quota=QuotaPolicy(tenant, registry.get_record(tenant).node_cap))
@@ -164,7 +164,7 @@ def register(app: FastAPI, db, registry, settings) -> None:
 
     @app.get("/v1/blame/{node_id}")
     def get_blame(node_id: Id, max_depth: int = Query(default=12, ge=1, le=LIMITS["depth_max"]), request: Request = None):
-        tenant, gname = tenant_and_db(request)
+        tenant, gname, db = tenant_and_db(request)
         auth.admit(request, "read")
         trace = Trace()
         result = run_blame(db, gname, node_id, max_depth=max_depth, trace=trace)
@@ -173,7 +173,7 @@ def register(app: FastAPI, db, registry, settings) -> None:
 
     @app.get("/v1/impact/{node_id}")
     def get_impact(node_id: Id, max_depth: int = Query(default=12, ge=1, le=LIMITS["depth_max"]), request: Request = None):
-        tenant, gname = tenant_and_db(request)
+        tenant, gname, db = tenant_and_db(request)
         auth.admit(request, "read")
         trace = Trace()
         result = run_impact(db, gname, node_id, max_depth=max_depth, trace=trace)
@@ -182,13 +182,13 @@ def register(app: FastAPI, db, registry, settings) -> None:
 
     @app.get("/v1/audit/sources")
     def audit(request: Request, limit: int = Query(default=50)):
-        tenant, gname = tenant_and_db(request)
+        tenant, gname, db = tenant_and_db(request)
         auth.admit(request, "read")
         return audit_sources(db, gname, limit=limit)
 
     @app.get("/v1/graph")
     def graph_summary(request: Request):
-        tenant, gname = tenant_and_db(request)
+        tenant, gname, db = tenant_and_db(request)
         auth.admit(request, "read")
         out = report(db, gname)
         update_nodes(tenant, out.get("by_status"))
@@ -196,7 +196,7 @@ def register(app: FastAPI, db, registry, settings) -> None:
 
     @app.get("/v1/stats")
     def stats(request: Request):
-        tenant, gname = tenant_and_db(request)
+        tenant, gname, db = tenant_and_db(request)
         auth.admit(request, "read")
         from ...engine.revoke import report as reporting
         out = reporting(db, gname)

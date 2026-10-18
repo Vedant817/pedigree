@@ -13,6 +13,7 @@ def register(app: FastAPI, db, registry, settings) -> None:
     @app.post("/v1/gate")
     def gate(payload: GateRequest, request: Request):
         auth.authenticate(request)
+        db = request.state.db
         tenant = request.state.tenant_id
         gname = request.state.graph_name
         auth.admit(request, "gate", record=payload.record)

@@ -145,11 +145,12 @@ def _startup_resume(db: Db, registry: TenantRegistry) -> None:
         for rec in registry.list_tenants():
             try:
                 gname = graph_name(rec.tenant_id)
-                done = resume_incomplete(db, gname)
+                tenant_db = db.for_tenant(rec.tenant_id)
+                done = resume_incomplete(tenant_db, gname)
                 if done:
                     log.info("startup-resume: finished %d revocation(s) for tenant %s",
                              len(done), rec.tenant_id)
-                rec_res = reconcile(db, gname)
+                rec_res = reconcile(tenant_db, gname)
                 if rec_res.get("reconciled"):
                     log.info("startup-reconcile: repaired %s quarantined nodes for tenant %s",
                              rec_res.get("reconciled"), rec.tenant_id)
