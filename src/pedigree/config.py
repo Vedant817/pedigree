@@ -83,6 +83,9 @@ class Settings(BaseSettings):
     pedigree_env: str = "dev"  # dev|test|local are lenient; anything else refuses empty/default admin tokens
     pedigree_public_docs: bool = False
     pedigree_seed_demo: bool = False
+    pedigree_demo_login: bool = False
+    pedigree_demo_tenant: str = "demo"
+    pedigree_credentials_dir: str = "scratch"
     pedigree_secret: str = ""
     pedigree_node_cap: int = 200_000
     pedigree_store_text: bool = False

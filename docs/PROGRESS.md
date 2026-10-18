@@ -2,7 +2,8 @@
 
 - **Phase:** Phase G started Sun 2026-10-18 (G1 README checker on `3e94e17`).
   `main` is ahead of `origin/main`. Phase F capture and the realistic seed remain as below.
-  Push and tags stay a human checkpoint (`AGENTS.md`).
+  Tags stay a human checkpoint (`AGENTS.md`). This tree is being pushed
+  because the operator asked to push and check CI.
   Landed and still true from Phase E: P-022 QA recorded (`docs/qa/P-022.md`, PASS
   with caveats), P-006 eval signed, P-012 evidence recorded, P-023 isolation suite
   implemented (`tests/isolation/`, independent QA closure still open), G3 fact sheet
@@ -17,8 +18,9 @@
   marked QA-closed.
   `make check` on `097309d`: 860 passed, 2 skipped, 6 deselected, 1 xfailed
   (262.82s); secret scan PASS; `check_numbers` PASS (2 files, 70 allowed values).
-- **Next:** Phase G hygiene, then Phase H. P-027 one-click demo login and a
-  screen recording are still not built; the synthetic `demorealistic` seed and
+- **Next:** Phase G hygiene, then Phase H. P-027 local demo login
+  (`PEDIGREE_DEMO_LOGIN=1`, agent credential only, loopback peers only) is in
+  this change. The screen recording is still not in the repo. The synthetic `demorealistic` seed and
   blame-path highlight are. G1 landed in `3e94e17`, `b0c9971`, and `7615eef`.
   An independent correctness review failed the first README wording and passed
   the corrected sentences in `7615eef`. The developer-experience review of
@@ -26,8 +28,9 @@
   `docs/WALKTHROUGH.md` (S1 six-node example), `docs/DEMO_SCRIPT.md`, and
   `docs/BLOG.md` in `36159b5`. They are drafts, not a recording. An independent
   correctness review of that commit passed. There is no separate devex review
-  of the drafts, and no `docs/qa` file was written for them. Feature freeze Sun 2026-10-18 15:00 IST. Do not push, tag,
-  publish, or fill human-voice disclosure fields. The realistic-seed tests
+  of the drafts, and no `docs/qa` file was written for them. Feature freeze was
+  written as Sun 2026-10-18 15:00 IST. Tags, publication, and human-voice
+  disclosure fields stay untouched. The realistic-seed tests
   passed (unit plus integration, 12 passed with the existing demo-seed file).
   `make check` on `3e94e17`: 867 passed, 2 skipped, 6 deselected, 1 xfailed
   (313.34s); secret scan PASS; `check_numbers` PASS (2 files, 70 allowed
@@ -40,6 +43,9 @@
   and the workspace path outline. `make check` on that tree: 867 passed,
   2 skipped, 6 deselected, 1 xfailed (259.78s); secret scan PASS;
   `check_numbers` PASS (4 files, 70 allowed values); `check_readme` PASS.
+  `make check` on the local demo-login tree: 871 passed, 1 skipped,
+  6 deselected, 1 xfailed (277.62s); secret scan PASS; `check_numbers` PASS
+  (4 files, 70 allowed values); `check_readme` PASS.
 - **Residuals:** ACL service wiring, installed runtime capture and stronger F-08
   eviction-proof lineage remain open. Private disclosure contact is human-owned.
   No hosted CI/deployment or native macOS acceptance is claimed; the Render

@@ -72,8 +72,10 @@ mkdir -p scratch && docker compose cp pedigree:/data/credentials/demo-demo.json 
 ```
 
 Open `http://localhost:8000` in a browser. Read `operator_token` from the private local
-`scratch/demo-demo.json` file and paste it into the workspace. Keep that file out
-of Git and agent configuration. Previewing a revocation changes nothing until you
+`scratch/demo-demo.json` file and paste it into the workspace. On this machine,
+`PEDIGREE_DEMO_LOGIN=1` enables **Open the local demo**, which asks the server for
+the agent credential in that private file. Revocation still needs `operator_token`.
+Keep that file out of Git and agent configuration. Previewing a revocation changes nothing until you
 confirm it. The local demo has operator powers; deployment-admin HTTP routes are
 disabled in demo mode. This is not a public read-only deployment.
 

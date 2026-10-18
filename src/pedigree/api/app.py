@@ -207,6 +207,7 @@ def create_app(db: Db | None = None, settings=None, *, limiter: RateLimiter | No
     routes.admin.register(app, registry, settings)
     routes.metrics.register(app, settings)
     routes.engine.register(app, db, registry, settings)
+    routes.demo_login.register(app, registry, settings)
     routes.events.register(app, db, registry, settings)
     routes.gate.register(app, db, registry, settings)
     routes.workspace.register(app, db)

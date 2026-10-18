@@ -111,6 +111,19 @@
   }
   function snapshot() { return {id:selected?.id,reason:$('reason').value,depth:$('depth').value,epoch}; }
   function same(a,b) { return a && a.id === b.id && a.reason === b.reason && a.depth === b.depth && a.epoch === b.epoch; }
+  $('demo-login').addEventListener('click',async ()=>{
+    $('demo-login').disabled = true;
+    try {
+      const response = await fetch('/v1/demo/session',{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',redirect:'error'});
+      const result = await response.json();
+      if (!response.ok) throw new Error(response.status === 403 ? 'Demo login is only available from this machine.' : 'Demo login is not enabled, or this machine has no local demo credential.');
+      if (result.role !== 'agent' || typeof result.token !== 'string' || !result.token) throw new Error('Demo login did not return an agent credential.');
+      reset(); token = result.token; await refresh();
+      $('connection').textContent = 'Connected'; $('connection').className = 'connection active'; $('disconnect').hidden = false;
+      notice('Connected to the local demo as an agent. Revocation still needs the operator credential.');
+    } catch(error) { reset(); fail(error); }
+    finally { $('demo-login').disabled = false; }
+  });
   $('connect-form').addEventListener('submit',async event => {
     event.preventDefault(); const candidate = $('token').value.trim(); reset(); token = candidate;
     $('connect-button').disabled = true;
