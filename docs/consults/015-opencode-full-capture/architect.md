@@ -1,0 +1,9 @@
+# Architecture response
+
+Observed installed OpenCode 1.19.3 successfully emitted paired native read/write/edit/bash hooks through beam-free. Retained evidence contains only keys/types/string lengths. Write: before args `content,filePath`; after metadata `filepath,exists,truncated`. Edit: before `filePath,oldString,newString`; after `filediff.file`, additions/deletions and truncation. Bash: before `command`; after `metadata.exit,output,truncated`.
+
+Extend exactly these tools. Keep per-session ordering, require matching runtime call/tool/argument identity, and deny unknown mappings. Write/edit paths need nearest-existing-parent canonicalization: the existing resolver cannot safely validate a nonexistent file below an escaping symlink. Reject credential paths and oversized content. Before execution gate file mutations as reversible/low; gate arbitrary Bash as unknown/high using only a command digest, since the server cannot inspect a hidden command.
+
+After write/edit, verify observed metadata path and bounded actual on-disk state. Record hash-only Action artifact/version identity with the session's real read dependencies; do not invent Memory text or a complete content lineage. Bash output becomes an untrusted hash-only tool-output Source plus Action; include exit status in sanitized outcome. Nonzero exit is an attempted action, never successful effect. Truncated/malformed/ambiguous after payloads latch incomplete and prevent subsequent tools. No automatic delivery retries without a server receipt protocol.
+
+Tests must prove denied tools do not run, credential/symlink containment, before/after mismatch rejection, capture-outage latch, raw-content absence, persisted artifact hashes and source/action edges, high-risk Bash reverify after untrusted input, plus installed plugin execution against the real API. Cross-session artifact linking and durable restart state require their own evidence; do not infer them from tool-shape coverage.
