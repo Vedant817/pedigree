@@ -138,7 +138,7 @@ def _startup_resume(db: Db, registry: TenantRegistry) -> None:
     import logging
 
     from ..config import graph_name
-    from ..engine.revoke import reconcile, resume_incomplete  # function-local: side-effect free
+    from ..engine.revoke import reconcile, resume_incomplete, tenant_lock
 
     log = logging.getLogger("pedigree.resume")
     try:
@@ -146,11 +146,14 @@ def _startup_resume(db: Db, registry: TenantRegistry) -> None:
             try:
                 gname = graph_name(rec.tenant_id)
                 tenant_db = db.for_tenant(rec.tenant_id)
-                done = resume_incomplete(tenant_db, gname)
+                # Use the same lifecycle lock as revoke/reinstate. Reconciliation
+                # must never seed/recompute statuses during an active cascade.
+                with tenant_lock(rec.tenant_id):
+                    done = resume_incomplete(tenant_db, gname)
+                    rec_res = reconcile(tenant_db, gname)
                 if done:
                     log.info("startup-resume: finished %d revocation(s) for tenant %s",
                              len(done), rec.tenant_id)
-                rec_res = reconcile(tenant_db, gname)
                 if rec_res.get("reconciled"):
                     log.info("startup-reconcile: repaired %s quarantined nodes for tenant %s",
                              rec_res.get("reconciled"), rec.tenant_id)
