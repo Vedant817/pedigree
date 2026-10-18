@@ -99,15 +99,15 @@ def test_read_missing_file_does_not_claim_capture(hook, tmp_path):
     assert not calls
 
 
-def test_subprocess_stdlib_only_and_network_failure_open():
+def test_subprocess_stdlib_only_and_network_failure_denies():
     env = {**os.environ, "PEDIGREE_URL": "http://127.0.0.1:1", "PEDIGREE_TOKEN": "private-token"}
     result = subprocess.run([sys.executable, "-I", "-S", str(HOOK), "pre"],
                             input=json.dumps({"session_id": "sess_test", "tool_name": "Bash",
                                               "tool_input": {"command": "private-command"}}),
                             text=True, capture_output=True, env=env, timeout=5)
     assert result.returncode == 0
-    assert result.stdout == ""
-    assert result.stderr == "Pedigree hook unavailable; continuing without capture or gating.\n"
+    assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert "restore connectivity" in result.stderr
 
 
 def test_operator_configuration_denied_before_network_or_fail_open(hook, monkeypatch):
@@ -139,12 +139,12 @@ def test_failed_tool_is_not_recorded_as_executed(hook, failure):
 
 
 @pytest.mark.parametrize("raw", [b"{bad json", b"x" * 262145], ids=["malformed", "oversized"])
-def test_malformed_or_oversized_input_is_bounded_fail_open(raw):
+def test_malformed_or_oversized_input_denies_gate(raw):
     result = subprocess.run([sys.executable, "-I", "-S", str(HOOK), "pre"],
                             input=raw, capture_output=True, timeout=5)
     assert result.returncode == 0
-    assert result.stdout == b""
-    assert b"continuing without capture or gating" in result.stderr
+    assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert b"replay" in result.stderr
     assert b"Traceback" not in result.stderr
 
 

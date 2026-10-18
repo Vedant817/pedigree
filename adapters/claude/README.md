@@ -14,17 +14,49 @@ deny/ask/allow. Risk/effect are classified by the server for normal commands.
 Bash commands longer than the API's 300-character summary limit explicitly send
 `risk=high` and `effect=unknown`, so a truncated risky suffix cannot lower the
 gate's risk classification. `post` hashes regular
-files up to 8 MiB for Read/Write/Edit/MultiEdit; Read looks up the exact absolute
-`path@sha256` before creating a source. Writes record an Action with that key.
+files up to 8 MiB for Read/Write/Edit/MultiEdit. Read persists the exact absolute
+`path@sha256`; the service resolves its artifact producer during delivery, before
+creating a source. Writes record an Action with that key.
 File bodies, edit text, tool responses and raw prompts are never transmitted.
 Bash command summaries (up to 300 characters) are transmitted for classification
 after URL userinfo and credential header or flag values are redacted.
 
-Network and malformed-input failures produce a generic stderr warning and exit 0;
-operator-token configuration is rejected as described above. There is no durable spool.
-Each HTTP request has a one second timeout and redirects are refused. This is
-fail-open capture and gating. A successful protocol unit test does not establish
-that Claude installed or executed this configuration.
+Capture envelopes are persisted before network access in a private SQLite outbox
+under `~/.pedigree/spool`, configurable with `PEDIGREE_SPOOL_DIR`. Each endpoint and
+credential fingerprint has its own queue; bearer credentials are never written to
+the queue. Keep this directory on durable local storage outside tracked source.
+Its files inherit the current Windows account's ACL; POSIX files are created mode
+0600. Capture retains paths, URLs, hashes and action metadata; protect these files
+as user data. Durable Bash actions retain only the tool name plus conservative
+high risk/unknown effect, so arbitrary shell arguments cannot leak into the spool.
+Pre-tool gate requests still send redacted summaries directly for classification.
+
+The queue holds at most 1000 envelopes or 8 MiB of payload per namespace. SQLite's
+data file is capped at 4096 pages (normally 16 MiB), with temporary journal overhead.
+Full, corrupt or unwritable storage reports failure; queued evidence is never
+silently evicted. A separate process lock serializes replay while allowing enqueue
+during network waits. Every request times out after one second; redirects are refused.
+Automatic hooks drain at most three envelopes to stay below the shipped ten-second
+runtime hook timeout; a larger backlog denies the gate. To drain up to 20 manually:
+
+```sh
+python adapters/claude/pedigree_hook.py replay
+```
+
+Repeat if the command reports remaining work. Use the original endpoint and agent
+credential to drain an old queue after account switching or rotation. Server delivery
+receipts provide retry identity, including after an acknowledgement is lost. The
+service must support `delivery_id`; an older service cannot acknowledge durable
+delivery, so the queue remains intact until upgrade. An ambiguous DB write can
+retain the existing tenant quota mutex; only an operator who has stopped all writers
+may perform its documented recovery. Do not delete receipts or mutexes to retry.
+
+`pre` first drains pending capture, then obtains a fresh gate decision. Pending
+capture, connectivity failure, malformed input or unavailable storage emits an
+actionable **deny** decision. Gate decisions are never queued or reused. Post/prompt
+failures return nonzero and warn; evidence already queued remains available for
+replay. Operator-token configuration is rejected as described above. These protocol
+and live-service tests do not establish installed Claude runtime execution.
 
 `WebFetch` records `Source(kind=web, integrity=untrusted)` for an http(s) URL
 with no userinfo, plus a session READ. `WebSearch` records the same kind of

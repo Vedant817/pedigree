@@ -94,6 +94,7 @@ def ensure_schema(db: Db, gname: str, *, label: str = "Node") -> dict:
     t0 = time.time()
     create_index(db, gname, Q.Q_INDEX_NODE_ID if label == "Node" else Q.Q_INDEX_TENANT_ID)
     if label == "Node":
+        create_index(db, gname, Q.Q_INDEX_CAPTURE_ID)
         create_index(db, gname, Q.Q_INDEX_MEMORY_ARTIFACT)
         create_index(db, gname, Q.Q_INDEX_ACTION_ARTIFACT)
         create_index(db, gname, Q.Q_INDEX_REVOCATION_ROOT)
@@ -139,6 +140,7 @@ def check_invariants(
     n_total = node_count(db, gname)
 
     checks: list[tuple[str, str, dict | None]] = [
+        (Q.Q_INV_CAPTURE_SHAPE, "malformed capture receipt", None),
         (Q.Q_INV_NOT_NODE, "node without :Node label", None),
         (Q.Q_INV_BAD_TYPE, "node without a known type label", None),
         (Q.Q_INV_MULTI_TYPE, "node with more than one type label", None),

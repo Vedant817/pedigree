@@ -108,6 +108,7 @@ class ActionFields(StrictModel):
 
 
 class SourceEvent(SourceFields):
+    artifact_key: ArtifactKey | None = None
     # Scanner is a privileged claim recognized by authentication, but it is not
     # a supported engine Source kind. Events authorize first, then reject it
     # here before any earlier valid event can be persisted.
@@ -162,7 +163,7 @@ _OPERATIONS = {
 _EVENT_MODELS = {"source": SourceEvent, "memory": MemoryEvent, "action": ActionEvent,
                  "session": SessionEvent, "session_read": ReadEvent}
 _RAW_FIELDS = {
-    "source": {"type", "kind", "source_kind", "uri", "title", "id", "integrity", "content_hash", "conf", "session_id"},
+    "source": {"type", "kind", "source_kind", "uri", "title", "id", "integrity", "content_hash", "conf", "session_id", "artifact_key"},
     "memory": {"type", "kind", "text", "derived_from", "corroborated_by", "artifact", "artifact_key", "id", "session_id"},
     "action": {"type", "kind", "tool", "tool_name", "summary", "title", "relied_on", "memories", "decision", "effect", "risk", "artifacts", "artifact_key", "id", "session_id"},
     "session": {"type", "kind", "session_id"},

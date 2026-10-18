@@ -39,6 +39,29 @@ Q_INDEX_REVOCATION_STATE = "CREATE INDEX FOR (n:Revocation) ON (n.state)"
 Q_INDEX_SOURCE_URI = "CREATE INDEX FOR (s:Source) ON (s.uri)"
 Q_INDEX_SOURCE_HASH = "CREATE INDEX FOR (s:Source) ON (s.content_hash)"
 Q_INDEXES = "CALL db.indexes()"
+Q_INDEX_CAPTURE_ID = "CREATE INDEX FOR (r:CaptureReceipt) ON (r.id)"
+Q_CAPTURE_GET = "MATCH (r:CaptureReceipt {id:$id}) RETURN r.digest, r.cursor, r.aliases, r.created, r.plans, r.created_at"
+Q_CAPTURE_CREATE = """
+CREATE (:CaptureReceipt {id:$id, digest:$digest, tenant:$tenant, cursor:0,
+    aliases:'{}', created:'[]', plans:'{}', created_at:$now})
+"""
+Q_CAPTURE_ADVANCE = """
+MATCH (r:CaptureReceipt {id:$id})
+SET r.cursor=$cursor, r.aliases=$aliases, r.created=$created, r.plans=$plans
+"""
+Q_CAPTURE_ACTION = "MATCH (a:Node {id:$id}) WHERE a:Action RETURN a.capture_key"
+Q_INV_CAPTURE_SHAPE = """
+MATCH (r:CaptureReceipt)
+WHERE r:Node OR r.digest IS NULL OR size(r.digest) <> 64 OR r.cursor IS NULL OR r.cursor < 0
+    OR r.aliases IS NULL OR r.created IS NULL OR r.plans IS NULL OR r.created_at IS NULL
+RETURN count(r)
+"""
+Q_CAPTURE_READ = """
+MATCH (se:Node {id:$sess}), (n:Node {id:$n}) WHERE se:Session
+MERGE (se)-[r:READ]->(n)
+SET r.at = CASE WHEN coalesce(r.at,0) > $now THEN r.at ELSE $now END
+RETURN n.id
+"""
 Q_WHATIF_STATUSES = """
 MATCH (n:Node) WHERE n:Source OR n:Memory OR n:Action RETURN n.id, n.status
 """
@@ -270,9 +293,9 @@ RETURN r.id AS id, size(nodes) AS n
 
 # --- invariants (aggregate counts; see db/schema.py) ------------------------
 Q_INV_COUNT_NODES = "MATCH (n) RETURN count(n) AS n"
-Q_INV_NOT_NODE = "MATCH (n) WHERE NOT n:Node RETURN count(n) AS n"
+Q_INV_NOT_NODE = "MATCH (n) WHERE NOT n:Node AND NOT n:CaptureReceipt RETURN count(n) AS n"
 Q_INV_BAD_TYPE = """
-MATCH (n) WHERE NOT (n:Source OR n:Memory OR n:Action OR n:Session OR n:Agent OR n:Revocation)
+MATCH (n) WHERE NOT (n:Source OR n:Memory OR n:Action OR n:Session OR n:Agent OR n:Revocation OR n:CaptureReceipt)
 RETURN count(n) AS n
 """
 Q_INV_MULTI_TYPE = """
