@@ -153,3 +153,16 @@ def test_production_acl_requires_dedicated_secret():
     db = Db(Settings(pedigree_env="production", pedigree_db_acl=True, pedigree_db_acl_secret=""))
     with pytest.raises(Unavailable, match="deployment secret"):
         db.for_tenant("abc")
+
+
+def test_deployment_admin_resume_still_uses_tenant_database_identity(service, monkeypatch):
+    client, admin, registry, (a, _) = service
+    client.app.state.settings.pedigree_admin_token = "recovery-test-admin"
+    original = admin.select
+    def registry_only(gname):
+        assert gname == registry.gname, "resume used administrator for tenant graph"
+        return original(gname)
+    monkeypatch.setattr(admin, "select", registry_only)
+    response = client.post("/v1/admin/resume", json={"tenant": a.tenant_id},
+                           headers={"X-Admin-Token": "recovery-test-admin"})
+    assert response.status_code == 200, response.text

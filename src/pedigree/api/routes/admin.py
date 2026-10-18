@@ -33,7 +33,7 @@ def register(app: FastAPI, registry, settings) -> None:
         _require_admin(request, settings)
         record = registry.get_record(payload.tenant)  # raises NotFoundInGraph if unknown
         gname = graph_name(record.tenant_id)
-        done = resume_incomplete(registry.db, gname)
+        done = resume_incomplete(registry.db.for_tenant(record.tenant_id), gname)
         return {"tenant": record.tenant_id, "resumed": done}
 
     @app.get("/admin/tenants")

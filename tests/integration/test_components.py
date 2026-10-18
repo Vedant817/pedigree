@@ -39,3 +39,33 @@ def test_components_query_failure_propagates(fresh_graph, monkeypatch):
     monkeypatch.setattr(db, "ro_query", unavailable)
     with pytest.raises(Unavailable):
         weak_components(db, graph)
+
+
+def test_component_endpoint_authentication_and_scoped_connection(fresh_graph, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from pedigree.api.app import create_app
+    from pedigree.api.registry import TenantRegistry
+
+    db, tenant, graph = fresh_graph
+    registry = TenantRegistry(db)
+    credential = registry.create_tenant(tenant)
+    try:
+        with TestClient(create_app(db, db.settings)) as client:
+            assert client.get("/v1/audit/components").status_code == 401
+            headers = {"Authorization": "Bearer " + credential.agent_token}
+            assert client.post("/v1/sources", headers=headers,
+                               json={"kind": "file", "uri": "captured-file", "id": "s"}).status_code == 200
+            original = db.select
+            def registry_only(gname):
+                assert gname != graph, "component query used privileged DB connection"
+                return original(gname)
+            with monkeypatch.context() as patch:
+                patch.setattr(db, "select", registry_only)
+                result = client.get("/v1/audit/components", headers=headers)
+            assert result.status_code == 200, result.text
+            assert result.json()["components"][0]["nodes"] == 1
+            assert result.json()["trace"][0]["op"] == "audit.components"
+            assert client.get("/v1/audit/components?limit=101", headers=headers).status_code == 422
+    finally:
+        db.query(registry.gname, "MATCH(t:Tenant {id:$id}) DELETE t", {"id": tenant})
