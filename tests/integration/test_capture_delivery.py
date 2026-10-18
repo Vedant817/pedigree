@@ -89,7 +89,8 @@ def test_db_response_loss_retains_mutex_and_resumes_after_quiescent_recovery(liv
 
     from pedigree.engine.quota import lock_key
     graph = graph_name(tenant)
-    original = database.query
+    scoped = database.for_tenant(tenant)
+    original = scoped.query
     failed = []
     def lost_response(*args, **kwargs):
         result = original(*args, **kwargs)
@@ -97,7 +98,7 @@ def test_db_response_loss_retains_mutex_and_resumes_after_quiescent_recovery(liv
             failed.append(True)
             raise ConnectionError("injected response loss after atomic create")
         return result
-    monkeypatch.setattr(database, "query", lost_response)
+    monkeypatch.setattr(scoped, "query", lost_response)
     assert client.post("/v1/events", headers=headers, json=body()).status_code == 500
     assert database.ro_query(graph, "MATCH(a:Action) RETURN count(a)").result_set == [[1]]
     assert database.client.connection.get(lock_key(graph))
