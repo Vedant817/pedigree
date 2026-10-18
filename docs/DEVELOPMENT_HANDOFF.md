@@ -297,6 +297,38 @@ runtime or deployment edits. Builder implementation and make check passed 2026-1
   Ruff, secret scan, `check_numbers`, `check_readme` PASS.
 - `46575a8`: consult 015 (OpenCode write-capture semantics) recorded for the OpenCode
   workstream.
-- Remaining release work: consult 014 acceptance items (two-tenant REST/MCP isolation,
-  checkpoint/failure recovery, local gates plus independent review). Render preview
+
+## Consult 014 acceptance evidence 2026-10-18 (release branch)
+
+Recorded on `release/production-completion-20261018` for the acceptance items in
+`docs/consults/014-production-completion/decision.md`. Runs used the real release-test
+FalkorDB (v4.22.1, module 42201) with `PYTHONPATH=src`, `FALKOR_HOST=127.0.0.1`,
+`FALKOR_PORT=6381` and the feature worktree venv; this worktree has no `.venv`.
+
+- Two-tenant REST/MCP isolation plus raw DB denial (security suite):
+  `python -m pytest -q tests/security/test_tenant_db_service.py
+  tests/integration/test_api.py tests/integration/test_mcp.py
+  tests/integration/test_whatif.py tests/integration/test_revoke_resume.py` — 32 passed
+  in 9.98s (9/7/2/5/9 per file).
+- Checkpoint/failure recovery: `python -m pytest -q
+  tests/unit/test_startup_maintenance.py tests/unit/test_config.py
+  tests/unit/test_production_launch.py` — 24 passed in 0.55s (startup repair waits on
+  the tenant lifecycle lock; checkpoint graph-name validation; `:ck:` ACL allowance).
+  Production-launch checks are configuration-level only (`decision.md:18`).
+  Consolidated rerun with the checkpoint-name test and the namespace prefix-confusion
+  guard: 12 passed in 4.77s.
+- Restore stays explicitly unbuilt and is not claimed (`KNOWN_ISSUES.md:49`,
+  `FEATURES.md:28`, `BLOG-DRAFT.md:167`; `domain.md:7`: no current test proves restore).
+- Atomic in-place graph replacement is impossible on this build: `GRAPH.COPY src dst`
+  onto an existing `dst` fails `destination key already exists` and mutates neither
+  graph; `GRAPH.COPY src dst REPLACE` fails `wrong number of arguments`; `GRAPH.RENAME`
+  is unregistered (`COMMAND INFO` returns nil; the attempt raises
+  `unknown command 'GRAPH.RENAME'`). Copy-to-new succeeds. This grounds
+  `decision.md:12`: the offline staged-write journal with rollback is the only
+  replacement path.
+- Worktree gates at `4a463c4`: Ruff `All checks passed!`; secret scan
+  `[secret-scan] PASS: no credential shapes found in tracked files`; `check_numbers`
+  `[check-numbers] PASS: 4 file(s) checked against 70 allowed values`; `check_readme`
+  `[check-readme] PASS: 11 headings, docs/*.md links, numbers`.
+- Remaining release work: independent review of this evidence is open; Render preview
   verification stays user-owned.
