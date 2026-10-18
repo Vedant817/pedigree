@@ -285,3 +285,18 @@ exists on a pull request.
 `feat/durable-capture-spool-20261018` owns durable Claude capture, event delivery
 receipts and focused tests. Isolated worktree and fresh DB port 6383. No shared
 runtime or deployment edits. Builder implementation and make check passed 2026-10-18; ready for independent QA/red-team.
+
+## F-22 verification 2026-10-18 (release branch)
+
+- `3ad6de9` on `release/production-completion-20261018`: the delivery-loss injection
+  test now patches the scoped tenant connection (`database.for_tenant(tenant)`) — the
+  instance the request path actually uses while the DB ACL service is on — instead of
+  the root connection, which the request never touched.
+- Focused set (`test_capture_delivery`, `test_capture_spool`, `test_claude_hook`): 41
+  passed. Full quick suite: 910 passed, 1 skipped, 6 deselected, 1 xfailed (186.58s);
+  Ruff, secret scan, `check_numbers`, `check_readme` PASS.
+- `46575a8`: consult 015 (OpenCode write-capture semantics) recorded for the OpenCode
+  workstream.
+- Remaining release work: consult 014 acceptance items (two-tenant REST/MCP isolation,
+  checkpoint/failure recovery, local gates plus independent review). Render preview
+  verification stays user-owned.
