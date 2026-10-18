@@ -204,6 +204,16 @@ def create_app(db: Db | None = None, settings=None, *, limiter: RateLimiter | No
     app.state.settings = settings
     app.state.registry = registry
     app.state.limiter = limiter
+
+    @app.get("/v1/ui/config")
+    def ui_configuration(request: Request):
+        from .auth import check_peer
+        check_peer(request)
+        local = request.client is not None and request.client.host in {"127.0.0.1", "::1", "testclient"}
+        return JSONResponse({"demo_login": bool(settings.pedigree_demo_login and local),
+                             "api_docs": bool(_docs_url(settings))},
+                            headers={"Cache-Control": "no-store"})
+
     _register_error_handlers(app)
     app.add_middleware(BodySizeMiddleware)
     app.add_middleware(CorrelationMiddleware)

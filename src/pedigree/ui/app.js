@@ -2,6 +2,13 @@
 (() => {
   'use strict';
   const $ = id => document.getElementById(id);
+  // Optional capabilities stay hidden if configuration cannot be verified.
+  fetch('/v1/ui/config', {cache:'no-store', redirect:'error'})
+    .then(response => response.ok ? response.json() : {})
+    .then(config => {
+      $('demo-login').hidden = config.demo_login !== true;
+      $('api-reference').hidden = config.api_docs !== true;
+    }).catch(() => {});
   let token = '', epoch = 0, nodes = [], selected = null, graph = null, preview = null, confirming = false;
   const colors = {ok:'#3483ac', tainted:'#ad3549', preserved:'#177c69', revoked:'#45485e', quarantined:'#a96808'};
   const text = (tag, value, className) => {
