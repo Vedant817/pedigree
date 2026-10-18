@@ -383,3 +383,12 @@ Q_INV_OK_HAS_NO_BAD_PARENT = """
 MATCH (n:Node {status:'ok'})-[:DERIVED_FROM]->(p:Node)
 WHERE p.status IN ['revoked','tainted','quarantined'] RETURN count(n)
 """
+
+# Weak connectivity of lineage, excluding session/history/receipt metadata.
+Q_WCC_SUMMARY = """
+CALL algo.WCC({nodeLabels:['Node'], relationshipTypes:['DERIVED_FROM','CORROBORATED_BY']})
+YIELD node, componentId
+WHERE node:Source OR node:Memory OR node:Action
+RETURN componentId, count(node) AS size
+ORDER BY size DESC, componentId ASC LIMIT $limit
+"""

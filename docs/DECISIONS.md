@@ -460,3 +460,17 @@ engine change is implied by this ADR beyond `7045e39`; `corroborate` latency is 
 `tests/unit/test_p012_oracle.py` (hand cases, drift guard against `evals.oracle` on its
 valid domain, import meta-test); `tests/integration/test_p012_invariant.py` (I-a
 negative test); `tests/integration/test_reinstate_oracle.py` (DB property battery).
+
+## ADR-016 | 2026-10-18 | Empty durable production launch and bounded component audit
+
+Default Compose starts empty with generated deployment/database credentials and a
+persistent authenticated FalkorDB volume. Synthetic startup is confined to the
+explicit local demo configuration. Production rejects demo flags before seeding.
+Render declares a persistent database disk and an always-on API; applying paid
+resources remains an account operation and requires live restart evidence.
+
+The additive `/v1/audit/components` endpoint reports weak connectivity of Source,
+Memory and Action lineage via static `algo.WCC` over DERIVED_FROM/CORROBORATED_BY.
+Session/history metadata is excluded, limits report truncation, component IDs are
+snapshot-local, and the existing token-derived tenancy contract is unchanged.
+Evidence: consult014, production-launch acceptance tests, real-DB component tests.

@@ -211,6 +211,8 @@ def create_app(db: Db | None = None, settings=None, *, limiter: RateLimiter | No
     routes.events.register(app, db, registry, settings)
     routes.gate.register(app, db, registry, settings)
     routes.workspace.register(app, db)
+    from .routes.components import register as register_components
+    register_components(app)
     ui = StaticFiles(directory=Path(__file__).resolve().parents[1] / "ui", html=True)
     app.mount("/", RootDispatcher(mcp_app, ui), name="workspace")
     return app
