@@ -16,7 +16,7 @@ from ...engine.ingest import (
     session_read,
 )
 from ...engine.quota import QuotaPolicy, admission, preflight
-from ...errors import TooLarge
+from ...errors import InvalidArgument, TooLarge
 from .. import auth
 from ..routes.engine import operator_authorized
 from ..schemas import EventsPayload
@@ -45,7 +45,12 @@ def register(app: FastAPI, db, registry, settings) -> None:
         for spec in spec_list:
             if spec.get("op") == "source":
                 auth.authorize_source(request.state.principal, spec.get("kind"), spec.get("integrity"))
+                if spec.get("artifact_key") and payload.delivery_id is None:
+                    raise InvalidArgument("deferred artifact lookup requires delivery_id")
         auth.admit(request, "write")
+        if payload.delivery_id is not None:
+            from ...engine.capture import deliver
+            return deliver(db, gname, tenant, payload, spec_list, settings, registry.get_record(tenant).node_cap)
         created: list[str] = []
         # In-batch alias map: a capture id names a node, but identity is derived from the
         # artifact (ADR-008), so later events in the same batch that reference the id are

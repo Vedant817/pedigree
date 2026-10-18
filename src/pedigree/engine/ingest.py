@@ -334,6 +334,8 @@ def record_action(
     via: str = "cite",
     now: int | None = None,
     trace: Trace | None = None,
+    capture_key: str | None = None,
+    defer_session_read: bool = False,
 ) -> IngestResult:
     if not isinstance(tool, str) or not tool or len(tool) > 128:
         raise InvalidArgument("invalid tool name")
@@ -357,6 +359,8 @@ def record_action(
 
     node_id = validate_id(id) if id else new_id("act")
     props: dict = {"id": node_id, "tenant": tenant, "tool": tool, "summary": summary, "conf": []}
+    if capture_key is not None:
+        props["capture_key"] = capture_key
     if effect:
         props["effect"] = effect
     if risk:
@@ -394,7 +398,7 @@ def record_action(
     if parents and n_parents != len(parents):
         raise Conflict("parent disappeared during write", detail={"expected": len(parents), "got": n_parents})
     result = IngestResult(row[0], row[1], bool(row[2]), list(row[3] or []), n_parents, warnings)
-    if session_id:
+    if session_id and not defer_session_read:
         session_read(db, gname, session_id, result.id, trace=trace)
     return result
 

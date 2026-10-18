@@ -32,6 +32,7 @@ evals/results/raw/
 # committed CSVs at evals/results/.
 evals/results/quick/
 scratch/
+.pedigree/
 output/playwright/
 .playwright-cli/
 

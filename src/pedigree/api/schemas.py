@@ -102,6 +102,7 @@ class OkResponse(BaseModel):
 
 class EventsPayload(StrictModel):
     runtime: Runtime = "generic"
+    delivery_id: Id | None = None
     session_id: Id | None = None
     events: list[dict[str, Any]] = Field(default_factory=list)
 

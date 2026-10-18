@@ -280,3 +280,8 @@ exists on a pull request.
 ## Release completion 2026-10-18
 - release/production-completion-20261018: Codex orchestrator owns production readiness, recovery and integration. Existing main worktree edits preserved. Real release-test DB uses port 6381; old crashed volume preserved.
 
+## F-22 ownership
+
+`feat/durable-capture-spool-20261018` owns durable Claude capture, event delivery
+receipts and focused tests. Isolated worktree and fresh DB port 6383. No shared
+runtime or deployment edits. Builder implementation and make check passed 2026-10-18; ready for independent QA/red-team.

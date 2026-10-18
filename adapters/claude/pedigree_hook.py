@@ -1,7 +1,7 @@
 """Claude Code command hook. Standalone Python 3.11+, standard library only.
 
 Inputs follow documented Claude hook fields; no captured runtime payloads are bundled.
-Network and malformed-input failures are fail-open, with a content-free warning.
+Capture is durably queued before delivery. Gates deny when delivery or checking fails.
 """
 from __future__ import annotations
 
@@ -11,12 +11,15 @@ import os
 import re
 import secrets
 import shlex
+import sqlite3
 import sys
 import urllib.parse
 import urllib.request
+from contextlib import contextmanager
 from pathlib import Path
 
-WARNING = "Pedigree hook unavailable; continuing without capture or gating."
+WARNING = "Pedigree capture pending or unavailable; restore connectivity and run pedigree_hook.py replay."
+GATE_ERROR = "Pedigree cannot verify this action. Restore capture delivery and service connectivity, then retry."
 TIMEOUT = 1.0
 MAX_BYTES = 8 * 1024 * 1024
 ROLE_ERROR = "Pedigree hook requires an agent token; operator configuration denied."
@@ -401,19 +404,21 @@ def segment_command(tokens):
     return _basename(tokens[0]) if tokens else None
 
 
-def file_read_events(path, digest, key, send):
-    found = send("/v1/artifacts/lookup?" + urllib.parse.urlencode({"key": key}))
+def file_read_events(path, digest, key, send, durable=False):
+    found = {} if durable else send("/v1/artifacts/lookup?" + urllib.parse.urlencode({"key": key}))
     nid = found["node_id"] if found.get("found") else "src_" + secrets.token_hex(8)
     events = []
     if not found.get("found"):
         kind = "rules_file" if Path(path).name in {"CLAUDE.md", "AGENTS.md", "MEMORY.md"} else "file"
         events.append({"type": "source_read", "source_kind": kind, "uri": path,
                        "content_hash": digest, "id": nid})
+        if durable:
+            events[-1]["artifact_key"] = key
     events.append({"type": "session_read", "node_id": nid})
     return events
 
 
-def handle(mode, payload, send=request):
+def handle(mode, payload, send=request, durable=False):
     validate_agent_config()
     sid = payload["session_id"]
     tool = payload.get("tool_name", "unknown")
@@ -449,7 +454,7 @@ def handle(mode, payload, send=request):
                 return None
             path, digest, key = artifact
             if tool == "Read":
-                events.extend(file_read_events(path, digest, key, send))
+                events.extend(file_read_events(path, digest, key, send, durable))
             else:
                 events.append({"type": "action_executed", "tool": tool, "summary": path[:300],
                                "artifacts": [path], "artifact_key": key})
@@ -486,7 +491,7 @@ def handle(mode, payload, send=request):
                 if artifact is None or len(artifact[0]) > _URI_LIMIT:
                     continue
                 path, digest, key = artifact
-                linked = file_read_events(path, digest, key, send)
+                linked = file_read_events(path, digest, key, send, durable)
                 events.extend(linked)
                 read_ids.append(linked[-1]["node_id"])
             segments = command_segments(command)
@@ -505,6 +510,112 @@ def handle(mode, payload, send=request):
     return None
 
 
+class Spool:
+    """Private bounded SQLite queue; an immediate transaction serializes send+ack.
+
+    The credential only chooses a namespace. It is never stored. Pending entries
+    survive hook exits and process death; a successful acknowledgement alone deletes
+    an entry. Old credential namespaces require that original credential to drain.
+    """
+    MAX_ITEMS = 1000
+    MAX_BYTES = 8 * 1024 * 1024
+
+    def __init__(self):
+        validate_agent_config()
+        base = os.environ.get("PEDIGREE_URL", "http://127.0.0.1:8000").rstrip("/")
+        token = os.environ.get("PEDIGREE_TOKEN", "")
+        parsed = urllib.parse.urlsplit(base)
+        if parsed.scheme not in {"http", "https"} or parsed.username or parsed.password or not token or parsed.query or parsed.fragment:
+            raise ValueError("invalid configuration")
+        self.identity = hashlib.sha256((base + "\0" + token).encode()).hexdigest()
+        root = Path(os.environ.get("PEDIGREE_SPOOL_DIR", str(Path.home() / ".pedigree" / "spool")))
+        if root.is_symlink():
+            raise ValueError("unsafe spool directory")
+        root.mkdir(mode=0o700, parents=True, exist_ok=True)
+        self.path = root / (self.identity + ".sqlite3")
+        if self.path.is_symlink():
+            raise ValueError("unsafe spool file")
+        # Create with private mode before SQLite sees the file (POSIX umask independent).
+        fd = os.open(self.path, os.O_CREAT | os.O_RDWR, 0o600)
+        os.close(fd)
+        with self.connect() as connection:
+            connection.execute("CREATE TABLE IF NOT EXISTS outbox (seq INTEGER PRIMARY KEY, body TEXT NOT NULL)")
+
+    @contextmanager
+    def connect(self, replay_lock=False):
+        path = self.path.with_suffix(".replay-lock") if replay_lock else self.path
+        if path.is_symlink():
+            raise ValueError("unsafe spool file")
+        fd = os.open(path, os.O_CREAT | os.O_RDWR, 0o600)
+        os.close(fd)
+        connection = sqlite3.connect(path, timeout=2.0)
+        try:
+            connection.execute("PRAGMA synchronous=FULL")
+            connection.execute("PRAGMA max_page_count=4096")
+            with connection:
+                yield connection
+        finally:
+            connection.close()
+
+    def pending(self):
+        with self.connect() as connection:
+            return connection.execute("SELECT count(*) FROM outbox").fetchone()[0]
+
+    def enqueue(self, body):
+        raw = json.dumps(body, separators=(",", ":"))
+        if len(raw.encode()) > 262144:
+            raise ValueError("capture too large")
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            count, size = connection.execute("SELECT count(*), coalesce(sum(length(CAST(body AS BLOB))),0) FROM outbox").fetchone()
+            if count >= self.MAX_ITEMS or size + len(raw.encode()) > self.MAX_BYTES:
+                raise ValueError("capture spool full; replay pending captures before retrying")
+            connection.execute("INSERT INTO outbox(body) VALUES (?)", (raw,))
+
+    def drain(self, send=request, limit=20):
+        base = os.environ.get("PEDIGREE_URL", "http://127.0.0.1:8000").rstrip("/")
+        token = os.environ.get("PEDIGREE_TOKEN", "")
+        if hashlib.sha256((base + "\0" + token).encode()).hexdigest() != self.identity:
+            raise ValueError("capture credential or endpoint changed")
+        # Use a separate SQLite lock file so network waits never block enqueue.
+        # SQLite releases this OS-level lock automatically on process death.
+        with self.connect(replay_lock=True) as replay_lock:
+            replay_lock.execute("BEGIN IMMEDIATE")
+            for _ in range(limit):
+                with self.connect() as connection:
+                    row = connection.execute("SELECT seq,body FROM outbox ORDER BY seq LIMIT 1").fetchone()
+                if row is None:
+                    return
+                body = json.loads(row[1])
+                result = send("/v1/events", body)
+                if not isinstance(result, dict) or result.get("delivery_id") != body["delivery_id"]:
+                    raise ValueError("server did not acknowledge durable delivery; upgrade service")
+                with self.connect() as connection:
+                    connection.execute("DELETE FROM outbox WHERE seq=?", (row[0],))
+
+
+def capture(mode, payload, spool):
+    """Construct a sanitized immutable envelope with zero network operations."""
+    def collect(path, body=None):
+        if path != "/v1/events":
+            raise ValueError("unexpected capture network operation")
+        body["delivery_id"] = "delivery_" + secrets.token_hex(16)
+        for event in body["events"]:
+            if event["type"] == "action_executed":
+                event["id"] = "act_" + secrets.token_hex(16)
+                if event.get("tool") == "Bash":
+                    # Shell arguments can contain arbitrary credentials. Keep only the
+                    # tool name and conservative classification in durable storage.
+                    event.update(summary="Bash", risk="high", effect="unknown")
+        spool.enqueue(body)
+    handle(mode, payload, collect, durable=True)
+
+
+def denied_gate():
+    return {"hookSpecificOutput": {"hookEventName": "PreToolUse",
+            "permissionDecision": "deny", "permissionDecisionReason": GATE_ERROR}}
+
+
 def main():
     # Configuration errors must not enter the network/malformed-input fail-open path.
     try:
@@ -516,15 +627,37 @@ def main():
                 "permissionDecision": "deny", "permissionDecisionReason": ROLE_ERROR}}))
         return 2
     try:
+        mode = sys.argv[1]
+        spool = Spool()
+        if mode == "replay":
+            spool.drain()
+            if spool.pending():
+                raise ValueError("capture still pending")
+            return 0
         raw = sys.stdin.buffer.read(262145)
         if len(raw) > 262144:
             raise ValueError("input too large")
-        output = handle(sys.argv[1], json.loads(raw))
+        payload = json.loads(raw)
+        if mode == "pre":
+            # Stay below the shipped ten-second runtime hook deadline. A backlog
+            # larger than this short drain produces deny, never a hook timeout.
+            spool.drain(limit=3)
+            if spool.pending():
+                raise ValueError("capture still pending")
+            output = handle(mode, payload)
+        else:
+            capture(mode, payload, spool)
+            spool.drain(limit=3)
+            output = None
         if output is not None:
             print(json.dumps(output))
     except Exception:
         # Do not include exception text: HTTP errors may contain tokens or payloads.
         print(WARNING, file=sys.stderr)
+        if len(sys.argv) > 1 and sys.argv[1] == "pre":
+            print(json.dumps(denied_gate()))
+            return 0
+        return 1
     return 0
 
 
