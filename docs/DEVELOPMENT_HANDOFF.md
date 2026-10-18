@@ -319,10 +319,30 @@ FalkorDB (v4.22.1, module 42201) with `PYTHONPATH=src`, `FALKOR_HOST=127.0.0.1`,
   guard: 12 passed in 4.77s.
 - Restore stays explicitly unbuilt and is not claimed (`KNOWN_ISSUES.md:49`,
   `FEATURES.md:28`, `BLOG-DRAFT.md:167`; `domain.md:7`: no current test proves restore).
-- Correction from independent review: `GRAPH.COPY` does not overwrite and `GRAPH.RENAME` is absent, but privileged Redis `RENAME` does replace graph keys. See `tests/security/test_release_independent.py::test_admin_redis_rename_replaces_existing_graph`. A rename primitive alone does not establish crash-safe restore, persistence or reader/writer coordination. Offline recovery implementation and acceptance remain separate gates.
+- Correction from independent review: privileged Redis `RENAME` replaces graph keys;
+  `GRAPH.RENAME` is absent and `GRAPH.COPY` does not overwrite. Offline recovery now
+  uses staged Redis `RENAME` with a durable journal. Independent recovery QA remains
+  pending; a rename primitive alone does not prove persistence or coordination.
 - Worktree gates at `4a463c4`: Ruff `All checks passed!`; secret scan
   `[secret-scan] PASS: no credential shapes found in tracked files`; `check_numbers`
   `[check-numbers] PASS: 4 file(s) checked against 70 allowed values`; `check_readme`
   `[check-readme] PASS: 11 headings, docs/*.md links, numbers`.
 - Remaining release work: independent review found a WCC metadata-input defect (fixed in the release branch), inaccurate rename wording (corrected here), and incomplete restore acceptance; recovery verification and Render preview
   verification stays user-owned.
+
+## Checkpoint recovery ownership 2026-10-18
+
+`t3/checkpoint-recovery` owns offline checkpoint recovery implementation and tests;
+imports only the authorized recovery files and tests serially on fresh port 6386.
+Original recovery worktree and its staged data remain untouched.
+
+### Checkpoint recovery implementation evidence
+
+Offline recovery is implemented on the checkpoint branch; independent QA is pending.
+Focused tests: 26 passed in 236.17s, including two hard DB/AOF restarts; final unit
+follow-up: 5 passed in 0.33s (27 unique tests across the commands). AOF compaction
+preflight mitigates a reproduced historical-deleted-graph replay crash in the pinned
+engine; it does not repair old crash-damaged storage. All original volumes are
+preserved. See `docs/qa/F-17-offline-recovery-local.md` and ADR-017 draft.
+Root owns CI AOF configuration and the final aggregate gate. No push or hosted test
+result is claimed. Scope excludes root's stdio flake and WCC follow-ups.

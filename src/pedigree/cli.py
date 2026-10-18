@@ -254,6 +254,50 @@ def serve(settings: Settings, host: str, port: int) -> int:
     return 0
 
 
+def checkpoint_command(settings: Settings, args) -> int:
+    """Deployment-local maintenance; credentials stay in the environment."""
+    from .api.registry import TenantRegistry
+    from .config import KNOWN_DEFAULT_ADMIN_TOKENS, validate_tenant
+    from .db.client import Db
+    from .engine.checkpoint import Checkpoints
+    from .errors import Forbidden, InvalidArgument, PedigreeError
+
+    try:
+        token = settings.pedigree_admin_token.strip()
+        if not token or token.lower() in KNOWN_DEFAULT_ADMIN_TOKENS:
+            raise Forbidden("deployment administrator credential required")
+        if getattr(args, "rollback", False) and args.action != "recover":
+            raise InvalidArgument("--rollback requires the recover action")
+        if args.action not in {"list", "status", "mutex-status"} and not args.writers_stopped:
+            raise InvalidArgument("stop every API/MCP/direct writer, then pass --writers-stopped")
+        validate_tenant(args.tenant)
+        db = Db(settings)
+        TenantRegistry(db, settings).get_record(args.tenant)
+        manager = Checkpoints(db, args.tenant)
+        if args.action == "list":
+            result = {"checkpoints": manager.list()}
+        elif args.action == "status":
+            result = {"pending": manager.pending()}
+        elif args.action == "mutex-status":
+            result = manager.mutex_status()
+        elif args.action == "release-mutex":
+            result = manager.release_mutex(confirmed=args.confirm_mutex_release)
+        elif args.action == "recover":
+            result = manager.recover(rollback=args.rollback)
+        else:
+            if not args.name:
+                raise InvalidArgument("--name is required")
+            result = getattr(manager, args.action)(args.name)
+        print(json.dumps(result))
+        return 0
+    except PedigreeError as exc:
+        print(json.dumps(exc.to_dict()), file=sys.stderr)
+        return 1
+    except Exception:
+        print('[checkpoint] unavailable; keep writers stopped and inspect checkpoint status', file=sys.stderr)
+        return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     settings = get_settings()
     parser = argparse.ArgumentParser(prog="pedigree", description="Pedigree service and tooling")
@@ -289,6 +333,16 @@ def main(argv: list[str] | None = None) -> int:
     p_reconcile = sub.add_parser("reconcile", help="repair stragglers (quarantined without running)")
     p_reconcile.add_argument("--tenant", default=None, help="limit to one tenant (default: all)")
 
+    p_checkpoint = sub.add_parser("checkpoint", help="offline administrator snapshots; stop all writers first")
+    p_checkpoint.add_argument("action", choices=["create", "list", "drop", "restore", "recover", "status",
+                                                  "mutex-status", "release-mutex"])
+    p_checkpoint.add_argument("--tenant", required=True)
+    p_checkpoint.add_argument("--name")
+    p_checkpoint.add_argument("--writers-stopped", action="store_true")
+    p_checkpoint.add_argument("--confirm-mutex-release", action="store_true",
+                              help="acknowledge all database work is quiescent before removing a stranded mutex")
+    p_checkpoint.add_argument("--rollback", action="store_true", help="recover the pre-restore graph")
+
     sub.add_parser("seed", help="seed the demo tenant (synthetic scenarios)")
     sub.add_parser("version", help="print version")
 
@@ -315,6 +369,8 @@ def main(argv: list[str] | None = None) -> int:
         return resume_revocations(settings, args.tenant)
     if args.cmd == "reconcile":
         return reconcile_stragglers(settings, args.tenant)
+    if args.cmd == "checkpoint":
+        return checkpoint_command(settings, args)
     if args.cmd == "seed":
         from . import __version__  # noqa: F401  (import check)
 

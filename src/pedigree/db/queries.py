@@ -415,3 +415,6 @@ WHERE node:Source OR node:Memory OR node:Action
 RETURN componentId, count(node) AS size
 ORDER BY size DESC, componentId ASC LIMIT $limit
 """
+Q_CHECKPOINT_COUNTS = "MATCH(n) WITH count(n) AS nodes OPTIONAL MATCH ()-[r]->() RETURN nodes,count(r)"
+Q_CHECKPOINT_NODES = "MATCH(n) RETURN labels(n),properties(n)"
+Q_CHECKPOINT_EDGES = "MATCH(a)-[r]->(b) RETURN a.id,type(r),b.id,properties(r)"

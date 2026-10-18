@@ -512,3 +512,9 @@ produces successful-action evidence. Shell gating does not sandbox the shell or
 prove complete command provenance. Consult015 and docs/adr/F-08-native-capture.md
 record the observed contracts, dissent and installed proof. Restart state durability
 is a separate acceptance requirement, not inferred from an in-memory latch.
+
+## ADR-020 draft | Offline checkpoint recovery
+
+Proposed implementation and local persistence mitigation are recorded in
+[the recovery ADR draft](adr/F-17-offline-recovery.md). Independent review is pending;
+no online exclusion or hosted recovery guarantee is introduced.
