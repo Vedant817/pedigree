@@ -8,12 +8,12 @@ A 20-second GIF is not in this repository. A human recording would go under `doc
 
 Three measurements from [`docs/NUMBERS.md`](docs/NUMBERS.md) (E1, generated DAGs, the engine's `compute_final`): recall **1.0**, over-invalidation **0.0**, explicit preservation-status sensitivity **1.0**. Intervals and the other rows are in [Evaluation](#evaluation).
 
-Three Compose commands. Read the quick-start notes before using the credential file:
+For an empty production installation, follow [Production operations](docs/PRODUCTION_OPERATIONS.md). The optional synthetic walkthrough uses this explicit local demo configuration:
 
 ```bash
 git clone https://github.com/Vedant817/pedigree.git && cd pedigree
-docker compose up --build --wait
-mkdir -p scratch && docker compose cp pedigree:/data/credentials/demo-demo.json scratch/demo-demo.json
+docker compose -f docker-compose.demo.yml up --build --wait
+mkdir -p scratch && docker compose -f docker-compose.demo.yml cp pedigree:/data/credentials/demo-demo.json scratch/demo-demo.json
 ```
 
 No Docker on Linux: `make quickstart` (or `bash scripts/quickstart.sh`). Windows Python with a Docker database: `make quickstart-windows`.
@@ -67,8 +67,8 @@ stays inside the Compose network. No model provider or API key is needed.
 
 ```bash
 git clone https://github.com/Vedant817/pedigree.git && cd pedigree
-docker compose up --build --wait
-mkdir -p scratch && docker compose cp pedigree:/data/credentials/demo-demo.json scratch/demo-demo.json
+docker compose -f docker-compose.demo.yml up --build --wait
+mkdir -p scratch && docker compose -f docker-compose.demo.yml cp pedigree:/data/credentials/demo-demo.json scratch/demo-demo.json
 ```
 
 Open `http://localhost:8000` in a browser. Read `operator_token` from the private local
@@ -110,9 +110,9 @@ printed without their contents. Native macOS acceptance has not been run.
 Compose is the primary path; use PowerShell to copy the private credential file:
 
 ```powershell
-docker compose up --build --wait
+docker compose -f docker-compose.demo.yml up --build --wait
 New-Item -ItemType Directory -Force scratch | Out-Null
-docker compose cp pedigree:/data/credentials/demo-demo.json scratch/demo-demo.json
+docker compose -f docker-compose.demo.yml cp pedigree:/data/credentials/demo-demo.json scratch/demo-demo.json
 ```
 
 For development with a Windows Python environment and a Docker DB, use

@@ -3,7 +3,8 @@ services:
     image: falkordb/falkordb:v4.22.1
     environment:
       BROWSER: "0"
-      REDIS_ARGS: "--appendonly yes --save 900 1"
+      REDIS_ARGS: "--appendonly yes --appendfsync everysec --save 900 1 --requirepass ${FALKOR_PASSWORD:?Set a generated database password in .env}"
+      REDISCLI_AUTH: ${FALKOR_PASSWORD:?Set a generated database password in .env}
       FALKORDB_ARGS: "TIMEOUT_MAX 60000 TIMEOUT_DEFAULT 20000 QUERY_MEM_CAPACITY 1073741824"
     volumes:
       - pedigree-dbdata:/var/lib/falkordb/data
@@ -19,11 +20,17 @@ services:
       - "127.0.0.1:${PEDIGREE_PORT:-8000}:8000"
     environment:
       PEDIGREE_ENV: production
-      PEDIGREE_SEED_DEMO: "1"
+      PEDIGREE_SEED_DEMO: "0"
+      PEDIGREE_DEMO_LOGIN: "0"
+      PEDIGREE_ADMIN_TOKEN: ${PEDIGREE_ADMIN_TOKEN:?Set a generated admin token in .env}
+      PEDIGREE_SECRET: ${PEDIGREE_SECRET:?Set a generated application secret in .env}
+      PEDIGREE_DB_ACL: "true"
+      PEDIGREE_DB_ACL_SECRET: ${PEDIGREE_DB_ACL_SECRET:?Set a generated tenant database secret in .env}
       PEDIGREE_DEMO_TENANT: ${PEDIGREE_DEMO_TENANT:-demo}
       PEDIGREE_CREDENTIALS_DIR: /data/credentials
       FALKOR_HOST: db
       FALKOR_PORT: "6379"
+      FALKOR_PASSWORD: ${FALKOR_PASSWORD:?Set a generated database password in .env}
     volumes:
       - pedigree-state:/data
     depends_on:

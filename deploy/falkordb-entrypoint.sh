@@ -14,10 +14,16 @@ BIN_PATH="${FALKORDB_BIN_PATH:-/var/lib/falkordb/bin}"
 
 mkdir -p "$DATA_PATH"
 
+if [ -n "${FALKOR_PASSWORD:-}" ]; then
+    set -- --requirepass "$FALKOR_PASSWORD"
+else
+    set --
+fi
+
 # REDIS_ARGS and FALKORDB_ARGS are intentionally unquoted: the upstream image
 # relies on word splitting to pass multiple flags through them.
 # shellcheck disable=SC2086
-exec redis-server ${REDIS_ARGS:-} \
+exec redis-server "$@" ${REDIS_ARGS:-} \
     --protected-mode no \
     --port "${PORT:-6379}" \
     --dir "$DATA_PATH" \

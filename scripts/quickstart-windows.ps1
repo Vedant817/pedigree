@@ -25,6 +25,7 @@ try {
     $env:FALKOR_HOST = '127.0.0.1'
     $env:FALKOR_PORT = "$taskDbPort"
     $env:PEDIGREE_SEED_DEMO = '1'
+    $env:PEDIGREE_ENV = 'local'
     if (-not $env:PEDIGREE_CREDENTIALS_DIR) { $env:PEDIGREE_CREDENTIALS_DIR = Join-Path $taskData 'credentials' }
     & $taskPython scripts/runtime.py wait-db
     if ($LASTEXITCODE -ne 0) { throw 'Database readiness failed' }

@@ -2,6 +2,7 @@
 # API only: Compose owns the separate database process.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
+python scripts/runtime.py validate-config
 python scripts/runtime.py wait-db
 if [[ "${PEDIGREE_SEED_DEMO:-0}" == "1" ]]; then
   python scripts/seed_demo.py

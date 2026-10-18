@@ -155,7 +155,7 @@ def quickstart() -> int:
     free_port(db_port)
     data = Path(os.environ.get('DATA_DIR', str(ROOT / 'data/local'))).resolve()
     env = {**os.environ, 'FALKOR_HOST': '127.0.0.1', 'FALKOR_PORT': str(db_port),
-           'DATA_DIR': str(data), 'PEDIGREE_SEED_DEMO': '1',
+           'DATA_DIR': str(data), 'PEDIGREE_ENV': 'local', 'PEDIGREE_SEED_DEMO': '1',
            'PEDIGREE_CREDENTIALS_DIR': os.environ.get('PEDIGREE_CREDENTIALS_DIR', str(data / 'credentials'))}
     # Settings must match the owned child, never an unrelated .env database.
     os.environ.update({key: env[key] for key in ('FALKOR_HOST', 'FALKOR_PORT')})
@@ -187,7 +187,13 @@ def quickstart() -> int:
 def main() -> int:
     try:
         command = sys.argv[1]
-        if command == 'fetch':
+        if command == 'validate-config':
+            from pedigree.config import Settings, admin_token_problem
+            problem = admin_token_problem(Settings(_env_file=None))
+            if problem:
+                raise RuntimeError(problem)
+            print('[runtime] startup configuration accepted')
+        elif command == 'fetch':
             fetch()
         elif command == 'wait-db':
             wait_db()

@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from functools import lru_cache
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .errors import InvalidArgument
@@ -77,16 +77,16 @@ class Settings(BaseSettings):
     falkor_host: str = "127.0.0.1"
     falkor_port: int = 6379
     falkor_username: str | None = None
-    falkor_password: str | None = None
+    falkor_password: str | None = Field(default=None, repr=False)
 
-    pedigree_admin_token: str = ""
+    pedigree_admin_token: str = Field(default="", repr=False)
     pedigree_env: str = "dev"  # dev|test|local are lenient; anything else refuses empty/default admin tokens
     pedigree_public_docs: bool = False
     pedigree_seed_demo: bool = False
     pedigree_demo_login: bool = False
     pedigree_demo_tenant: str = "demo"
     pedigree_credentials_dir: str = "scratch"
-    pedigree_secret: str = ""
+    pedigree_secret: str = Field(default="", repr=False)
     pedigree_node_cap: int = 200_000
     pedigree_store_text: bool = False
     pedigree_read_window: int = 50
@@ -96,8 +96,8 @@ class Settings(BaseSettings):
     pedigree_db_mode: str = "auto"  # auto|docker|so  (how `pedigree db start` runs FalkorDB)
 
     llm_provider: str = ""
-    gemini_api_key: str = ""
-    groq_api_key: str = ""
+    gemini_api_key: str = Field(default="", repr=False)
+    groq_api_key: str = Field(default="", repr=False)
 
     # read/write query timeouts (ms)
     read_timeout_ms: int = 5_000
@@ -122,12 +122,14 @@ def admin_token_problem(settings: Settings) -> str | None:
     Non-dev environments refuse an empty or known-default token; dev/test/local accept
     anything so a local checkout works without ceremony.
     """
+    env = (settings.pedigree_env or "dev").strip().lower()
+    if env not in DEV_ENVS and (settings.pedigree_seed_demo or settings.pedigree_demo_login):
+        return "demo seeding and demo login are disabled in production"
     if settings.pedigree_seed_demo:
         # Demo mode disables deployment-admin routes instead of provisioning an
         # unnecessary shared deployment credential.
         return None
     token = (settings.pedigree_admin_token or "").strip()
-    env = (settings.pedigree_env or "dev").strip().lower()
     if env in DEV_ENVS:
         return None
     if not token:

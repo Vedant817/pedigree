@@ -275,3 +275,6 @@ host's secret store and outside version control.
 
 No automated test result is claimed anywhere in this repository until one actually
 exists on a pull request.
+## Release completion 2026-10-18
+- release/production-completion-20261018: Codex orchestrator owns production readiness, recovery and integration. Existing main worktree edits preserved. Real release-test DB uses port 6381; old crashed volume preserved.
+

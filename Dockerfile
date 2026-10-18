@@ -6,6 +6,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
 WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
+COPY policy.yaml ./policy.yaml
 RUN uv sync --frozen --no-dev --no-editable \
     && uv lock --check \
     && groupadd --gid 10001 pedigree && useradd --uid 10001 --gid pedigree --no-create-home pedigree \

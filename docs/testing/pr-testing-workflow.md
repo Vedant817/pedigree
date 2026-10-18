@@ -46,16 +46,9 @@ deployment step should confirm that the host can keep a persistent volume for bo
 `/data` (graph + credentials) and the FalkorDB data directory, and that it can build
 from the committed `Dockerfile` and `docker-compose.yml`.
 
-#### `docker-compose.yml` is demo-only — deploy from the `Dockerfile`
+#### Production launch configuration
 
-Verified: the Compose `pedigree` service hard-codes `PEDIGREE_SEED_DEMO: "1"` and passes
-through **no** admin token, HMAC secret, ACL flag or public URL, with no `env_file`. It
-therefore cannot express a production deployment. A host pointed at this Compose file gets
-a demo-mode service with deployment-admin routes disabled.
-
-Consequence for the deployment step: build from the **`Dockerfile`** and set the
-environment on the service, using the FalkorDB image the Compose file already pins. The
-compose file remains the local development and demo path.
+Default Compose now starts empty with required credentials and a persistent authenticated database. The optional synthetic setup is explicitly named `docker-compose.demo.yml`. See `docs/PRODUCTION_OPERATIONS.md`. Source configuration is not hosted deployment proof.
 
 ### 1.1b Live deployment (current state)
 
