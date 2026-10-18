@@ -386,7 +386,7 @@ WHERE p.status IN ['revoked','tainted','quarantined'] RETURN count(n)
 
 # Weak connectivity of lineage, excluding session/history/receipt metadata.
 Q_WCC_SUMMARY = """
-CALL algo.WCC({nodeLabels:['Node'], relationshipTypes:['DERIVED_FROM','CORROBORATED_BY']})
+CALL algo.WCC({nodeLabels:['Source','Memory','Action'], relationshipTypes:['DERIVED_FROM','CORROBORATED_BY']})
 YIELD node, componentId
 WHERE node:Source OR node:Memory OR node:Action
 RETURN componentId, count(node) AS size
