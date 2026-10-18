@@ -1,6 +1,6 @@
 # Development handoff
 
-- **Active work area:** tenant database ACL service wiring; branch `feat/tenant-db-acl-20261018`. Dedicated isolated test DB only; no checkpoint or spool edits.
+- **Active work area:** release integration and verification on `release/production-completion-20261018`; independent recovery, native restart durability and operator UI acceptance use isolated delegated worktrees.
 
 Shared status board for concurrent work on Pedigree. One fact per line, evidence over
 opinion. Update it when a milestone moves, not on every commit.
@@ -8,14 +8,26 @@ opinion. Update it when a milestone moves, not on every commit.
 Governing engineering rules live in `AGENTS.md` (canonical). If this file and
 `AGENTS.md` disagree, `AGENTS.md` wins.
 
-- **Last updated:** 2026-10-17
-- **Updated by:** feature-development session (Phase F: P-017 capture landed, QA follow-up fixed, full `make check` green)
-- **Product milestone:** Phase F in progress. P-017 synthetic web and shell-read capture
-  is on `main` through `097309d`. Devex QA on the first capture commit passed;
-  correctness and red-team failed that commit, and the code bugs they named are
-  fixed in `097309d` without a new QA report yet. P-023 independent QA closure is
-  still open. Installed Claude capture, disclosure voice, video, and publish stay
-  human-only. See `docs/PROGRESS.md` `CURRENT STATE` for the authoritative live state.
+- **Last updated:** 2026-10-18
+- **Milestone:** local production completion under verification. Empty authenticated
+  containers, tenant DB identities, durable capture receipts, native OpenCode capture,
+  WCC and offline checkpoint recovery are implemented on the integration branch.
+- **Independent evidence:** round-two release review passes its scoped ACL/WCC/native
+  attack checks. Recovery restart durability remains a separate review.
+- **Local gate:** quick suite on this worktree: 948 passed, 3 skipped, 6 deselected,
+  1 xfailed in 411.80s. Ruff, secret scan, `check_numbers` and `check_readme` passed.
+  Log: `scratch/release-check-final.log`.
+- **Rebuilt image:** `pedigree:local` `sha256:25b65a76b24fc22f3a1f489ad571aff531c2d2332c152cadcee9efec3304d4b6`
+  is the healthy container on `127.0.0.1:8110`. A rerun after that rebuild preserved
+  3 nodes and 2 edges across an API and database restart. Browser acceptance on that
+  image: empty token, hidden demo login, invalid credential stays disconnected,
+  operator connect loads the three recorded nodes, dry-run revoke reports taint
+  without changing status, and a lineage check of `git status` allows.
+- **Production blocker:** historical pinned-engine AOF replay crashed two owned test
+  volumes. Recovery compaction passed focused restart tests; broader host-crash
+  durability is not established. See `docs/KNOWN_ISSUES.md`.
+- **External acceptance:** hosted persistent storage, PR previews and automatic
+  preview testing remain unverified. `docs/PROGRESS.md` is the live resume point.
 
 ## 1. Product
 
@@ -39,13 +51,14 @@ Substantially built and independently verified on the local stack:
 | Lineage queries (`/v1/blame`, `/v1/impact`, `/v1/graph`, `/v1/stats`) | implemented, tested |
 | Revoke / reinstate with fixpoint, dry-run, what-if on a graph copy | implemented, tested |
 | Gate with lineage-path reasons and *not in the graph* on unknown ids | implemented, tested |
-| Capture: REST, MCP (stdio + HTTP), Claude Code hook, OpenCode plugin | implemented; plugin is an explicitly gated read-only slice |
+| Capture: REST, MCP (stdio + HTTP), Claude Code hook, OpenCode plugin | native read/write/edit/bash capture locally verified; restart acceptance pending |
 | Operator UI at `/` | implemented |
 | Tenant isolation, indexed auth, per-instance and per-tenant rate limits | implemented |
 | Public input validation and transport-error containment | implemented |
 | Non-root container runtime, pinned DB, locked env, CI workflow | implemented |
-| Service-level FalkorDB ACL credential wiring | **open** |
-| Checkpoint/restore and write-Cypher (WCC) | **not built** |
+| Service-level FalkorDB ACL credential wiring | implemented; real DB boundary checks pass |
+| Offline checkpoint/restore | implemented; independent acceptance pending |
+| Weakly connected components (WCC) | implemented; independent regression checks pass |
 
 `docs/FEATURES.md` and `docs/PROGRESS.md` carry per-feature detail and evidence. Do not
 claim a feature that is not listed there as done.
@@ -56,7 +69,8 @@ Ownership is first-come; claim an area here before starting substantial work on 
 
 | Branch / area | Owner | State |
 |---|---|---|
-| `main` | feature-development session | active; several commits ahead of `origin/main` |
+| `main` | shared baseline | aligned with origin; preserved |
+| `release/production-completion-20261018` | release orchestrator | integration and final verification |
 | Phase D runtime + CI verification | feature-development session | **done** — `docs/qa/P-003.md` (PASS with caveats), `docs/qa/P-028.md` (PASS), `docs/qa/redteam-P-003.md` (PASS); findings in `docs/KNOWN_ISSUES.md` |
 | `chore/agent-guidance-and-pr-testing` (this pass) | automated-testing integration | ready for review |
 | Repository, deployment, PR-testing wiring | **unclaimed** | see section 4 |
@@ -327,8 +341,9 @@ FalkorDB (v4.22.1, module 42201) with `PYTHONPATH=src`, `FALKOR_HOST=127.0.0.1`,
   `[secret-scan] PASS: no credential shapes found in tracked files`; `check_numbers`
   `[check-numbers] PASS: 4 file(s) checked against 70 allowed values`; `check_readme`
   `[check-readme] PASS: 11 headings, docs/*.md links, numbers`.
-- Remaining release work: independent review found a WCC metadata-input defect (fixed in the release branch), inaccurate rename wording (corrected here), and incomplete restore acceptance; recovery verification and Render preview
-  verification stays user-owned.
+- Remaining release work: independent recovery acceptance and native restart
+  markers. Render preview verification stays user-owned. The local quick gate
+  and rebuilt-image browser check recorded above are complete.
 
 ## Checkpoint recovery ownership 2026-10-18
 

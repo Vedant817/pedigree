@@ -1,24 +1,32 @@
 # CURRENT STATE (overwritten after every feature / checkpoint)
 
 - **Date:** 2026-10-18 release completion, continued after provider interruptions.
-- **Integration branch:** `release/production-completion-20261018`; latest committed
-  checkpoint `2947c30`. Original main stays at `fbf6538`; its unrelated untracked
-  testing files are preserved.
+- **Integration branch:** `release/production-completion-20261018`; committed tip
+  `290a741` before this verification record. Original main stays at `fbf6538`;
+  its unrelated untracked testing files are preserved.
 - **Implemented here:** empty authenticated production Compose, durable hosting
   declarations, service-selected tenant database ACLs for REST/MCP/admin recovery,
   lifecycle/startup serialization, bounded weak-component audit, production UI
   capability visibility, and durable Claude capture with resumable graph receipts.
 - **Review artifacts:** draft PR #1 (production foundation) and draft PR #2
   (durable capture), both on the repository. Neither is merged or release-approved.
-- **Verified source checkpoint:** recorded integrated quick suite on this branch:
-  910 passed, 1 skipped, 6 deselected, 1 xfailed. Current final gate is being rerun.
-  New focused harness checks: 2 passed. Harsh-user harness after selected-DB fix:
-  PASS=23 FAIL=0 EXPECTED-FAIL=0 STALE=0 SKIP=0. Full-history secret scan passed.
-- **Real runtime:** separate authenticated production containers on loopback8110;
-  fresh boot had zero tenants. Actual repository configuration inspection produced
-  persisted lineage; revoke/gate/reinstate, what-if nonmutation, cross-tenant denial,
-  unknown-ID refusal and API+DB restart survival passed. The running image predates
-  later source changes and must be rebuilt after final integration.
+- **Verified source checkpoint:** quick suite on this worktree after integration:
+  948 passed, 3 skipped, 6 deselected, 1 xfailed in 411.80s. Ruff, tracked secret
+  scan, `check_numbers` and `check_readme` passed (`scratch/release-check-final.log`).
+  Earlier checkpoint on the same branch: 910 passed, 1 skipped, 6 deselected,
+  1 xfailed. Harsh-user harness after selected-DB fix: PASS=23 FAIL=0
+  EXPECTED-FAIL=0 STALE=0 SKIP=0. Full-history secret scan passed.
+- **Real runtime:** separate authenticated production containers on `127.0.0.1:8110`.
+  The first boot had zero tenants. Repository configuration capture persisted
+  lineage; revoke/gate/reinstate, what-if nonmutation, cross-tenant denial,
+  unknown-ID refusal and API+DB restart survival passed. The container now runs
+  rebuilt `pedigree:local`
+  `sha256:25b65a76b24fc22f3a1f489ad571aff531c2d2332c152cadcee9efec3304d4b6`.
+  A rerun against that image again preserved 3 nodes and 2 edges across restart.
+  Browser check on the same image: invalid operator credential stays disconnected;
+  a valid operator credential loads the three nodes; dry-run revoke would taint 2
+  and leaves every node `ok`; checking `git status` against the healthy source
+  returns allow. Confirmed revoke was not submitted.
 - **In flight:** preserved unfinished checkpoint/restore and installed OpenCode
   read/write/edit/bash changes are being completed in isolated delegated worktrees.
   Independent release security review is running. Do not edit the original abandoned
@@ -29,8 +37,9 @@
   present); account-side false-positive review remains pending. Local TestSprite
   reports passed runs, but recorded assertions are incomplete; coverage is
   inconclusive. No preview-triggered TestSprite approval is claimed.
-- **Next:** integrate reviewed recovery/native capture; run final check/perf and
-  rebuild/retest production persistence; update focused PRs and evidence.
+- **Next:** independent recovery acceptance and native restart-marker review.
+  Hosted persistence, PR preview testing, and the GitGuardian false-positive
+  mark remain human-owned. Draft PRs #1 and #2 are not this integration branch.
 - **Human-owned:** user chose to handle Render billing/resource changes. Hosted
   persistence, PR previews, submission, private security contact and personal
   disclosure statements remain unverified. Claude account is unauthenticated;

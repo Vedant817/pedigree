@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 COPY --from=ghcr.io/astral-sh/uv:0.12.22 /uv /usr/local/bin/uv
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
-    UV_NO_CACHE=1 UV_PYTHON_DOWNLOADS=never \
+    UV_NO_CACHE=1 UV_PYTHON_DOWNLOADS=never UV_HTTP_TIMEOUT=120 \
     PATH=/app/.venv/bin:$PATH PEDIGREE_CREDENTIALS_DIR=/data/credentials
 WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./

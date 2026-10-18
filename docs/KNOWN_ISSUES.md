@@ -18,11 +18,11 @@ that cannot be finished goes here rather than being silently dropped.
 | 11 | 2026-10-15 | P-015 / ADR-011 replaces interim global-admin trust headers with stored tenant agent/operator roles. Agent trusted claims and revoke/reinstate reject; global X-Admin-Token cannot elevate an agent. Explicit operator REST/MCP calls are supported; MCP defaults and hooks require agent credentials. Legacy bearers retain agent privileges and need explicit admin operator issuance. Supplying an operator bearer to an agent grants that authority; host compromise is outside this boundary. | high | closed 2026-10-16; independent P-015 QA/red-team PASS |
 | 12 | 2026-10-15 | Claude hooks have synthetic contract and real localhost HTTP subprocess proof, but no installed-runtime execution. WebFetch/WebSearch and bash `cat`/`head`/`curl`/`wget` reads are captured from synthetic payloads (`tests/fixtures/claude/`, P-017). Glob/Grep, shell writes, and tool-description sources are still not captured. Real Claude Code session fixtures are human-only. The pre-tool gate still applies the ADR-007 read-window floor, so a later command that does not name its own inputs asks when the session has read a now-revoked node. ~~Repeated unmatched file reads create separate Source ids~~ - identity now converges on `(uri, content_hash)` (ADR-008). | high | installed-runtime capture still open; synthetic web and shell-read capture landed 2026-10-17 |
 | 13 | 2026-10-15 | Runtime registry uses ped:registry while unused REGISTRY_GRAPH and original spec say pedigree:registry. Reserved tenant id prevents collision; deployment/ACL docs must use the actual name until migrated. | medium | open, F-13 consistency |
-| 14 | 2026-10-15 | Shell classification is a regex heuristic, not a sandbox. Hook network/malformed-payload failures are fail-open. | medium | documented, F-11 |
-| 15 | 2026-10-15 | The earlier OpenCode spike was quota-blocked. The free-only recheck captured one genuine read-tool before/after pair with a temporary observation plugin; the session final response timed out. An opt-in read-only adapter slice now exists (`adapters/opencode/`, ADR-009) and is hook-replay verified against a live API; installed-session acceptance and write/edit/shell coverage remain unverified. | medium | F-08 implementing; see opencode-recheck-2026-10-16.md, docs/qa/F-08.md, docs/qa/redteam-F-08.md |
+| 14 | 2026-10-15 | Shell classification is a regex heuristic, not a sandbox. Hook network/storage/malformed-payload failures now deny pre-tool execution; offline capture is retained in a scoped durable spool. Actual installed Claude execution remains unverified. | medium | delivery/gate implementation tested locally; installed acceptance open |
+| 15 | 2026-10-15 | Genuine installed OpenCode read/write/edit/bash capture and revoked-input denial are recorded in docs/qa/opencode-native-local.md. Arbitrary shell provenance and cross-session artifact linkage remain unsupported. Durable restart markers and independent native review are in progress. | medium | F-08 QA |
 | 16 | 2026-10-16 | Sources recorded with agent bearers are untrusted, including ordinary file/rules captures, so gate rule 3 `untrusted_influence` fires on irreversible/high-risk actions built on captured evidence. Explicit trusted claims require the tenant operator bearer. The friction cost is NOT MEASURED (no E3b benign corpus); engine/seed and explicit operator paths can create trusted evidence. | low | documented (ADR-011) |
 | 17 | 2026-10-16 | Source identity residuals: a hash-less read after a hashed one of the same uri creates a second node; capture ids from an earlier batch are not resolvable as aliases (only in-batch aliases are). | low | documented (ADR-008) |
-| 18 | 2026-10-16 | Per-tenant DB ACL users are **verified but not wired**: `tests/security/test_acl_mechanism.py` provisions real ACL users (scoped `~ped:<tenant>` / `~ped:<tenant>:wi:*`) and proves cross-namespace denial on v4.22.1, but the service still connects with the shared admin credentials. Tenant isolation in the shipped service is therefore API-level (bearer token -> one graph per tenant, cross-tenant ids 404), with the ACL mechanism proven and the wiring tracked for F-16 hardening. | medium | open (F-16) |
+| 18 | 2026-10-16 | Tenant database identities are now selected by REST/MCP/admin recovery after live bearer resolution. Dedicated ACL secret, namespace restrictions and no-admin-fallback behavior have real DB tests; deployed identity selection requires final-image verification. | medium | implemented; independent local review and runtime evidence tracked separately |
 | 19 | 2026-10-16 | `Db` now holds one FalkorDB connection **per thread** (measured: 160 writers on one connection produced `unavailable`). A deployment that creates unbounded threads therefore creates unbounded connections; the API threadpool is bounded, and `reset()` drops them. | low | documented, mitigated |
 | 20 | 2026-10-16 | Engine writes assume the tenant graph schema exists (`ensure_schema`); the API runs it on every authenticated request, but a direct engine caller (seeder/test) must create it first - `record_source` on a schema-less graph can create duplicate identities under concurrency because the constraints are missing. | low | documented (F-10/F-15 tests call ensure_schema) |
 | 21 | 2026-10-16 | Isolation and E3 scenario fixture teardown previously enumerated and deleted all registered tenants. It now tracks only successful creates owned by that fixture, preserves a real pre-existing sentinel, and reports retained/unknown cleanup failures. Earlier runs cannot establish preservation of pre-existing data. The dedicated synthetic demo was re-seeded after repair; no recovery of arbitrary deleted data is claimed. | high | repaired; docs/qa/test-fixture-ownership.md and e3-fixture-ownership.md PASS; lazy suite sentinel added |
@@ -46,9 +46,10 @@ tenant mutex. Recovery requires stopping writers and confirming DB work is quies
 before deleting the exact key; failover with live writers is outside this guarantee.
 A full graph can reject revoke/reinstate when a new ledger node is needed. See
 [the quota contract](fixes/P-014.md) and ADR-010 for this availability tradeoff.
-F-17 concurrency admission is process-local; checkpoint/restore remains unbuilt.
-F-18 WCC analysis remains unbuilt. These subset passes do not close the ACL service-wiring
-item or establish multi-process what-if coordination.
+F-17 what-if concurrency admission is process-local. Offline checkpoint/restore is
+implemented with stopped-writer acknowledgement, durable journals and AOF compaction;
+independent acceptance remains pending. F-18 WCC and ACL service wiring are implemented
+and tested locally. These changes do not establish multi-process what-if coordination.
 
 P-020 authentication now performs one indexed live digest query; local latency probes
 are acceptance evidence, not a worst-case or production guarantee. Rate accounting is
@@ -65,3 +66,15 @@ Its private disclosure contact remains an explicit human TODO before public rele
 The final [Phase C security review](qa/phase-C-security.md) retains the optional ACL
 secret skip and the strict F-08 read-window watchdog xfail; neither proves deployed
 DB isolation or complete installed-runtime capture.
+
+## Pinned-engine AOF replay defect (2026-10-18)
+
+Two isolated recovery test volumes failed hard restart with exit 139 while replaying
+schema effects for already-deleted historical graphs. Both volumes are retained for
+diagnosis; the original crashed volume was untouched. Offline recovery now completes
+a fresh AOF rewrite before each maintenance reservation/recovery, and its consolidated
+crash tests passed. This mitigation does not fix general v4.22.1 persistence behavior.
+Orderly production-container restart evidence does not close arbitrary host-crash
+durability. Treat this as a high-severity production qualification blocker pending
+independent review and an upstream-supported resolution or verified operational limit.
+See [the reproduction and mitigation evidence](qa/F-17-offline-recovery-local.md).

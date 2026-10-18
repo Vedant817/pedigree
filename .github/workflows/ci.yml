@@ -33,6 +33,7 @@ jobs:
       - name: Start pinned FalkorDB with mandatory limits
         run: |
           docker run -d --name pedigree-ci-db -p 127.0.0.1:6379:6379 \
+            -e 'REDIS_ARGS=--appendonly yes --appendfsync everysec' \
             -e 'FALKORDB_ARGS=TIMEOUT_MAX 60000 TIMEOUT_DEFAULT 20000 QUERY_MEM_CAPACITY 1073741824' \
             falkordb/falkordb:v4.22.1
           for attempt in $(seq 1 60); do
