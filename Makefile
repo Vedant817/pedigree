@@ -7,13 +7,13 @@ PY := .venv/bin/python
 endif
 
 .DEFAULT_GOAL := help
-.PHONY: help setup start-db stop-db db-status test test-quick lint check check-perf eval eval-quick demo seed clean-clone dogfood dogfood-strict
+.PHONY: help setup start-db stop-db db-status test test-quick lint check check-perf eval eval-quick clean-clone dogfood dogfood-strict
 
 help:
 	@echo "Pedigree targets:"
 	@echo "  make setup       create .venv and install the package + dev deps"
-	@echo "  make quickstart  Linux no-Docker: locked install, pinned DB module, seed, serve"
-	@echo "  make quickstart-windows  Windows: locked install + owned Docker DB, seed, serve"
+	@echo "  make quickstart  Linux no-Docker: locked install, pinned DB module, serve"
+	@echo "  make quickstart-windows  Windows: locked install + owned Docker DB, serve"
 	@echo "  make start-db    start FalkorDB v4.22.1 (Docker image, or pinned .so on Linux)"
 	@echo "  make stop-db     stop the local FalkorDB"
 	@echo "  make db-status   show DB reachability and module version"
@@ -24,8 +24,6 @@ help:
 	@echo "  make check-perf  heavy perf gates on the live DB (P-010)"
 	@echo "  make eval        full evaluation run (writes evals/results/*.csv)"
 	@echo "  make eval-quick  2-minute evaluation subset"
-	@echo "  make demo        seed the demo tenant (synthetic scenarios S1+S8)"
-	@echo "  make seed        alias for demo"
 	@echo "  make dogfood     brutal end-to-end user pass (spawns a server; writes scratch/dogfood/)"
 	@echo "  make dogfood-strict  same, but every expected-failure must now pass"
 
@@ -70,9 +68,6 @@ eval:
 
 eval-quick:
 	$(PY) evals/run_all.py --quick
-
-demo seed:
-	$(PY) scripts/seed_demo.py
 
 clean-clone:
 	bash scripts/clean_clone_check.sh

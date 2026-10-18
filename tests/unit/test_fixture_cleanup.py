@@ -41,32 +41,3 @@ def test_isolation_fixture_never_deletes_preexisting_tenant(monkeypatch):
         next(generator)
     assert removed_rows == [owned]
     assert removed_graphs == ["ped:" + owned]
-
-
-def test_e3_fixture_never_deletes_preexisting_tenant(monkeypatch):
-    spec = importlib.util.spec_from_file_location(
-        "e3_fixture_review", Path(__file__).parents[1] / "evals" / "test_e3_scenarios.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    removed = []
-    closed = []
-    registry = SimpleNamespace(gname="ped:registry", list_tenants=lambda: [SimpleNamespace(tenant_id="preexisting")])
-    db = SimpleNamespace(select=lambda graph: SimpleNamespace(delete=lambda: removed.append(graph)),
-                         query=lambda *args: removed.append(args))
-    class Client:
-        def __enter__(self):
-            return self
-        def __exit__(self, *args):
-            closed.append(True)
-        def close(self):
-            closed.append(True)
-    monkeypatch.setattr(module, "Db", lambda settings: db)
-    monkeypatch.setattr(module, "TenantRegistry", lambda db, settings: registry)
-    monkeypatch.setattr(module, "create_app", lambda db, settings: None)
-    monkeypatch.setattr(module, "TestClient", lambda app: Client())
-    generator = module.boundary.__wrapped__()
-    next(generator)
-    with pytest.raises(StopIteration):
-        next(generator)
-    assert removed == []
-    assert closed == [True]

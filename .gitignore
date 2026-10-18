@@ -35,6 +35,7 @@ scratch/
 .pedigree/
 output/playwright/
 .playwright-cli/
+.agents/
 
 # OS noise
 .DS_Store

@@ -24,13 +24,11 @@ try {
     $taskCreated = $true
     $env:FALKOR_HOST = '127.0.0.1'
     $env:FALKOR_PORT = "$taskDbPort"
-    $env:PEDIGREE_SEED_DEMO = '1'
+    $env:PEDIGREE_SEED_DEMO = '0'
     $env:PEDIGREE_ENV = 'local'
     if (-not $env:PEDIGREE_CREDENTIALS_DIR) { $env:PEDIGREE_CREDENTIALS_DIR = Join-Path $taskData 'credentials' }
     & $taskPython scripts/runtime.py wait-db
     if ($LASTEXITCODE -ne 0) { throw 'Database readiness failed' }
-    & $taskPython scripts/seed_demo.py
-    if ($LASTEXITCODE -ne 0) { throw 'Demo seed failed; recover the private credentials or choose a new dedicated tenant' }
     & $taskPython -m uvicorn pedigree.api.app:create_app --factory --host 127.0.0.1 --port $taskApiPort --no-proxy-headers
 } finally {
     if ($taskCreated) {

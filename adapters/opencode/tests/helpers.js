@@ -13,7 +13,7 @@ import { createCore, projectKeyFor } from "../pedigree-core.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = path.resolve(HERE, "..", "..", "..");
-export const FIXTURE_PATH = path.join(REPO_ROOT, "docs", "consults", "opencode-recheck-2026-10-16-shape.json");
+export const FIXTURE_PATH = path.join(HERE, "fixtures", "opencode-recheck-2026-10-16-shape.json");
 
 const REALPATH = typeof fs.realpathSync.native === "function" ? fs.realpathSync.native : fs.realpathSync;
 

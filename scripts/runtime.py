@@ -118,7 +118,7 @@ def module_dependencies(module: Path) -> list[str]:
 def run_db() -> None:
     if platform.system() != 'Linux':
         raise RuntimeError('no-Docker runtime is verified only on Linux; Windows uses Docker')
-    port = int(os.environ.get('FALKOR_PORT', os.environ.get('PORT', '6379')))
+    port = int(os.environ.get('FALKOR_PORT', os.environ.get('PORT', '6379')))\
     free_port(port)
     module = fetch()
     missing = module_dependencies(module)
@@ -155,7 +155,7 @@ def quickstart() -> int:
     free_port(db_port)
     data = Path(os.environ.get('DATA_DIR', str(ROOT / 'data/local'))).resolve()
     env = {**os.environ, 'FALKOR_HOST': '127.0.0.1', 'FALKOR_PORT': str(db_port),
-           'DATA_DIR': str(data), 'PEDIGREE_ENV': 'local', 'PEDIGREE_SEED_DEMO': '1',
+           'DATA_DIR': str(data), 'PEDIGREE_ENV': 'local', 'PEDIGREE_SEED_DEMO': '0',
            'PEDIGREE_CREDENTIALS_DIR': os.environ.get('PEDIGREE_CREDENTIALS_DIR', str(data / 'credentials'))}
     # Settings must match the owned child, never an unrelated .env database.
     os.environ.update({key: env[key] for key in ('FALKOR_HOST', 'FALKOR_PORT')})
@@ -168,7 +168,6 @@ def quickstart() -> int:
         db = subprocess.Popen([sys.executable, __file__, 'db'], env=env, start_new_session=True)
         processes.append(db)
         wait_db(process=db)
-        subprocess.run([sys.executable, str(ROOT / 'scripts/seed_demo.py')], env=env, check=True)
         api = subprocess.Popen([sys.executable, '-m', 'uvicorn', 'pedigree.api.app:create_app',
             '--factory', '--host', '127.0.0.1', '--port', str(port), '--no-proxy-headers'],
             env=env, start_new_session=True)

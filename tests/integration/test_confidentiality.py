@@ -4,23 +4,16 @@ from __future__ import annotations
 
 import pytest
 
-from pedigree.demo import load_scenarios, seed_scenarios
 from pedigree.engine.gate import check_action
-from pedigree.engine.ingest import get_node_statuses
-
-
-def test_s6_fixture_shape():
-    scenario = next(s for s in load_scenarios() if s["id"] == "S6")
-    ids = [node["id"] for node in scenario["nodes"]]
-    assert ids == ["demo_s6_hr", "demo_s6_summary", "demo_s6_write"]
-    assert scenario["nodes"][0]["conf"] == ["hr"]
-    assert all(step["decision"] for step in scenario["expected_gate"])
+from pedigree.engine.ingest import get_node_statuses, record_source, remember
 
 
 def test_confidentiality_blocks_a_public_destination(fresh_graph):
     db, tenant, gname = fresh_graph
-    seed_scenarios(db, tenant)
     summary = "demo_s6_summary"
+    record_source(db, gname, tenant, id="demo_s6_hr", kind="file", uri="file:///hr/notes.txt", conf=["hr"])
+    remember(db, gname, tenant, id=summary, text="HR notes summary", derived_from=["demo_s6_hr"])
+
     # the label inherited from the source at write time
     statuses = get_node_statuses(db, gname, [summary])
     assert statuses[summary] == "ok"
@@ -41,7 +34,7 @@ def test_confidentiality_blocks_a_public_destination(fresh_graph):
     assert allowed["decision"] == "allow"
 
     # a local destination defaults to audience ['local'], which does not include the tag either
-    # (docs/01 section 6.6 rule 2 has no local exemption - the caller declares the clearance)
+    # (the caller declares the clearance)
     local = check_action(db, gname, {"tool": "Write", "summary": "keep local",
                                      "effect": "reversible", "risk": "low"}, relied_on=[summary])
     assert local["decision"] == "block"
@@ -53,10 +46,7 @@ def test_confidentiality_blocks_a_public_destination(fresh_graph):
 
 
 def test_confidentiality_is_inherited_by_dependents(fresh_graph):
-    from pedigree.engine.ingest import remember
-
     db, tenant, gname = fresh_graph
-    from pedigree.engine.ingest import record_source
 
     record_source(db, gname, tenant, id="src_hr", kind="file", uri="hr/x.csv", conf=["hr"])
     remember(db, gname, tenant, id="m1", text="a", derived_from=["src_hr"])
@@ -74,8 +64,6 @@ def test_confidentiality_is_inherited_by_dependents(fresh_graph):
     (["public", "hr", "legal"], "allow"),   # the full superset is the boundary
 ])
 def test_audience_superset_is_the_boundary(fresh_graph, audience, decision):
-    from pedigree.engine.ingest import record_source, remember
-
     db, tenant, gname = fresh_graph
     record_source(db, gname, tenant, id="src_hr2", kind="file", uri="hr/y.csv", conf=["hr", "legal"])
     remember(db, gname, tenant, id="m", text="c", derived_from=["src_hr2"])

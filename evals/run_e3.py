@@ -13,7 +13,8 @@ from pedigree.api.app import create_app
 from pedigree.api.registry import TenantRegistry
 from pedigree.config import Settings, graph_name
 from pedigree.db.client import Db
-from pedigree.demo import load_scenarios
+
+from .scenarios import load_scenarios
 
 ADMIN = "e3-operator"
 

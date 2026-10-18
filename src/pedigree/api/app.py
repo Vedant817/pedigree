@@ -209,8 +209,7 @@ def create_app(db: Db | None = None, settings=None, *, limiter: RateLimiter | No
     def ui_configuration(request: Request):
         from .auth import check_peer
         check_peer(request)
-        local = request.client is not None and request.client.host in {"127.0.0.1", "::1", "testclient"}
-        return JSONResponse({"demo_login": bool(settings.pedigree_demo_login and local),
+        return JSONResponse({"demo_login": False,
                              "api_docs": bool(_docs_url(settings))},
                             headers={"Cache-Control": "no-store"})
 
@@ -221,7 +220,6 @@ def create_app(db: Db | None = None, settings=None, *, limiter: RateLimiter | No
     routes.admin.register(app, registry, settings)
     routes.metrics.register(app, settings)
     routes.engine.register(app, db, registry, settings)
-    routes.demo_login.register(app, registry, settings)
     routes.events.register(app, db, registry, settings)
     routes.gate.register(app, db, registry, settings)
     routes.workspace.register(app, db)

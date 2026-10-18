@@ -6,8 +6,10 @@
   fetch('/v1/ui/config', {cache:'no-store', redirect:'error'})
     .then(response => response.ok ? response.json() : {})
     .then(config => {
-      $('demo-login').hidden = config.demo_login !== true;
-      $('api-reference').hidden = config.api_docs !== true;
+      const demoBtn = $('demo-login');
+      if (demoBtn) demoBtn.hidden = config.demo_login !== true;
+      const apiRef = $('api-reference');
+      if (apiRef) apiRef.hidden = config.api_docs !== true;
     }).catch(() => {});
   let token = '', epoch = 0, nodes = [], selected = null, graph = null, preview = null, confirming = false;
   const colors = {ok:'#3483ac', tainted:'#ad3549', preserved:'#177c69', revoked:'#45485e', quarantined:'#a96808'};
@@ -71,7 +73,7 @@
       button.append(text('small', `${node.type} · ${node.status}${node.tool ? ' · ' + node.tool : ''}`));
       button.addEventListener('click', () => select(node.id)); fragment.append(button);
     }
-    if (!matches.length) fragment.append(text('p',nodes.length ? 'No nodes match your search.' : 'No recorded nodes. Run capture or seed the dedicated demo tenant.','empty'));
+    if (!matches.length) fragment.append(text('p',nodes.length ? 'No nodes match your search.' : 'No recorded nodes. Connect an agent hook or record nodes to see lineage.','empty'));
     $('node-list').replaceChildren(fragment);
     if (focusedId) [...$('node-list').querySelectorAll('button')].find(b=>b.dataset.nodeId === focusedId)?.focus({preventScroll:true});
   }
@@ -120,19 +122,6 @@
   }
   function snapshot() { return {id:selected?.id,reason:$('reason').value,depth:$('depth').value,epoch}; }
   function same(a,b) { return a && a.id === b.id && a.reason === b.reason && a.depth === b.depth && a.epoch === b.epoch; }
-  $('demo-login').addEventListener('click',async ()=>{
-    $('demo-login').disabled = true;
-    try {
-      const response = await fetch('/v1/demo/session',{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',redirect:'error'});
-      const result = await response.json();
-      if (!response.ok) throw new Error(response.status === 403 ? 'Demo login is only available from this machine.' : 'Demo login is not enabled, or this machine has no local demo credential.');
-      if (result.role !== 'agent' || typeof result.token !== 'string' || !result.token) throw new Error('Demo login did not return an agent credential.');
-      reset(); token = result.token; await refresh();
-      $('connection').textContent = 'Connected'; $('connection').className = 'connection active'; $('disconnect').hidden = false;
-      notice('Connected to the local demo as an agent. Revocation still needs the operator credential.');
-    } catch(error) { reset(); fail(error); }
-    finally { $('demo-login').disabled = false; }
-  });
   $('connect-form').addEventListener('submit',async event => {
     event.preventDefault(); const candidate = $('token').value.trim(); reset(); token = candidate;
     $('connect-button').disabled = true;
@@ -184,8 +173,7 @@
         text('p',`Selected root: ${current.id}. Preview has made no changes.`));
       effects(result.actions || impact.actions); $('confirm').hidden = false; $('cancel').hidden = false;
       showTrace(result);
-    } catch(error) {invalidatePreview();fail(error);} finally {controls();}
-  });
+    } catch(error) {invalidatePreview();fail(error);} finally {controls();}\n  });
   $('confirm').addEventListener('click',async()=>{
     if (confirming || !same(preview,snapshot())) return;
     const current = preview; confirming = true; $('confirm').disabled = true;

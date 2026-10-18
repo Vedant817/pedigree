@@ -1,4 +1,4 @@
-"""Pedigree command line: cross-platform DB lifecycle, service, seeding (ADR-003).
+"""Pedigree command line: cross-platform DB lifecycle, service (ADR-003).
 
 `pedigree db start` prefers Docker (pinned image falkordb/falkordb:v4.22.1 with the
 mandatory module args) and falls back to the Linux no-Docker path
@@ -343,7 +343,6 @@ def main(argv: list[str] | None = None) -> int:
                               help="acknowledge all database work is quiescent before removing a stranded mutex")
     p_checkpoint.add_argument("--rollback", action="store_true", help="recover the pre-restore graph")
 
-    sub.add_parser("seed", help="seed the demo tenant (synthetic scenarios)")
     sub.add_parser("version", help="print version")
 
     args = parser.parse_args(argv)
@@ -371,14 +370,6 @@ def main(argv: list[str] | None = None) -> int:
         return reconcile_stragglers(settings, args.tenant)
     if args.cmd == "checkpoint":
         return checkpoint_command(settings, args)
-    if args.cmd == "seed":
-        from . import __version__  # noqa: F401  (import check)
-
-        script = os.path.join("scripts", "seed_demo.py")
-        if not os.path.exists(script):
-            print("[seed] scripts/seed_demo.py not implemented yet", file=sys.stderr)
-            return 1
-        return subprocess.run([sys.executable, script], check=False).returncode
     if args.cmd == "version":
         from . import __version__
 

@@ -11,8 +11,7 @@ RUN uv sync --frozen --no-dev --no-editable \
     && uv lock --check \
     && groupadd --gid 10001 pedigree && useradd --uid 10001 --gid pedigree --no-create-home pedigree \
     && mkdir -p /data/credentials && chown -R pedigree:pedigree /data && chmod 700 /data /data/credentials
-COPY scripts/entrypoint.sh scripts/seed_demo.py scripts/runtime.py ./scripts/
-COPY demo/scenarios ./demo/scenarios
+COPY scripts/entrypoint.sh scripts/runtime.py ./scripts/
 USER 10001:10001
 EXPOSE 8000
 VOLUME ["/data"]

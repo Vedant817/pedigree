@@ -10,14 +10,6 @@ from pedigree.api.app import create_app
 from pedigree.config import Settings
 
 
-def seed_module():
-    path = Path(__file__).resolve().parents[2] / 'scripts/seed_demo.py'
-    spec = importlib.util.spec_from_file_location('runtime_seed', path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
 def test_demo_denies_deployment_admin_even_with_correct_token(fresh_graph):
     db, _, _ = fresh_graph
     app = create_app(db, Settings(_env_file=None, pedigree_seed_demo=True,
@@ -31,40 +23,6 @@ def test_demo_denies_deployment_admin_even_with_correct_token(fresh_graph):
             assert client.request(method, route, json=payload,
                 headers={'X-Admin-Token': 'runtime-test-admin'}).status_code == 403
 
-
-def test_seed_boot_fails_if_existing_tenant_has_no_local_credential(monkeypatch, tmp_path, capsys):
-    module = seed_module()
-    monkeypatch.setenv('PEDIGREE_CREDENTIALS_DIR', str(tmp_path))
-    monkeypatch.setattr(module, 'Db', lambda: object())
-    monkeypatch.setattr(module, 'TenantRegistry', lambda db: SimpleNamespace())
-    monkeypatch.setattr(module, 'ensure_demo_tenant', lambda *args: None)
-    monkeypatch.setattr(module, 'seed_scenarios', lambda *args: pytest.fail('must fail before seed'))
-    assert module.main() == 1
-    err = capsys.readouterr().err
-    assert 'restore the private file' in err and 'dedicated' in err
-    assert 'token' not in err.lower()  # never echo credential material
-
-
-def test_seed_refuses_revoked_demo_tenant_with_actionable_error(tmp_path):
-    module = seed_module()
-    registry = SimpleNamespace(get_record=lambda tenant: SimpleNamespace(status='revoked'))
-    with pytest.raises(module.SeedError):
-        module.ensure_demo_tenant(registry, 'demo', tmp_path)
-
-
-def test_seed_boot_uses_configured_durable_credentials_directory(monkeypatch, tmp_path):
-    module = seed_module()
-    monkeypatch.setenv('PEDIGREE_CREDENTIALS_DIR', str(tmp_path))
-    monkeypatch.setattr(module, 'Db', lambda: object())
-    monkeypatch.setattr(module, 'TenantRegistry', lambda db: SimpleNamespace())
-    calls = []
-    def ensure(registry, tenant, directory):
-        calls.append(directory)
-        return directory / 'demo-demo.json'
-    monkeypatch.setattr(module, 'ensure_demo_tenant', ensure)
-    monkeypatch.setattr(module, 'seed_scenarios', lambda *args: {'created': 0})
-    assert module.main() == 0
-    assert calls == [tmp_path]
 
 @pytest.mark.parametrize('version,expected', [(42201, 200), (42200, 503), (None, 503)])
 def test_readiness_requires_pinned_module(version, expected):

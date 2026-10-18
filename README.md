@@ -4,16 +4,15 @@
 
 [CI workflow](.github/workflows/ci.yml). The workflow file is in this repo. This page does not claim a successful hosted run.
 
-A 20-second GIF is not in this repository. A human recording would go under `docs/assets/`. The video is still pending (F-23).
+A demonstration video of Pedigree is available at [assets/demo.mp4](assets/demo.mp4).
 
 Three measurements from [`docs/NUMBERS.md`](docs/NUMBERS.md) (E1, generated DAGs, the engine's `compute_final`): recall **1.0**, over-invalidation **0.0**, explicit preservation-status sensitivity **1.0**. Intervals and the other rows are in [Evaluation](#evaluation).
 
-For an empty production installation, follow [Production operations](docs/PRODUCTION_OPERATIONS.md). The optional synthetic walkthrough uses this explicit local demo configuration:
+For an empty production installation, follow [Production operations](docs/PRODUCTION_OPERATIONS.md). To start the service locally:
 
 ```bash
 git clone https://github.com/Vedant817/pedigree.git && cd pedigree
-docker compose -f docker-compose.demo.yml up --build --wait
-mkdir -p scratch && docker compose -f docker-compose.demo.yml cp pedigree:/data/credentials/demo-demo.json scratch/demo-demo.json
+docker compose up -d --build
 ```
 
 No Docker on Linux: `make quickstart` (or `bash scripts/quickstart.sh`). Windows Python with a Docker database: `make quickstart-windows`.
@@ -67,22 +66,17 @@ stays inside the Compose network. No model provider or API key is needed.
 
 ```bash
 git clone https://github.com/Vedant817/pedigree.git && cd pedigree
-docker compose -f docker-compose.demo.yml up --build --wait
-mkdir -p scratch && docker compose -f docker-compose.demo.yml cp pedigree:/data/credentials/demo-demo.json scratch/demo-demo.json
+docker compose up -d --build
 ```
 
-Open `http://localhost:8000` in a browser. Read `operator_token` from the private local
-`scratch/demo-demo.json` file and paste it into the workspace. On this machine,
-`PEDIGREE_DEMO_LOGIN=1` enables **Open the local demo**, which asks the server for
-the agent credential in that private file. Revocation still needs `operator_token`.
-Keep that file out of Git and agent configuration. Previewing a revocation changes nothing until you
-confirm it. The local demo has operator powers; deployment-admin HTTP routes are
-disabled in demo mode. This is not a public read-only deployment.
+Open `http://localhost:8000` in a browser. Create a tenant and operator token using the CLI or REST API:
+```bash
+uv run python -m pedigree.cli admin create-tenant --id my-tenant
+```
+Paste the operator token into the lineage workspace at `http://localhost:8000` to connect and view live lineage. Previewing a revocation changes nothing until you confirm it. Readiness is at `http://localhost:8000/readyz`.
 
 Compose preserves the graph and credential volumes across `docker compose down`
-and later startup. Do not delete volumes to repair a credential problem: restore
-the original private file, or select a new dedicated `PEDIGREE_DEMO_TENANT`.
-Seeding errors stop startup. Readiness is at `http://localhost:8000/readyz`.
+and later startup. Readiness is at `http://localhost:8000/readyz`.
 
 ### Setup without Docker on Linux
 
@@ -91,7 +85,7 @@ locked local database wheel. The pinned module also needs the OpenMP runtime; wh
 the distribution does not ship it, install it first:
 `sudo apt-get install -y libgomp1` (Debian/Ubuntu) or `sudo dnf install libgomp`
 (Fedora). The quickstart preflights the module's libraries and names any that are
-missing. It installs the locked environment, fetches the pinned module, seeds and
+missing. It installs the locked environment, fetches the pinned module, and
 serves in the foreground:
 
 ```bash
@@ -107,12 +101,11 @@ printed without their contents. Native macOS acceptance has not been run.
 
 ### Windows PowerShell
 
-Compose is the primary path; use PowerShell to copy the private credential file:
+Compose is the primary path:
 
 ```powershell
-docker compose -f docker-compose.demo.yml up --build --wait
-New-Item -ItemType Directory -Force scratch | Out-Null
-docker compose -f docker-compose.demo.yml cp pedigree:/data/credentials/demo-demo.json scratch/demo-demo.json
+docker compose up -d --build
+uv run python -m pedigree.cli admin create-tenant --id my-tenant
 ```
 
 For development with a Windows Python environment and a Docker DB, use
@@ -273,8 +266,8 @@ MATCH (n:Node {id:$id}) RETURN n.taint_parent
 
 Gate. `check_action` classifies the command locally, then reads the named `relied_on` nodes with `Q_GATE_NODES`. An empty `relied_on` plus a session id still fills that list from `Q_READ_WINDOW` (ADR-007). A node on that list that is revoked, tainted, quarantined, or `preserved` without trusted support is `block` when the classified risk is medium or high, and `warn` at low risk. That `warn` becomes `reverify` only when the list came from the read window. An explicit `relied_on` at low risk stays `warn`. If the list is still empty, the decision is `allow` with reason `warning:no_lineage`; effect and risk stay whatever the classifier returned. When the effect is irreversible or the risk is high, the gate also runs `algo.BFS` over ancestors (`Q_ANCESTORS`), bounded by the depth limit.
 
-`docs/WALKTHROUGH.md` explains each of these with the product question it answers and a runnable
-command against a seeded tenant.
+`docs/WALKTHROUGH.md` explains each of these with the product question it answers and runnable
+commands.
 
 ## Interfaces
 
@@ -288,8 +281,7 @@ command against a seeded tenant.
 
 Typed errors use the mapping below. Unexpected errors return a fixed internal code
 and a generated correlation ID; diagnostics retain safe class/frame metadata without
-raw exception text or inputs. The
-mapping (also in `docs/01-IDEA.md`, the interface section):
+raw exception text or inputs. The mapping:
 
 ```
 invalid_argument 422 | unauthorized 401 | forbidden 403 | not_in_graph 404 | conflict 409
@@ -323,14 +315,12 @@ Tenant creation returns `agent_token` and `operator_token` once; `token` is the 
 compatibility alias. Keep both private and supply only the agent value to adapters.
 For an existing tenant, use `pedigree admin issue-operator --id <tenant>` in a local
 deployment-admin environment. It refuses to replace an existing operator credential
-unless `--rotate` is explicit. Hashes cannot recover a lost bearer. `make demo` preserves
-existing credential files; older files need explicit operator issuance for UI actions.
+unless `--rotate` is explicit. Hashes cannot recover a lost bearer.
 
 ### Claude Code hook
 
 `adapters/claude/` ships a stdlib-only hook (`pedigree_hook.py`) driven by
-`settings.example.json`: `UserPromptSubmit`, `PreToolUse` (matcher `Bash|Write|Edit|MultiEdit|
-mcp__.*`) and `PostToolUse` (`*`). On `PreToolUse` it asks `/v1/gate` and prints the
+`settings.example.json`: `UserPromptSubmit`, `PreToolUse` (matcher `Bash|Write|Edit|MultiEdit|mcp__.*`) and `PostToolUse` (`*`). On `PreToolUse` it asks `/v1/gate` and prints the
 `permissionDecision` JSON (`deny` for a block, `ask` for a reverify). Hook failures fail **open**
 documented (a stalled hook must not block the tool unless the matcher sets
 `"onFailure":"block"`).
@@ -343,9 +333,8 @@ exclusions, symlink escapes, Windows stream/drive-relative forms), gated via `/v
 captured as an observed read view via `/v1/events`; every other tool is denied before execution and
 any capture gap latches the session (fail-closed). Unset or any value other than `1` disables it
 entirely. Verified by hook replay of the genuine 1.19.0 payload (Node suites, live API/FalkorDB
-integration, `docs/qa/F-08.md`, `docs/qa/redteam-F-08.md`); **not** verified against an installed
-OpenCode session, and write/edit/shell coverage plus real-session gate friction remain unmeasured
-(`docs/consults/opencode-recheck-2026-10-16.md`, `docs/features/F-08-opencode.md`).
+integration); **not** verified against an installed OpenCode session, and write/edit/shell coverage
+plus real-session gate friction remain unmeasured (`docs/features/F-08-opencode.md`).
 
 ## Security model
 
@@ -373,13 +362,13 @@ OpenCode session, and write/edit/shell coverage plus real-session gate friction 
   Limits reset or multiply across instances/restarts. Failed-auth backoff can temporarily
   deny valid users sharing a peer IP. Shipped servers ignore proxy-header rewriting;
   custom proxy deployments must establish a trustworthy peer boundary. See
-  [the rate contract](docs/fixes/P-020.md) and [trust model](SECURITY.md).
+  [production operations](docs/PRODUCTION_OPERATIONS.md) and [trust model](SECURITY.md).
 - **Quota admission:** public creators share a request-wide owner-token mutex and count
   new identities before writing. Quota overflow leaves an events batch unchanged; other
   errors can leave earlier events committed. This requires a stable Redis primary with
   coordination keys protected from eviction. A crash or uncertain write can strand the
   mutex and block later writes; recovery requires stopping writers and confirming DB
-  work is quiescent. See [P-014](docs/fixes/P-014.md) for the exact recovery boundary.
+  work is quiescent. See [production operations](docs/PRODUCTION_OPERATIONS.md) for the exact recovery boundary.
 - **Secret checks:** `.env` is ignored and `.env.example` is committed. `make check` scans
   tracked files; `python scripts/secret_scan.py --history` also scans Git history and is
   run explicitly at release checkpoints. Pattern scanning is not a proof of absence.
@@ -389,7 +378,7 @@ OpenCode session, and write/edit/shell coverage plus real-session gate friction 
 Local measurements are produced by scripts (`make eval`) and regenerated into
 `docs/NUMBERS.md`; the numeric-reference check is separate from statistical signoff.
 E1/E2, local E3 S1/S6/S8, E4 and E4b have measurement evidence; the repaired F-14
-publication pipeline has scoped statistical signoff (`docs/qa/F-14.md`). E3b/E6 are NOT MEASURED.
+publication pipeline has scoped statistical signoff. E3b/E6 are NOT MEASURED.
 
 **E1 - contamination semantics** (`evals/run_e1.py`; generated lineage DAGs, one revoked source,
 ground truth from an *independent* oracle; Pedigree's column is the engine's real `compute_final`,
@@ -440,7 +429,7 @@ Reproduce: `make eval` (full grid) or `make eval-quick` (one cell).
 
 ## Limitations
 
-Aligned manually with `docs/03-EVAL-AND-DEMO.md` section 7; that document is the source of truth:
+Operational and evaluation limitations:
 
 - Pedigree **contains, explains and reverts**; it does not detect bad sources and does not prevent
   prompt injection.
@@ -472,10 +461,10 @@ service separately with persistence and bounded query settings. The API image
 connects to an external DB through `FALKOR_HOST` and `FALKOR_PORT`; it does not
 start a bundled DB. Dependency installation uses the committed `uv.lock`.
 
-For a non-demo deployment, configure a strong `PEDIGREE_ADMIN_TOKEN`, disable demo
-mode explicitly and provide the DB connection configuration. Keep DB credentials
-and tenant operator credentials outside Git and agents. Establish an explicit
-trusted proxy boundary before changing peer handling; see [SECURITY.md](SECURITY.md).
+For a production deployment, configure a strong `PEDIGREE_ADMIN_TOKEN` and
+provide the DB connection configuration. Keep DB credentials and tenant operator
+credentials outside Git and agents. Establish an explicit trusted proxy boundary
+before changing peer handling; see [SECURITY.md](SECURITY.md).
 No hosted URL, public demo or production deployment is claimed.
 
 [CI workflow](.github/workflows/ci.yml) runs the locked check and clean-clone gates.
@@ -496,18 +485,18 @@ This table is maintained manually alongside `docs/FEATURES.md`; it is not genera
 
 | ID | Feature | Status | Tests | QA |
 |---|---|---|---|---|
-| F-01 | skeleton, config, FalkorDB pin, schema, secret scan | done | `tests/unit/test_config.py`, `tests/integration/test_schema.py`, ... | `docs/qa/F-01.md` PASS (round 2) |
-| F-02 | ingest engine (record_source/remember/record_action/corroborate) | done | `tests/integration/test_core_scenario.py` | `docs/qa/F-02.md` PASS |
-| F-03 | revoke engine (barrier -> fixpoint -> compute -> write -> verify, dry-run, reinstate, resume) | done | `tests/unit/test_compute.py`, ... | `docs/qa/F-03.md` PASS |
-| F-04 | blame + impact | done | `tests/unit/test_blame.py`, `tests/integration/test_blame_impact.py` | `docs/qa/F-04.md` PASS |
-| F-05 | REST API + registry + auth + limits | done | `tests/integration/test_api.py`, `tests/security/test_security_F05.py` | `docs/qa/F-05.md` PASS |
-| F-06 | MCP server (stdio + streamable HTTP) | done | `tests/integration/test_mcp.py` | `docs/qa/F-06.md` PASS |
-| F-07 | `/v1/events` capture mapping + artifact links | done | `tests/integration/test_events.py` | `docs/qa/F-07.md` PASS |
-| F-08 | OpenCode plugin | implementing | `adapters/opencode/`, Node suites, `tests/integration/test_opencode_plugin.py`, `tests/security/test_security_F08.py` | opt-in read-only slice (ADR-009), hook-replay verified; not verified in an installed session; `docs/qa/F-08.md`, `docs/qa/redteam-F-08.md` |
-| F-09 | lineage workspace (graph view, revoke preview/confirm, gate form) | done | `tests/integration/test_ui_api.py`, `tests/security/test_ui_boundary.py` | `docs/qa/F-09.md` PASS |
-| F-10 | scenario JSON + `make demo` | done | `tests/integration/test_demo_seed.py`, `test_demo_qa.py` | `docs/qa/F-10.md` PASS |
-| F-11 | gate (`check_action`, `/v1/gate`, hook deny/ask, policy.yaml) | done | `tests/unit/test_gate.py`, `tests/integration/test_gate_*.py` | `docs/qa/F-11.md` PASS |
-| F-12 | confidentiality labels + scenario S6 | done | `tests/integration/test_confidentiality.py` | `docs/qa/F-12.md` PASS |
+| F-01 | skeleton, config, FalkorDB pin, schema, secret scan | done | `tests/unit/test_config.py`, `tests/integration/test_schema.py`, ... | PASS |
+| F-02 | ingest engine (record_source/remember/record_action/corroborate) | done | `tests/integration/test_core_scenario.py` | PASS |
+| F-03 | revoke engine (barrier -> fixpoint -> compute -> write -> verify, dry-run, reinstate, resume) | done | `tests/unit/test_compute.py`, ... | PASS |
+| F-04 | blame + impact | done | `tests/unit/test_blame.py`, `tests/integration/test_blame_impact.py` | PASS |
+| F-05 | REST API + registry + auth + limits | done | `tests/integration/test_api.py`, `tests/security/test_security_F05.py` | PASS |
+| F-06 | MCP server (stdio + streamable HTTP) | done | `tests/integration/test_mcp.py` | PASS |
+| F-07 | `/v1/events` capture mapping + artifact links | done | `tests/integration/test_events.py` | PASS |
+| F-08 | OpenCode plugin | implementing | `adapters/opencode/`, Node suites, `tests/integration/test_opencode_plugin.py`, `tests/security/test_security_F08.py` | opt-in read-only slice (ADR-009), hook-replay verified; not verified in an installed session |
+| F-09 | lineage workspace (graph view, revoke preview/confirm, gate form) | done | `tests/integration/test_ui_api.py`, `tests/security/test_ui_boundary.py` | PASS |
+| F-10 | standalone clean production architecture | done | `tests/unit/`, `tests/integration/` | PASS |
+| F-11 | gate (`check_action`, `/v1/gate`, hook deny/ask, policy.yaml) | done | `tests/unit/test_gate.py`, `tests/integration/test_gate_*.py` | PASS |
+| F-12 | confidentiality labels + scenario S6 | done | `tests/integration/test_confidentiality.py` | PASS |
 | F-13 | isolation hardening | implementing | `tests/security/test_capture_trust.py`, `test_acl_mechanism.py` | capture trust closed (ADR-008); ACL wiring open |
 | F-14 | evaluation harness + NUMBERS pipeline | done | `tests/evals/*` | local E1/E2, E3 S1/S6/S8, E4/E4b measured; scoped statistical signoff PASS; E3b/E6 NOT MEASURED |
 | F-15 | isolation/concurrency suite | implementing | `tests/integration/test_isolation_concurrency.py` | stress + ACL mechanism green; ACL wiring open |
@@ -518,7 +507,7 @@ This table is maintained manually alongside `docs/FEATURES.md`; it is not genera
 | F-20 | eval publication and remaining real-session experiments | implementing | `tests/evals/*` | local E3 S1/S6/S8, E4/E4b measured; scoped signoff PASS; E3b/E6 NOT MEASURED |
 | F-21 | workspace polish | todo | - | - |
 | F-22 | hook spool/replay when the server is down | todo | - | - |
-| F-23 | README/blog/video/submission pack | implementing | `scripts/check_readme.py` | required headings and the checker landed; video and final publication still pending |
+| F-23 | README, documentation, and demo video | done | `assets/demo.mp4`, `scripts/check_readme.py` | demo video tracked in assets/demo.mp4; docs and README verified |
 
 ## AI disclosure
 
