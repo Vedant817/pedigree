@@ -30,6 +30,15 @@ def test_components_limit_is_explicit_and_empty_is_not_failure(fresh_graph):
     assert result["truncated"] is True
 
 
+def test_metadata_cannot_bridge_otherwise_disconnected_lineage(fresh_graph):
+    db, _, graph = fresh_graph
+    db.query(graph, "CREATE(a:Node:Action {id:'a'}), (b:Node:Action {id:'b'}),"
+             "(s:Node:Session {id:'session'}), (a)-[:DERIVED_FROM]->(s),"
+             "(b)-[:DERIVED_FROM]->(s)")
+    result = weak_components(db, graph)
+    assert sorted(component["nodes"] for component in result["components"]) == [1, 1]
+
+
 def test_components_query_failure_propagates(fresh_graph, monkeypatch):
     from pedigree.errors import Unavailable
 
