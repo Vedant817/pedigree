@@ -1,4 +1,4 @@
-"""Manual independent release probe. Only run against the named owned 6385 DB.
+"""Manual independent release probe. Only run against a named owned review DB.
 
 Not collected by pytest: restarts an explicitly named disposable Docker container.
 No existing application, volume, or deployment is used.
@@ -23,12 +23,15 @@ from pedigree.db.client import Db
 
 def main():
     container = os.environ["INDEPENDENT_QA_CONTAINER"]
-    assert container == "pedigree-independent-qa-20261018-6385"
+    ports = {"pedigree-independent-qa-20261018-6385": "6385",
+             "pedigree-round2-6389": "6389"}
+    assert container in ports
+    db_port = ports[container]
     info = json.loads(subprocess.check_output(["docker", "inspect", container], text=True))[0]
     assert info["Config"]["Image"] == "falkordb/falkordb:v4.22.1"
     assert info["Mounts"] == []
-    assert info["NetworkSettings"]["Ports"]["6379/tcp"] == [{"HostIp": "127.0.0.1", "HostPort": "6385"}]
-    assert os.environ["FALKOR_PORT"] == "6385"
+    assert info["NetworkSettings"]["Ports"]["6379/tcp"] == [{"HostIp": "127.0.0.1", "HostPort": db_port}]
+    assert os.environ["FALKOR_PORT"] == db_port
     db = Db(Settings(_env_file=None))
     assert db.module_version() == 42201
     registry = TenantRegistry(db)
@@ -43,7 +46,7 @@ def main():
     tenant = "runtime" + uuid.uuid4().hex[:10]
     child = None
     with socket.socket() as reservation:
-        reservation.bind(("127.0.0.1", 0))
+        reservation.bind(("127.0.0.1", 8119 if db_port == "6389" else 0))
         port = reservation.getsockname()[1]
     origin = f"http://127.0.0.1:{port}"
     with tempfile.TemporaryDirectory(prefix="pedigree-independent-") as temporary:
